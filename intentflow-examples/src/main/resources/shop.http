@@ -1,0 +1,126 @@
+### IntentFlow Shop API — run with the IntelliJ / VS Code REST client.
+### Start the app first: gradle :intentflow-examples:bootTestRun
+@base = http://localhost:8080
+
+### --- AI search -------------------------------------------------------------
+
+### Simple filter
+GET {{base}}/api/search?q=apple laptops under 2000
+
+### Sorting + limit
+GET {{base}}/api/search?q=top 5 best rated headphones
+
+### Routes to another service
+GET {{base}}/api/search?q=vip customers from germany or france
+
+### Dates relative to today
+GET {{base}}/api/search?q=orders placed in the last 3 months, newest first
+
+### Scoped search: only products are offered to the LLM, response items are Product JSON
+GET {{base}}/api/products/search?q=samsung phones under 1000 dollars
+
+### Scoped search on orders
+GET {{base}}/api/orders/search?q=cancelled orders this year
+
+### Nothing matches -> 200 with empty rows, uri points at the collection
+GET {{base}}/api/search?q=products that cost more than 100000 dollars
+
+### Hidden field -> 422 "Can't answer that"
+GET {{base}}/api/search?q=products sorted by supplier cost
+
+### Blank query -> 400
+GET {{base}}/api/search?q=
+
+### --- Products ---------------------------------------------------------------
+
+GET {{base}}/api/products?page=0&size=10
+
+###
+GET {{base}}/api/products/1
+
+###
+POST {{base}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Galaxy Z Fold 7",
+  "brand": "Samsung",
+  "category": "PHONE",
+  "price": 1999.00,
+  "rating": 4.4,
+  "stock": 12,
+  "active": true,
+  "supplierCost": 1400.00
+}
+
+### Validation error -> 400 with per-field errors
+POST {{base}}/api/products
+Content-Type: application/json
+
+{
+  "name": "",
+  "brand": "Acme",
+  "category": "TOASTER",
+  "price": -1,
+  "rating": 7,
+  "stock": -3,
+  "active": true,
+  "supplierCost": 1
+}
+
+###
+PUT {{base}}/api/products/1
+Content-Type: application/json
+
+{
+  "name": "MacBook Air 13 M3",
+  "brand": "Apple",
+  "category": "LAPTOP",
+  "price": 999.00,
+  "rating": 4.8,
+  "stock": 140,
+  "active": true,
+  "supplierCost": 865.83
+}
+
+###
+DELETE {{base}}/api/products/40
+
+### --- Customers --------------------------------------------------------------
+
+GET {{base}}/api/customers
+
+###
+POST {{base}}/api/customers
+Content-Type: application/json
+
+{ "name": "Ada Lovelace", "email": "ada@example.com", "city": "London", "country": "gb", "vip": true }
+
+### --- Orders -----------------------------------------------------------------
+
+GET {{base}}/api/orders?page=0&size=20
+
+###
+POST {{base}}/api/orders
+Content-Type: application/json
+
+{ "customerId": 1, "status": "NEW", "total": 249.00, "itemsCount": 1 }
+
+### Unknown customer -> 404
+POST {{base}}/api/orders
+Content-Type: application/json
+
+{ "customerId": 9999, "status": "NEW", "total": 10.00, "itemsCount": 1 }
+
+### --- Relations, totals and debugging ----------------------------------------
+
+GET {{base}}/api/search?q=delivered orders from customers in Germany
+
+###
+GET {{base}}/api/search?q=how many orders are there per status?
+
+###
+GET {{base}}/api/products/search?q=average price of phones
+
+###
+GET {{base}}/api/search?q=vip customers with a cancelled order&debug=true

@@ -1,0 +1,31 @@
+customer.findById = {
+    SELECT * FROM customer WHERE id = [id]
+}
+
+customer.findAll = {
+    SELECT * FROM customer ORDER BY id
+}
+
+customer.findPage = {
+    SELECT * FROM customer ORDER BY id LIMIT [limit] OFFSET [offset]
+}
+
+customer.count = {
+    SELECT count(*) FROM customer
+}
+
+customer.exists = {
+    SELECT count(*) FROM customer WHERE id = [id]
+}
+
+customer.insert = {
+    INSERT INTO customer (full_name, email, city, country, vip, created_at) VALUES ([full_name], [email], [city], [country], [vip], [created_at])
+}
+
+customer.update = {
+    UPDATE customer SET full_name = [full_name], email = [email], city = [city], country = [country], vip = [vip] WHERE id = [id]
+}
+
+customer.delete = {
+    DELETE FROM customer WHERE id = [id]
+}

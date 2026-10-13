@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+.claude/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse / VS Code
+.classpath
+.project
+.settings/
+bin/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs & local env
+*.log
+.env
+.env.*
+
+
+/data/

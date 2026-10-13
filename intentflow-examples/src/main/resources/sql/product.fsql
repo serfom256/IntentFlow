@@ -1,0 +1,31 @@
+product.findById = {
+    SELECT * FROM product WHERE id = [id]
+}
+
+product.findAll = {
+    SELECT * FROM product ORDER BY id
+}
+
+product.findPage = {
+    SELECT * FROM product ORDER BY id LIMIT [limit] OFFSET [offset]
+}
+
+product.count = {
+    SELECT count(*) FROM product
+}
+
+product.exists = {
+    SELECT count(*) FROM product WHERE id = [id]
+}
+
+product.insert = {
+    INSERT INTO product (name, brand, category, price, rating, stock, active, supplier_cost, created_at) VALUES ([name], [brand], [category], [price], [rating], [stock], [active], [supplier_cost], [created_at])
+}
+
+product.update = {
+    UPDATE product SET name = [name], brand = [brand], category = [category], price = [price], rating = [rating], stock = [stock], active = [active], supplier_cost = [supplier_cost] WHERE id = [id]
+}
+
+product.delete = {
+    DELETE FROM product WHERE id = [id]
+}

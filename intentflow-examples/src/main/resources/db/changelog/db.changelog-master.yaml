@@ -1,0 +1,96 @@
+databaseChangeLog:
+  - property:
+      name: timestamptz
+      value: TIMESTAMP WITH TIME ZONE
+      dbms: postgresql,h2
+  - property:
+      name: timestamptz
+      value: TIMESTAMP
+      dbms: mysql,mariadb
+  - changeSet:
+      id: 1-tables
+      author: intentflow
+      changes:
+        - createTable:
+            tableName: product
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: name, type: VARCHAR(120), constraints: { nullable: false } }
+              - column: { name: brand, type: VARCHAR(60), constraints: { nullable: false } }
+              - column: { name: category, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: price, type: "DECIMAL(10, 2)", constraints: { nullable: false } }
+              - column: { name: rating, type: "DECIMAL(2, 1)", constraints: { nullable: false } }
+              - column: { name: stock, type: INT, constraints: { nullable: false } }
+              - column: { name: active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: supplier_cost, type: "DECIMAL(10, 2)", constraints: { nullable: false } }
+              - column: { name: created_at, type: "${timestamptz}", defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createTable:
+            tableName: customer
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: full_name, type: VARCHAR(120), constraints: { nullable: false } }
+              - column: { name: email, type: VARCHAR(160), constraints: { nullable: false, unique: true } }
+              - column: { name: city, type: VARCHAR(80), constraints: { nullable: false } }
+              - column: { name: country, type: CHAR(2), constraints: { nullable: false } }
+              - column: { name: vip, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: created_at, type: "${timestamptz}", defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createTable:
+            tableName: orders
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: customer_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: orders_customer_fk
+                    references: customer(id)
+                    deleteCascade: true
+              - column: { name: status, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: total, type: "DECIMAL(12, 2)", constraints: { nullable: false } }
+              - column: { name: items_count, type: INT, constraints: { nullable: false } }
+              - column: { name: created_at, type: "${timestamptz}", defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: orders
+            indexName: orders_customer_idx
+            columns:
+              - column: { name: customer_id }
+        - sql:
+            sql: >
+              ALTER TABLE product ADD CONSTRAINT product_price_chk CHECK (price >= 0);
+              ALTER TABLE product ADD CONSTRAINT product_rating_chk CHECK (rating BETWEEN 0 AND 5);
+              ALTER TABLE product ADD CONSTRAINT product_stock_chk CHECK (stock >= 0);
+              ALTER TABLE orders ADD CONSTRAINT orders_total_chk CHECK (total >= 0);
+              ALTER TABLE orders ADD CONSTRAINT orders_items_chk CHECK (items_count > 0);
+
+  - changeSet:
+      id: 2-lower-indexes-postgresql
+      author: intentflow
+      dbms: postgresql
+      changes:
+        - sql:
+            sql: >
+              CREATE INDEX product_brand_lower_idx ON product (LOWER(brand));
+              CREATE INDEX product_category_lower_idx ON product (LOWER(category));
+              CREATE INDEX customer_country_lower_idx ON customer (LOWER(country));
+              CREATE INDEX orders_status_lower_idx ON orders (LOWER(status));
+
+  - changeSet:
+      id: 2-lower-indexes-mysql
+      author: intentflow
+      dbms: mysql,mariadb
+      changes:
+        - sql:
+            sql: >
+              CREATE INDEX product_brand_lower_idx ON product ((LOWER(brand)));
+              CREATE INDEX product_category_lower_idx ON product ((LOWER(category)));
+              CREATE INDEX customer_country_lower_idx ON customer ((LOWER(country)));
+              CREATE INDEX orders_status_lower_idx ON orders ((LOWER(status)));
+
+  - changeSet:
+      id: 3-seed-data
+      author: intentflow
+      changes:
+        - sqlFile:
+            path: seed-data.sql
+            relativeToChangelogFile: true

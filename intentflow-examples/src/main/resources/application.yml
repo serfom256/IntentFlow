@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: intentflow-shop
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:15432/intentflow}
+    username: ${DB_USER:intentflow}
+    password: ${DB_PASSWORD:intentflow}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  mvc:
+    problemdetails:
+      enabled: true
+
+openmapper:
+  dao:
+    packagesToScan: io.github.serfom256.intentflow.examples.shop.dao
+  model:
+    packagesToScan: io.github.serfom256.intentflow.examples.shop.domain
+
+intentflow:
+  llm:
+    base-url: ${LLM_URL:http://localhost:1234/v1}
+    model: ${LLM_MODEL:qwen/qwen3.8-27b}
+    api-key: ${LLM_API_KEY:}
+    timeout: 120s
+  cache:
+    ttl: 30m
+
+logging:
+  level:
+    io.github.serfom256.intentflow: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:13306/intentflow}

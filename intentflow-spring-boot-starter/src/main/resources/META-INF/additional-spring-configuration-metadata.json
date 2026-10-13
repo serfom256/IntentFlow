@@ -1,0 +1,67 @@
+{
+  "properties": [
+    {
+      "name": "intentflow.enabled",
+      "description": "Whether to auto-configure the IntentFlow pipeline."
+    },
+    {
+      "name": "intentflow.executor",
+      "description": "Executor that runs queries and maps rows. When unset, the first available one wins: openmapper, jpa, spring-data-jdbc, cassandra, jdbc."
+    },
+    {
+      "name": "intentflow.dialect",
+      "description": "SQL dialect. When unset, it is detected from the DataSource, or taken from the only dialect module on the classpath."
+    },
+    {
+      "name": "intentflow.llm.base-url",
+      "description": "Base URL of an OpenAI-compatible chat completions API, e.g. http://localhost:1234/v1 (LM Studio), http://localhost:11434/v1 (Ollama) or https://api.openai.com/v1."
+    },
+    {
+      "name": "intentflow.llm.model",
+      "description": "Model id sent to the LLM. Required unless the application defines its own LlmClient bean."
+    },
+    {
+      "name": "intentflow.llm.api-key",
+      "description": "Bearer token for the LLM API. Leave empty for local servers."
+    },
+    {
+      "name": "intentflow.llm.timeout",
+      "description": "Timeout of one LLM request."
+    },
+    {
+      "name": "intentflow.cache.ttl",
+      "description": "How long a translated question is reused before the LLM is asked again."
+    },
+    {
+      "name": "intentflow.cache.max-size",
+      "description": "Maximum number of cached translations."
+    },
+    {
+      "name": "intentflow.catalog.packages",
+      "description": "Packages scanned for @IntentService classes. Defaults to the application's auto-configuration packages."
+    },
+    {
+      "name": "intentflow.cassandra.max-scanned-rows",
+      "description": "Rows one Cassandra query may read before it fails. Conditions CQL cannot express, sorting and paging are applied in memory over these rows."
+    }
+  ],
+  "hints": [
+    {
+      "name": "intentflow.executor",
+      "values": [
+        { "value": "openmapper", "description": "OpenMapper Procedures." },
+        { "value": "jpa", "description": "JPA native queries mapped to @Entity classes." },
+        { "value": "spring-data-jdbc", "description": "Spring Data JDBC entity mapping." },
+        { "value": "cassandra", "description": "Spring Data Cassandra." },
+        { "value": "jdbc", "description": "Spring JdbcClient with constructor or bean mapping." }
+      ]
+    },
+    {
+      "name": "intentflow.dialect",
+      "values": [
+        { "value": "postgresql", "description": "PostgreSQL and H2." },
+        { "value": "mysql", "description": "MySQL 8+ and MariaDB." }
+      ]
+    }
+  ]
+}

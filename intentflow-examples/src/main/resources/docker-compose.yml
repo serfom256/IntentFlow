@@ -1,0 +1,50 @@
+name: intentflow
+
+services:
+  postgres:
+    image: postgres:17.4
+    environment:
+      POSTGRES_DB: intentflow
+      POSTGRES_USER: intentflow
+      POSTGRES_PASSWORD: intentflow
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intentflow -d intentflow"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: intentflow
+      MYSQL_USER: intentflow
+      MYSQL_PASSWORD: intentflow
+      MYSQL_ROOT_PASSWORD: intentflow
+    ports:
+      - "${MYSQL_PORT:-13306}:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uintentflow -pintentflow --silent"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  cassandra:
+    image: cassandra:5.0
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 200M
+    ports:
+      - "${CASSANDRA_PORT:-19042}:9042"
+    volumes:
+      - ./data/cassandra:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES'"]
+      interval: 5s
+      timeout: 10s
+      retries: 60
