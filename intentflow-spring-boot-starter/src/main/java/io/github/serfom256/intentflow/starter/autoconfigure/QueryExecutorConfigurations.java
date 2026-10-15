@@ -8,6 +8,8 @@ import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor;
+import io.github.serfom256.intentflow.jimmer.JimmerNameResolver;
+import io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor;
 import io.github.serfom256.intentflow.jpa.JpaNameResolver;
 import io.github.serfom256.intentflow.jpa.JpaQueryExecutor;
 import io.github.serfom256.intentflow.openmapper.OpenMapperNameResolver;
@@ -16,6 +18,7 @@ import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcNameResolver
 import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcQueryExecutor;
 import io.github.serfom256.procedures.Procedures;
 import jakarta.persistence.EntityManagerFactory;
+import org.babyfish.jimmer.sql.JSqlClient;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -68,6 +71,25 @@ final class QueryExecutorConfigurations {
         @ConditionalOnProperty(prefix = "intentflow", name = "executor", havingValue = "jpa", matchIfMissing = true)
         QueryExecutor intentFlowJpaQueryExecutor(EntityManagerFactory entityManagerFactory) {
             return new JpaQueryExecutor(SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass({JimmerQueryExecutor.class, JSqlClient.class})
+    static class Jimmer {
+
+        @Bean
+        @ConditionalOnMissingBean(JimmerNameResolver.class)
+        NameResolver intentFlowJimmerNameResolver() {
+            return new JimmerNameResolver();
+        }
+
+        @Bean
+        @ConditionalOnMissingBean(QueryExecutor.class)
+        @ConditionalOnBean(JSqlClient.class)
+        @ConditionalOnProperty(prefix = "intentflow", name = "executor", havingValue = "jimmer", matchIfMissing = true)
+        QueryExecutor intentFlowJimmerQueryExecutor(JSqlClient sqlClient) {
+            return new JimmerQueryExecutor(sqlClient);
         }
     }
 

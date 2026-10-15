@@ -61,6 +61,14 @@ public final class CqlValues {
         return s.toLowerCase(Locale.ROOT);
     }
 
+    static Optional<LocalDate> dateOnly(String text) {
+        try {
+            return Optional.of(LocalDate.parse(text.strip()));
+        } catch (DateTimeParseException notDate) {
+            return Optional.empty();
+        }
+    }
+
     static Optional<LocalDateTime> parseTimestamp(String text) {
         String s = text.strip().replace(' ', 'T');
         try {

@@ -12,6 +12,7 @@ import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
+import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
@@ -66,8 +67,11 @@ public final class CassandraQueryBuilder implements SqlBuilder {
                 }
                 CqlIdentifier column = columns.get(c.field().value());
                 ColumnMetadata metadata = column == null ? null : table.getColumn(column).orElse(null);
+                boolean dayLiteral = c.value() instanceof TextLiteral t
+                        && CqlValues.dateOnly(t.value()).isPresent();
                 if (metadata == null || !pushable(table, metadata, c.op())
-                        || (CqlValues.isText(metadata.getType()) && c.op() != ComparisonOp.EQ)) {
+                        || (CqlValues.isText(metadata.getType()) && c.op() != ComparisonOp.EQ)
+                        || (dayLiteral && c.op() != ComparisonOp.LT && c.op() != ComparisonOp.GE)) {
                     continue;
                 }
                 Object bound = CqlValues.bindValue(metadata.getType(), c.value(),

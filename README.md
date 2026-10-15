@@ -14,7 +14,7 @@ your own entity classes. The query *"apple laptops under 2000, best rated first"
 
 The LLM never generates SQL. It emits a constrained query DSL, which IntentFlow parses, validates
 against the declared catalog and compiles into SQL with bound parameters. Rows are mapped by the
-persistence layer the application already uses: JDBC, Spring Data JDBC, OpenMapper, JPA or Spring Data Cassandra
+persistence layer the application already uses: JDBC, Spring Data JDBC, OpenMapper, JPA, Jimmer or Spring Data Cassandra
 
 ## Contents
 
@@ -187,6 +187,26 @@ public class Product {
   and keys can use plain column indexes
 - **`uri`** is a template for the navigation URI returned with each response, see [Usage](#usage)
 
+Interface-based entities, such as Jimmer's, declare `@IntentField` on their property methods:
+
+```java
+@Entity
+@IntentService(value = "books", uri = "/books/{{id}}", defaultSort = "id")
+public interface Book {
+
+    @Id
+    @IntentField
+    long id();
+
+    @IntentField
+    String title();
+
+    @Column(name = "published_at")
+    @IntentField
+    @Nullable LocalDateTime publishedAt();
+}
+```
+
 The catalog can also be built programmatically with `ServiceDescriptors.of(...)` and `ServiceCatalogs.of(...)`
 
 ## Usage
@@ -253,10 +273,13 @@ Semantics:
 
 - Text comparisons are case-insensitive unless the field is declared `caseSensitive`
 - NULLs sort last in both directions
+- A date without a time denotes the whole day: `created_at == "2026-10-10"` matches any time on that
+  day, `> "2026-10-10"` starts at the next day and `<= "2026-10-10"` includes it
 - The service's `defaultSort` is appended to every sort as a tie-breaker, which keeps pagination
   deterministic; it should end with a unique field
-- When a request cannot be expressed with the declared catalog, the LLM returns
-  `unsupported "reason"`, raised as `UnsupportedRequestException`
+- When a request, or any condition in it, cannot be expressed with the declared catalog, the LLM
+  returns `unsupported "reason"` instead of answering a narrower question; IntentFlow raises it as
+  `UnsupportedRequestException`
 
 ## Relations
 
@@ -315,10 +338,11 @@ are located in `intentflow-executors/`:
 | `intentflow-spring-data-jdbc`      | Spring Data JDBC entity mapping                   | `@Table`, `@Column`    |
 | `intentflow-openmapper`            | OpenMapper `Procedures` (`@Model`, `@Field`)      | `@Field`               |
 | `intentflow-jpa`                   | JPA native query mapped onto the `@Entity`        | `@Table`, `@Column`    |
+| `intentflow-jimmer`                | Jimmer `JSqlClient`: matching ids, then `findMapByIds` | Jimmer `@Table`, `@Column` |
 | `intentflow-spring-data-cassandra` | Spring Data Cassandra converter                   | `@Table`, `@Column`    |
 
 When several executors are present, the starter selects the first available in the order OpenMapper,
-JPA, Spring Data JDBC, Cassandra, JDBC. `intentflow.executor` selects one explicitly; a user-defined
+JPA, Jimmer, Spring Data JDBC, Cassandra, JDBC. `intentflow.executor` selects one explicitly; a user-defined
 `QueryExecutor` bean replaces auto-configuration
 
 ## SQL dialects
@@ -387,7 +411,7 @@ Outside Spring: `new CassandraQueryBuilder(session)` together with `CassandraQue
 | Parameter name                        | Parameter type | Default value                     | Description                                                  |
 | ------------------------------------- | -------------- | --------------------------------- | ------------------------------------------------------------ |
 | intentflow.enabled                    | boolean        | true                              | Enables the auto-configuration                               |
-| intentflow.executor                   | string         | first available                   | `openmapper`, `jpa`, `spring-data-jdbc`, `cassandra`, `jdbc` |
+| intentflow.executor                   | string         | first available                   | `openmapper`, `jpa`, `jimmer`, `spring-data-jdbc`, `cassandra`, `jdbc` |
 | intentflow.dialect                    | string         | detected                          | `postgresql` or `mysql`                                      |
 | intentflow.llm.base-url               | uri            | http://localhost:1234/v1          | Base URL of the OpenAI-compatible API                        |
 | intentflow.llm.model                  | string         | -                                 | Model id; required unless an `LlmClient` bean is defined     |
@@ -402,6 +426,6 @@ Outside Spring: `new CassandraQueryBuilder(session)` together with `CassandraQue
 
 ## Example application
 
-[`intentflow-examples`](intentflow-examples) is a Spring Boot REST API with CRUD endpoints and
-natural-language search, together with a Docker Compose setup for running it and the integration
-tests against PostgreSQL, MySQL and Cassandra
+[`intentflow-examples`](intentflow-examples) contains a reference shop application: a Spring Boot API
+with CRUD endpoints and natural-language search, a React UI on top of it, and a Docker Compose setup for
+running both and the integration tests against PostgreSQL, MySQL and Cassandra

@@ -53,7 +53,7 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "intentflow", name = "enabled", matchIfMissing = true)
 @EnableConfigurationProperties(IntentFlowProperties.class)
 @Import({SqlDialectConfigurations.Jdbc.class, QueryExecutorConfigurations.OpenMapper.class, QueryExecutorConfigurations.Jpa.class,
-        QueryExecutorConfigurations.SpringDataJdbc.class, QueryExecutorConfigurations.Cassandra.class, QueryExecutorConfigurations.Jdbc.class})
+        QueryExecutorConfigurations.Jimmer.class, QueryExecutorConfigurations.SpringDataJdbc.class, QueryExecutorConfigurations.Cassandra.class, QueryExecutorConfigurations.Jdbc.class})
 public class IntentFlowAutoConfiguration {
 
     @Bean
@@ -150,7 +150,7 @@ public class IntentFlowAutoConfiguration {
         if (queryExecutor == null) {
             throw new IllegalStateException("No QueryExecutor: configure a DataSource (spring.datasource.*) "
                     + "or Cassandra (spring.cassandra.*) and add an executor module (intentflow-jdbc, "
-                    + "intentflow-jpa, intentflow-openmapper, intentflow-spring-data-jdbc, "
+                    + "intentflow-jpa, intentflow-jimmer, intentflow-openmapper, intentflow-spring-data-jdbc, "
                     + "intentflow-spring-data-cassandra), or define a QueryExecutor bean.");
         }
         return IntentPipelines.create(normalizer, cache, llm, parser, validator, sqlBuilder,

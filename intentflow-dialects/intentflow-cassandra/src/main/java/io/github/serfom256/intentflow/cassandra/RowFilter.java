@@ -16,7 +16,10 @@ import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -63,6 +66,15 @@ final class RowFilter implements Predicate<Row> {
                 }
                 boolean unknown = false;
                 for (var literal : in.values()) {
+                    if (CqlValues.comparable(value) instanceof LocalDateTime
+                            && literal instanceof TextLiteral t && CqlValues.dateOnly(t.value()).isPresent()) {
+                        Boolean sameDay = compare(new Compare(in.field(), ComparisonOp.EQ, literal), row);
+                        if (Boolean.TRUE.equals(sameDay)) {
+                            yield true;
+                        }
+                        unknown |= sameDay == null;
+                        continue;
+                    }
                     Integer c = CqlValues.compare(value, literal, true, caseSensitive.contains(in.field().value()));
                     if (c == null) {
                         unknown = true;
@@ -85,6 +97,22 @@ final class RowFilter implements Predicate<Row> {
             return value instanceof String s && c.value() instanceof TextLiteral t
                     ? CqlValues.lower(s).contains(CqlValues.lower(t.value()))
                     : null;
+        }
+        if (CqlValues.comparable(value) instanceof LocalDateTime at && c.value() instanceof TextLiteral t) {
+            Optional<LocalDate> day = CqlValues.dateOnly(t.value());
+            if (day.isPresent()) {
+                LocalDateTime start = day.get().atStartOfDay();
+                LocalDateTime end = start.plusDays(1);
+                return switch (c.op()) {
+                    case EQ -> !at.isBefore(start) && at.isBefore(end);
+                    case NE -> at.isBefore(start) || !at.isBefore(end);
+                    case LT -> at.isBefore(start);
+                    case GE -> !at.isBefore(start);
+                    case GT -> !at.isBefore(end);
+                    case LE -> at.isBefore(end);
+                    case CONTAINS -> null;
+                };
+            }
         }
         boolean equality = switch (c.op()) {
             case EQ, NE -> true;

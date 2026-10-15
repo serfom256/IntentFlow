@@ -37,7 +37,7 @@ class TypedQueryTest {
             "price in (1, 2.5, -3)                  | \"price_usd\" IN (?, ?, ?)",
             "active == true                         | \"is_active\" = ?",
             "created >= \"2026-01-01\"              | \"created_at\" >= CAST(? AS TIMESTAMP)",
-            "created in (\"2026-01-01\", \"2026-02-01T10:00:00\") | \"created_at\" IN (CAST(? AS TIMESTAMP), CAST(? AS TIMESTAMP))",
+            "created in (\"2026-01-01T09:00:00\", \"2026-02-01T10:00:00\") | \"created_at\" IN (CAST(? AS TIMESTAMP), CAST(? AS TIMESTAMP))",
             "name < \"M\"                           | \"item_name\" < ?",
             "name ~ \"dun\"                         | \"item_name\" ILIKE ? ESCAPE '\\'",
     })

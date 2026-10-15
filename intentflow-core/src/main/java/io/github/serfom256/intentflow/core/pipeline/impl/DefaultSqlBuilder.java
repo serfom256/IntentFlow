@@ -259,7 +259,9 @@ public final class DefaultSqlBuilder implements SqlBuilder {
             dialect.contains(sql, col, t.value());
             return;
         }
-        if (fm.type() == FieldType.TIMESTAMP && c.value() instanceof TextLiteral) {
+        if (fm.type() == FieldType.TIMESTAMP && c.value() instanceof TextLiteral t && Timestamps.isDateOnly(t.value())) {
+            appendDay(col, c.op(), t.value(), sql);
+        } else if (fm.type() == FieldType.TIMESTAMP && c.value() instanceof TextLiteral) {
             sql.text(col).text(" " + sqlOp(c.op()) + " ");
             dialect.timestamp(sql, c.value());
         } else if (caseInsensitive(fm, c.value()) && (c.op() == ComparisonOp.EQ || c.op() == ComparisonOp.NE)) {
@@ -269,9 +271,53 @@ public final class DefaultSqlBuilder implements SqlBuilder {
         }
     }
 
+    private void appendDay(String col, ComparisonOp op, String day, Sql sql) {
+        TextLiteral start = new TextLiteral(day.strip());
+        TextLiteral end = new TextLiteral(Timestamps.nextDay(day));
+        switch (op) {
+            case EQ -> {
+                sql.text("(").text(col).text(" >= ");
+                dialect.timestamp(sql, start);
+                sql.text(" AND ").text(col).text(" < ");
+                dialect.timestamp(sql, end);
+                sql.text(")");
+            }
+            case NE -> {
+                sql.text("(").text(col).text(" < ");
+                dialect.timestamp(sql, start);
+                sql.text(" OR ").text(col).text(" >= ");
+                dialect.timestamp(sql, end);
+                sql.text(")");
+            }
+            case LT, GE -> {
+                sql.text(col).text(" " + sqlOp(op) + " ");
+                dialect.timestamp(sql, start);
+            }
+            case GT -> {
+                sql.text(col).text(" >= ");
+                dialect.timestamp(sql, end);
+            }
+            case LE -> {
+                sql.text(col).text(" < ");
+                dialect.timestamp(sql, end);
+            }
+            case CONTAINS -> throw new IllegalArgumentException("'~' does not apply to timestamps");
+        }
+    }
+
     private void appendIn(In in, Sql sql, Scope scope) {
         List<DslLiteral> values = in.values();
         FieldMapping fm = scope.field(in.field());
+        if (fm.type() == FieldType.TIMESTAMP
+                && values.stream().anyMatch(v -> v instanceof TextLiteral t && Timestamps.isDateOnly(t.value()))) {
+            sql.text("(");
+            for (int i = 0; i < values.size(); i++) {
+                if (i > 0) sql.text(" OR ");
+                appendCompare(new Compare(in.field(), ComparisonOp.EQ, values.get(i)), sql, scope);
+            }
+            sql.text(")");
+            return;
+        }
         boolean lower = values.stream().allMatch(v -> caseInsensitive(fm, v));
         boolean timestamp = fm.type() == FieldType.TIMESTAMP;
         String col = scope.column(in.field());

@@ -73,17 +73,24 @@ class MySqlDialectTest {
     @Test
     void timestampLiteralsAreNormalisedForDatetimeCast() {
         BoundQuery q = build(new In(PUBLISHED, List.of(
-                new TextLiteral("2026-07-01"),
                 new TextLiteral("2026-07-01T10:15"),
                 new TextLiteral("2026-07-01 10:15:30.5"),
                 new TextLiteral("2026-07-01T10:15:30+02:00"))), List.of());
 
         assertThat(q.sql()).contains("`published_at` IN (CAST(? AS DATETIME(6)), CAST(? AS DATETIME(6)),");
         assertThat(q.values()).containsExactly(
-                "2026-07-01 00:00:00.000000",
                 "2026-07-01 10:15:00.000000",
                 "2026-07-01 10:15:30.500000",
                 "2026-07-01 10:15:30.000000");
+    }
+
+    @Test
+    void aDateWithoutTimeCoversTheWholeDay() {
+        BoundQuery q = build(new Compare(PUBLISHED, ComparisonOp.EQ, new TextLiteral("2026-07-01")), List.of());
+
+        assertThat(q.sql()).contains(
+                "(`published_at` >= CAST(? AS DATETIME(6)) AND `published_at` < CAST(? AS DATETIME(6)))");
+        assertThat(q.values()).containsExactly("2026-07-01 00:00:00.000000", "2026-07-02 00:00:00.000000");
     }
 
     @Test

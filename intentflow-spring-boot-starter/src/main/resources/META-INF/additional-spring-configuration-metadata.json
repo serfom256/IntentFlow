@@ -6,7 +6,7 @@
     },
     {
       "name": "intentflow.executor",
-      "description": "Executor that runs queries and maps rows. When unset, the first available one wins: openmapper, jpa, spring-data-jdbc, cassandra, jdbc."
+      "description": "Executor that runs queries and maps rows. When unset, the first available one wins: openmapper, jpa, jimmer, spring-data-jdbc, cassandra, jdbc."
     },
     {
       "name": "intentflow.dialect",
@@ -51,6 +51,7 @@
       "values": [
         { "value": "openmapper", "description": "OpenMapper Procedures." },
         { "value": "jpa", "description": "JPA native queries mapped to @Entity classes." },
+        { "value": "jimmer", "description": "Jimmer entities loaded through the JSqlClient." },
         { "value": "spring-data-jdbc", "description": "Spring Data JDBC entity mapping." },
         { "value": "cassandra", "description": "Spring Data Cassandra." },
         { "value": "jdbc", "description": "Spring JdbcClient with constructor or bean mapping." }

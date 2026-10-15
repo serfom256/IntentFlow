@@ -9,6 +9,7 @@ import io.github.serfom256.intentflow.core.ast.And;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoolLiteral;
 import io.github.serfom256.intentflow.core.ast.Compare;
+import io.github.serfom256.intentflow.core.ast.ComparisonOp;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.In;
@@ -20,6 +21,7 @@ import io.github.serfom256.intentflow.core.ast.Or;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
+import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
@@ -163,7 +165,7 @@ public abstract class DifferentialTestBase {
                 assertThat(actual.uri().value()).as(ctx).isEqualTo("/gadgets");
             } else {
                 assertThat(actual.uri().value()).as(ctx)
-                        .isEqualTo("/gadgets/" + ((BigDecimal) got.getFirst().getFirst()).toPlainString());
+                        .isEqualTo("/gadgets/" + ((BigDecimal) got.getFirst().get(columns.indexOf("id"))).toPlainString());
             }
         }
     }
@@ -294,7 +296,9 @@ public abstract class DifferentialTestBase {
                     yield null;
                 }
                 FieldMapping fm = fields.get(in.field().value());
-                yield in.values().stream().anyMatch(v -> compare(fm, col, v, true) == 0);
+                yield in.values().stream().anyMatch(v -> fm.type() == FieldType.TIMESTAMP
+                        ? Boolean.TRUE.equals(day(ComparisonOp.EQ, (LocalDateTime) col, ((TextLiteral) v).value()))
+                        : compare(fm, col, v, true) == 0);
             }
             case Compare c -> {
                 Object col = row.get(c.field().value());
@@ -302,6 +306,12 @@ public abstract class DifferentialTestBase {
                     yield null;
                 }
                 FieldMapping fm = fields.get(c.field().value());
+                Boolean day = fm.type() == FieldType.TIMESTAMP
+                        ? day(c.op(), (LocalDateTime) col, ((TextLiteral) c.value()).value())
+                        : null;
+                if (day != null) {
+                    yield day;
+                }
                 yield switch (c.op()) {
                     case CONTAINS -> lower(col).contains(lower(((TextLiteral) c.value()).value()));
                     case EQ -> compare(fm, col, c.value(), true) == 0;
@@ -312,6 +322,36 @@ public abstract class DifferentialTestBase {
                     case GE -> compare(fm, col, c.value(), false) >= 0;
                 };
             }
+        };
+    }
+
+    private static Boolean day(ComparisonOp op, LocalDateTime at, String literal) {
+        if (literal.length() != 10) {
+            return dayless(op, at, LocalDateTime.parse(literal));
+        }
+        LocalDateTime start = LocalDate.parse(literal).atStartOfDay();
+        LocalDateTime end = start.plusDays(1);
+        return switch (op) {
+            case EQ -> !at.isBefore(start) && at.isBefore(end);
+            case NE -> at.isBefore(start) || !at.isBefore(end);
+            case LT -> at.isBefore(start);
+            case GE -> !at.isBefore(start);
+            case GT -> !at.isBefore(end);
+            case LE -> at.isBefore(end);
+            case CONTAINS -> throw new IllegalStateException();
+        };
+    }
+
+    private static Boolean dayless(ComparisonOp op, LocalDateTime at, LocalDateTime value) {
+        int c = at.compareTo(value);
+        return switch (op) {
+            case EQ -> c == 0;
+            case NE -> c != 0;
+            case LT -> c < 0;
+            case LE -> c <= 0;
+            case GT -> c > 0;
+            case GE -> c >= 0;
+            case CONTAINS -> throw new IllegalStateException();
         };
     }
 
@@ -356,6 +396,16 @@ public abstract class DifferentialTestBase {
     }
 
     private static Object readField(Object entity, String name) {
+        for (String accessor : new String[]{name, "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1)}) {
+            try {
+                java.lang.reflect.Method m = entity.getClass().getMethod(accessor);
+                m.setAccessible(true);
+                return m.invoke(entity);
+            } catch (NoSuchMethodException e) {
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+        }
         for (Class<?> t = entity.getClass(); t != null; t = t.getSuperclass()) {
             try {
                 Field f = t.getDeclaredField(name);

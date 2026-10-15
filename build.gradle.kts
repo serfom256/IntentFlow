@@ -1,6 +1,6 @@
 allprojects {
     group = "io.github.serfom256"
-    version = "0.1.0"
+    version = "0.2.0"
 
     repositories {
         mavenCentral()
@@ -8,6 +8,10 @@ allprojects {
 }
 
 subprojects {
+    if (name == "intentflow-shop-ui") {
+        return@subprojects
+    }
+
     pluginManager.apply("java")
 
     configure<JavaPluginExtension> {
@@ -35,7 +39,7 @@ subprojects {
         useJUnitPlatform()
     }
 
-    if (name != "intentflow-examples") {
+    if (!projectDir.parentFile.name.equals("intentflow-examples")) {
         pluginManager.apply("maven-publish")
 
         configure<JavaPluginExtension> {

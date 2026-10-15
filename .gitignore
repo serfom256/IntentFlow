@@ -28,3 +28,7 @@ bin/
 
 
 /data/
+
+node_modules/
+/intentflow-examples/intentflow-shop-ui/dist/
+*.tsbuildinfo

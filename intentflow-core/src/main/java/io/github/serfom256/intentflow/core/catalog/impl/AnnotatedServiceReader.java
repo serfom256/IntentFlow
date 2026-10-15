@@ -13,6 +13,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
@@ -33,6 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AnnotatedServiceReader {
@@ -54,10 +56,21 @@ public final class AnnotatedServiceReader {
         }
 
         List<FieldMapping> fields = new ArrayList<>();
-        for (Field field : declaredFields(type)) {
-            IntentField meta = field.getAnnotation(IntentField.class);
-            if (meta != null) {
-                fields.add(mapping(type, field, meta, resolvers));
+        if (type.isInterface()) {
+            for (Method method : propertyMethods(type)) {
+                IntentField meta = method.getAnnotation(IntentField.class);
+                if (meta != null) {
+                    fields.add(mapping(type, propertyName(method), method.getReturnType(), meta,
+                            () -> resolve(resolvers, r -> r.columnName(method))));
+                }
+            }
+        } else {
+            for (Field field : declaredFields(type)) {
+                IntentField meta = field.getAnnotation(IntentField.class);
+                if (meta != null) {
+                    fields.add(mapping(type, field.getName(), field.getType(), meta,
+                            () -> resolve(resolvers, r -> r.columnName(field))));
+                }
             }
         }
         if (fields.isEmpty()) {
@@ -86,13 +99,13 @@ public final class AnnotatedServiceReader {
                 new DefaultLogicalFieldName(r.from()), new DefaultLogicalFieldName(r.to()));
     }
 
-    private static FieldMapping mapping(Class<?> owner, Field field, IntentField meta, List<NameResolver> resolvers) {
-        String logical = meta.name().isEmpty() ? snakeCase(field.getName()) : meta.name();
+    private static FieldMapping mapping(Class<?> owner, String property, Class<?> javaType, IntentField meta,
+                                        Supplier<Optional<String>> resolvedColumn) {
+        String logical = meta.name().isEmpty() ? snakeCase(property) : meta.name();
         String column = !meta.column().isEmpty() ? meta.column()
-                : resolve(resolvers, r -> r.columnName(field)).orElseGet(() -> snakeCase(field.getName()));
-        Class<?> javaType = field.getType();
+                : resolvedColumn.get().orElseGet(() -> snakeCase(property));
 
-        FieldType type = meta.type() != FieldType.ANY ? meta.type() : inferType(owner, field, javaType);
+        FieldType type = meta.type() != FieldType.ANY ? meta.type() : inferType(owner, property, javaType);
         List<String> values = meta.values().length > 0
                 ? List.of(meta.values())
                 : javaType.isEnum() ? enumNames(javaType) : List.of();
@@ -104,7 +117,7 @@ public final class AnnotatedServiceReader {
                 type,
                 meta.description(),
                 values,
-                field.getName(),
+                property,
                 meta.caseSensitive());
     }
 
@@ -118,7 +131,7 @@ public final class AnnotatedServiceReader {
         return Optional.empty();
     }
 
-    private static FieldType inferType(Class<?> owner, Field field, Class<?> t) {
+    private static FieldType inferType(Class<?> owner, String property, Class<?> t) {
         if (t == String.class || t == char.class || t == Character.class || t == UUID.class || t.isEnum()) {
             return FieldType.TEXT;
         }
@@ -132,7 +145,7 @@ public final class AnnotatedServiceReader {
             return FieldType.TIMESTAMP;
         }
         throw new IllegalArgumentException("cannot infer field type of " + owner.getSimpleName() + "."
-                + field.getName() + " (" + t.getName() + "); set @IntentField(type = ...)");
+                + property + " (" + t.getName() + "); set @IntentField(type = ...)");
     }
 
     private static List<String> enumNames(Class<?> enumType) {
@@ -154,6 +167,45 @@ public final class AnnotatedServiceReader {
             };
         }
         return new DefaultSortKey(new DefaultLogicalFieldName(parts[0]), direction);
+    }
+
+    private static List<Method> propertyMethods(Class<?> type) {
+        Deque<Class<?>> hierarchy = new ArrayDeque<>();
+        collectInterfaces(type, hierarchy);
+        List<Method> out = new ArrayList<>();
+        Set<String> seen = new java.util.HashSet<>();
+        for (Class<?> c : hierarchy) {
+            Method[] methods = c.getDeclaredMethods();
+            Arrays.sort(methods, java.util.Comparator.comparing(AnnotatedServiceReader::propertyName));
+            for (Method m : methods) {
+                if (m.getParameterCount() == 0 && m.getReturnType() != void.class && !Modifier.isStatic(m.getModifiers())
+                        && !m.isSynthetic() && seen.add(m.getName())) {
+                    out.add(m);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void collectInterfaces(Class<?> type, Deque<Class<?>> out) {
+        if (out.contains(type)) {
+            return;
+        }
+        for (Class<?> parent : type.getInterfaces()) {
+            collectInterfaces(parent, out);
+        }
+        out.addLast(type);
+    }
+
+    static String propertyName(Method method) {
+        String name = method.getName();
+        for (String prefix : new String[]{"get", "is"}) {
+            if (name.length() > prefix.length() && name.startsWith(prefix)
+                    && Character.isUpperCase(name.charAt(prefix.length()))) {
+                return Character.toLowerCase(name.charAt(prefix.length())) + name.substring(prefix.length() + 1);
+            }
+        }
+        return name;
     }
 
     private static List<Field> declaredFields(Class<?> type) {

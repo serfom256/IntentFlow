@@ -9,12 +9,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Exposes a field (or record component) of an {@link IntentService} class.
+ * Exposes a field (or record component) of an {@link IntentService} class, or a property
+ * method of an {@link IntentService} interface such as a Jimmer entity.
  * Fields without this annotation are invisible to the LLM.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
+@Target({ElementType.FIELD, ElementType.METHOD})
 public @interface IntentField {
 
     /** Logical name used in the DSL; defaults to the snake_case Java field name. */

@@ -1,6 +1,7 @@
 package io.github.serfom256.intentflow.core.catalog;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Optional;
 
 /**
@@ -17,6 +18,11 @@ public interface NameResolver {
     }
 
     default Optional<String> columnName(Field field) {
+        return Optional.empty();
+    }
+
+    /** Column of a property declared as a method, as on interface-based entities. */
+    default Optional<String> columnName(Method method) {
         return Optional.empty();
     }
 }

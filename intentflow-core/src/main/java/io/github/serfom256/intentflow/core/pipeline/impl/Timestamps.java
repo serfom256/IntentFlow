@@ -18,6 +18,14 @@ final class Timestamps {
                 || parses(() -> OffsetDateTime.parse(s));
     }
 
+    static boolean isDateOnly(String text) {
+        return parses(() -> LocalDate.parse(text.strip()));
+    }
+
+    static String nextDay(String date) {
+        return LocalDate.parse(date.strip()).plusDays(1).toString();
+    }
+
     private static boolean parses(Runnable parse) {
         try {
             parse.run();

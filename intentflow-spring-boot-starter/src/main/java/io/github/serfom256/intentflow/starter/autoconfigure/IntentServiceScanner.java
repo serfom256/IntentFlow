@@ -26,7 +26,7 @@ final class IntentServiceScanner extends ClassPathScanningCandidateComponentProv
     @Override
     protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
         var metadata = beanDefinition.getMetadata();
-        return metadata.isIndependent() && !metadata.isInterface() && !metadata.isAnnotation();
+        return metadata.isIndependent() && !metadata.isAnnotation();
     }
 
     List<Class<?>> scan(Collection<String> packages) {

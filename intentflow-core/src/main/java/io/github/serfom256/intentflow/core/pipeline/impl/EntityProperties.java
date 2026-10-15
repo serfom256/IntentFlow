@@ -66,6 +66,11 @@ final class EntityProperties {
                     return Optional.of(lookup.unreflect(getter));
                 }
             }
+            Method accessor = publicNoArg(type, property);
+            if (accessor != null) {
+                accessor.setAccessible(true);
+                return Optional.of(lookup.unreflect(accessor));
+            }
             for (Class<?> c = type; c != null && c != Object.class; c = c.getSuperclass()) {
                 for (Field f : c.getDeclaredFields()) {
                     if (f.getName().equals(property) && !Modifier.isStatic(f.getModifiers())) {

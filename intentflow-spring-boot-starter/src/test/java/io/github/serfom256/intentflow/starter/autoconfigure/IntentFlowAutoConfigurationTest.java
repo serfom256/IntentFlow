@@ -39,6 +39,10 @@ import io.github.serfom256.intentflow.springdata.cassandra.CassandraNameResolver
 import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
 import io.github.serfom256.intentflow.springdata.cassandra.CassandraQueryExecutor;
 import io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor;
+import io.github.serfom256.intentflow.jimmer.JimmerNameResolver;
+import io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor;
+import org.babyfish.jimmer.sql.JSqlClient;
+import org.babyfish.jimmer.sql.runtime.JSqlClientImplementor;
 import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcNameResolver;
 import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcQueryExecutor;
 import org.springframework.data.jdbc.core.convert.JdbcConverter;
@@ -407,6 +411,20 @@ class IntentFlowAutoConfigurationTest {
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class);
                     assertThat(ctx.getBean(SqlBuilder.class)).isNotInstanceOf(CassandraQueryBuilder.class);
                 });
+    }
+
+    @Test
+    void jimmerRunsQueriesWhenAJSqlClientExists() {
+        runner.withBean(JSqlClient.class, () -> mock(JSqlClientImplementor.class))
+                .run(ctx -> {
+                    assertThat(ctx).hasNotFailed();
+                    assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JimmerQueryExecutor.class);
+                    assertThat(ctx.getBeansOfType(NameResolver.class).values())
+                            .hasAtLeastOneElementOfType(JimmerNameResolver.class);
+                });
+        runner.withBean(JSqlClient.class, () -> mock(JSqlClientImplementor.class))
+                .withPropertyValues("intentflow.executor=jdbc")
+                .run(ctx -> assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class));
     }
 
     @Test

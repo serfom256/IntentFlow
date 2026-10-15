@@ -50,6 +50,8 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
             - Values: "double-quoted text" (no double quotes inside), numbers like 42 or 9.99, true, false, null.
             - Respect field types: text fields take "text", number fields take numbers, boolean fields
               take true/false, timestamp fields take quoted ISO dates like "2026-01-31" or "2026-01-31T10:15:00".
+            - A date without a time means that whole day: created_at == "2026-10-10" matches any time on that
+              day, > "2026-10-10" means after it and <= "2026-10-10" includes it.
             - For fields with a fixed list of values, use one of the listed values.
             - Only use services and fields listed below. Omit 'take' unless the user asks for a specific count.
             - Text comparisons with == != in are case-insensitive, except for fields marked case-sensitive.
@@ -57,7 +59,9 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
               e.g. customer.country == "DE". Only filters can use them, not sort or group.
             - If the request needs a service or field that is not listed, or cannot be expressed
               with this grammar, reply exactly: unsupported "<short reason>"
-              Never substitute a different field for the one the user asked about.
+              Never substitute a different field for the one the user asked about, and never answer a
+              narrower question by dropping a condition you cannot express (for example "my", "near me",
+              or a field that is not listed): reply unsupported instead.
 
             Examples:
               books | filter author ~ "tolkien" | sort year desc
