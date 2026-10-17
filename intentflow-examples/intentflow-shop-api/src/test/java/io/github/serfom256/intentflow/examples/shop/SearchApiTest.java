@@ -8,18 +8,20 @@ import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.LlmException;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
-import io.github.serfom256.intentflow.examples.shop.dao.CustomerDao;
-import io.github.serfom256.intentflow.examples.shop.dao.OrderDao;
-import io.github.serfom256.intentflow.examples.shop.dao.ProductDao;
 import io.github.serfom256.intentflow.examples.shop.domain.Category;
 import io.github.serfom256.intentflow.examples.shop.domain.Customer;
 import io.github.serfom256.intentflow.examples.shop.domain.Order;
 import io.github.serfom256.intentflow.examples.shop.domain.OrderStatus;
 import io.github.serfom256.intentflow.examples.shop.domain.Product;
+import io.github.serfom256.intentflow.examples.shop.store.CrudStore;
+import io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor;
+import io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor;
+import io.github.serfom256.intentflow.jpa.JpaQueryExecutor;
 import io.github.serfom256.intentflow.openmapper.OpenMapperQueryExecutor;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -30,6 +32,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -39,17 +42,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SearchApiTest extends ApiTestSupport {
 
     @Autowired
-    ProductDao products;
+    CrudStore<Product> products;
     @Autowired
-    CustomerDao customers;
+    CrudStore<Customer> customers;
     @Autowired
-    OrderDao orders;
+    CrudStore<Order> orders;
     @Autowired
     ServiceCatalog catalog;
     @Autowired
     QueryExecutor executor;
     @Autowired
     JdbcClient jdbc;
+    @Autowired
+    Environment environment;
 
     private MvcTestResult search(String question, String dsl) {
         return search("/api/search", question, dsl);
@@ -70,8 +75,12 @@ class SearchApiTest extends ApiTestSupport {
     class Wiring {
 
         @Test
-        void openMapperAdapterRunsTheQueries() {
-            assertThat(executor).isInstanceOf(OpenMapperQueryExecutor.class);
+        void theActiveProfilesOrmRunsTheQueries() {
+            Map<String, Class<?>> executors = Map.of("jpa", JpaQueryExecutor.class, "jimmer",
+                    JimmerQueryExecutor.class, "jdbc", JdbcQueryExecutor.class);
+            Class<?> expected = Arrays.stream(environment.getActiveProfiles()).map(executors::get)
+                    .filter(Objects::nonNull).findFirst().orElse(OpenMapperQueryExecutor.class);
+            assertThat(executor).isInstanceOf(expected);
         }
 
         @Test
@@ -81,7 +90,7 @@ class SearchApiTest extends ApiTestSupport {
         }
 
         @Test
-        void columnNamesComeFromOpenMapperFieldAnnotations() {
+        void columnNamesComeFromTheOrmMapping() {
             Map<String, FieldMapping> p = fields("products");
             assertThat(p.get("created_at").column().value()).isEqualTo("created_at");
             assertThat(fields("customers").get("name").column().value()).isEqualTo("full_name");
@@ -222,7 +231,8 @@ class SearchApiTest extends ApiTestSupport {
             assertThat(r).hasStatusOk().bodyJson()
                     .hasPathSatisfying("$.trace.dsl", d -> assertThat(d).isEqualTo(
                             "products | filter category == \"PHONE\" and price < 500"))
-                    .hasPathSatisfying("$.trace.sql", sql -> assertThat(sql).asString().startsWith("SELECT * FROM"))
+                    .hasPathSatisfying("$.trace.sql", sql -> assertThat(sql).asString().startsWith("SELECT ")
+                            .contains(" FROM \"product\" WHERE "))
                     .hasPathSatisfying("$.trace.parameters", p -> assertThat(p).asList().hasSize(2));
             assertThat(search("cheap phones", "products | filter category == \"PHONE\" and price < 500"))
                     .bodyJson().doesNotHavePath("$.trace");

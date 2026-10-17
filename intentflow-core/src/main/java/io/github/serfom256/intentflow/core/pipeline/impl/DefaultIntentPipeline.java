@@ -37,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -84,6 +85,16 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             return IntentResponses.trace(dsl.value(), cached, query.sql(), new ArrayList<>(query.values()),
                     query.optimizations(), repairs);
         }
+    }
+
+    private Optional<List<BoundQuery>> related(Class<?> type, String relationName, Collection<?> keys) {
+        return catalog.findByType(type)
+                .flatMap(service -> service.relations().stream().filter(r -> r.name().equals(relationName)).findFirst())
+                .flatMap(relation -> catalog.find(relation.target()).map(target -> {
+                    String column = target.fields().stream().filter(f -> f.logical().equals(relation.to()))
+                            .findFirst().map(f -> f.column().value()).orElse(relation.to().value());
+                    return sqlBuilder.buildRelated(target, column, List.copyOf(keys), executor::restrictions);
+                }));
     }
 
     private ServiceDescriptor serviceFor(Class<?> resultType) {
@@ -164,7 +175,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         @SuppressWarnings("unchecked")
         Class<T> type = (Class<T>) validated.service().resultType();
         Aggregate aggregate = validated.ast().aggregate();
-        List<T> items = aggregate == null ? executor.execute(query, type) : List.of();
+        List<T> items = aggregate == null ? executor.execute(query, type, this::related) : List.of();
         Aggregation aggregation = aggregate == null ? null : aggregation(aggregate, executor.rows(query));
         MicroFrontendUri uri = uriBuilder.build(validated, items);
         log.debug("Resolved '{}' to {} with {} {} in {} ms", compiled.question().value(), uri.value(),

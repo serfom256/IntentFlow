@@ -30,6 +30,15 @@ public interface QueryExecutor {
     }
 
     /**
+     * Like {@link #execute(BoundQuery, Class)}, for executors that also load
+     * relations of the result: they run the
+     * statements {@code related} builds. The default ignores {@code related}.
+     */
+    default <T> List<T> execute(BoundQuery query, Class<T> resultType, RelatedRows related) {
+        return execute(query, resultType);
+    }
+
+    /**
      * Conditions that rows of {@code entityType} must meet in the session this
      * executor runs in, such as the
      * Hibernate filters enabled on the current session. They are added to every

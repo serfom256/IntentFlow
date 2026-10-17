@@ -1,14 +1,12 @@
 package io.github.serfom256.intentflow.examples.shop;
 
 import com.jayway.jsonpath.JsonPath;
-import io.github.serfom256.intentflow.examples.shop.dao.CustomerDao;
-import io.github.serfom256.intentflow.examples.shop.dao.OrderDao;
-import io.github.serfom256.intentflow.examples.shop.dao.ProductDao;
 import io.github.serfom256.intentflow.examples.shop.domain.Category;
 import io.github.serfom256.intentflow.examples.shop.domain.Customer;
 import io.github.serfom256.intentflow.examples.shop.domain.Order;
 import io.github.serfom256.intentflow.examples.shop.domain.OrderStatus;
 import io.github.serfom256.intentflow.examples.shop.domain.Product;
+import io.github.serfom256.intentflow.examples.shop.store.CrudStore;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -66,11 +64,11 @@ abstract class LlmEvaluationSupport {
     @Autowired
     MockMvcTester mvc;
     @Autowired
-    ProductDao products;
+    CrudStore<Product> products;
     @Autowired
-    CustomerDao customers;
+    CrudStore<Customer> customers;
     @Autowired
-    OrderDao orders;
+    CrudStore<Order> orders;
     @Autowired
     JdbcClient jdbc;
 

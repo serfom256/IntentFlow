@@ -57,9 +57,9 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.3.0")
-    implementation("io.github.serfom256:intentflow-jdbc:0.3.0")
-    implementation("io.github.serfom256:intentflow-postgresql:0.3.0")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.3.1")
+    implementation("io.github.serfom256:intentflow-jdbc:0.3.1")
+    implementation("io.github.serfom256:intentflow-postgresql:0.3.1")
 }
 ```
 
@@ -252,7 +252,9 @@ Your ORM still loads the entities, so associations behave as usual:
   `@NamedEntityGraph(name = "Order.intentflow", attributeNodes = @NamedAttributeNode("customer"))`
 - **Jimmer** uses a `Fetcher` bean per entity type, e.g.
   `OrderFetcher.$.allScalarFields().customer(CustomerFetcher.$.allScalarFields())`
-- **OpenMapper** filters and sorts by `@Joined` fields but does not fill them
+- **OpenMapper** fills `@Joined` fields with one extra query per association, `WHERE <to> IN (...)` over the keys
+  of the page, never one per row. The target's restriction applies, a back-reference points to the already loaded
+  parent, and only the first level is loaded (the children's own `@Joined` fields stay empty)
 
 ## Aggregations and top rows
 
@@ -426,4 +428,5 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 ## Example application
 
 [`intentflow-examples`](intentflow-examples) is a complete shop: a Spring Boot API with natural-language search, a
-React UI, the admin UI, and a Docker Compose setup for PostgreSQL, MySQL and Cassandra.
+React UI, the admin UI, and a Docker Compose setup for PostgreSQL, MySQL and Cassandra. It runs on OpenMapper, JPA,
+Jimmer or plain JDBC, chosen by a Spring profile, so you can compare how each declares the same entities.

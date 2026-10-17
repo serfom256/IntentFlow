@@ -5,6 +5,7 @@ import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
+import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
@@ -15,6 +16,7 @@ import io.github.serfom256.intentflow.core.sql.plan.SqlPredicate;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 
 final class QueryPlanner {
 
@@ -59,6 +61,13 @@ final class QueryPlanner {
             scope.context().applied(Optimization.DATE_RANGES);
         }
         return rewritten;
+    }
+
+    static Select related(ServiceDescriptor target, String column, List<?> keys, PlanContext context) {
+        SqlScope scope = SqlScope.outer(context, target, Map.of(), false);
+        SqlPredicate in = new SqlPredicate.In(scope.column(column),
+                keys.stream().<SqlExpr>map(SqlExpr.Value::new).toList());
+        return Select.from(scope.from(), List.of(scope.allColumns()), scope.where(List.of(in)));
     }
 
     private static List<Select.Item> items(@Nullable Aggregate aggregate, SqlScope scope) {

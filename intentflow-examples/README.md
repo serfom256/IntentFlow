@@ -4,7 +4,7 @@ A complete example: a shop (products, customers, orders) with CRUD and plain-lan
 
 | Module                                       | Stack                                                                 |
 | -------------------------------------------- | --------------------------------------------------------------------- |
-| [`intentflow-shop-api`](intentflow-shop-api) | Spring Boot 4, IntentFlow with OpenMapper, Liquibase, PostgreSQL or MySQL |
+| [`intentflow-shop-api`](intentflow-shop-api) | Spring Boot 4, IntentFlow with OpenMapper, JPA, Jimmer or JDBC, Liquibase, PostgreSQL or MySQL |
 | [`intentflow-shop-ui`](intentflow-shop-ui)   | React 19, TypeScript, Mantine 9, TanStack Router and Query, Vite      |
 
 The API also includes the [admin UI](../intentflow-admin-spring-boot-starter/README.md) at
@@ -16,7 +16,7 @@ From the repository root, with an LLM at `http://localhost:1234/v1` (LM Studio; 
 `LLM_API_KEY`):
 
 ```
-intentflow-examples/run.sh [testcontainers|postgres|mysql]
+intentflow-examples/run.sh [testcontainers|postgres|mysql] [openmapper|jpa|jimmer|jdbc]
 ```
 
 This starts the API on port 8080 and the UI on http://localhost:5173; Ctrl+C stops both. To run them separately:
@@ -25,12 +25,31 @@ This starts the API on port 8080 and the UI on http://localhost:5173; Ctrl+C sto
 ./gradlew :intentflow-shop-api:bootTestRun                                     # PostgreSQL in a throwaway container
 docker compose up -d --wait && ./gradlew :intentflow-shop-api:bootRun          # PostgreSQL from Docker Compose
 ./gradlew :intentflow-shop-api:bootRun --args=--spring.profiles.active=mysql   # MySQL from Docker Compose
+./gradlew :intentflow-shop-api:bootRun --args=--spring.profiles.active=jpa     # JPA instead of OpenMapper
 ./gradlew :intentflow-shop-ui:dev                                              # the UI, proxying /api to port 8080
 ```
 
 Gradle downloads Node.js itself. Compose exposes PostgreSQL on 15432, MySQL on 13306 and Cassandra on 19042 (change
 with `POSTGRES_PORT`, `MYSQL_PORT`, `CASSANDRA_PORT`) and keeps their data in `./data`. `DB_URL`, `DB_USER` and
 `DB_PASSWORD` point the API at another database.
+
+## Persistence layers
+
+The same shop runs on four persistence layers; a Spring profile picks one, and the REST API, UI and tests stay the
+same. Each lives in its own package, so you can read just the one you use:
+
+| Profile                | Package       | Entities                                                       | Persistence                     |
+| ---------------------- | ------------- | -------------------------------------------------------------- | ------------------------------- |
+| `openmapper` (default) | `openmapper/` | `@Model` classes, relations with `@IntentRelation`             | `.fsql` procedures and DAOs     |
+| `jpa`                  | `jpa/`        | `@Entity` classes, relations from `@ManyToOne` / `@OneToMany`  | Spring Data JPA repositories    |
+| `jimmer`               | `jimmer/`     | Jimmer entity interfaces, relations from `@ManyToOne` / `@OneToMany` | `JSqlClient`              |
+| `jdbc`                 | `jdbc/`       | records, relations with `@IntentRelation`                      | `JdbcClient` with plain SQL     |
+
+What changes per profile is small: which entities `intentflow.catalog.packages` scans, which executor
+`intentflow.executor` uses, and which ORM's auto-configuration is on (see `application.yml`). The shared code works
+with the plain classes in `domain/` through `CrudStore`; each package implements it and maps its entities to them.
+Field descriptions for the LLM live in `domain/Descriptions`, so every profile describes the shop identically.
+Combine with `mysql` as `--spring.profiles.active=mysql,jpa`.
 
 ## API
 
@@ -70,7 +89,8 @@ and 3,000 orders, so answers go beyond the 50-row page like on real data. Produc
 ## Tests
 
 ```
-./gradlew :intentflow-shop-api:test        # API tests with a scripted LLM
+./gradlew :intentflow-shop-api:test        # API tests with a scripted LLM, on OpenMapper
+./gradlew :intentflow-shop-api:check       # the same tests on OpenMapper, JPA, Jimmer and JDBC
 ./gradlew :intentflow-shop-api:llmTest     # questions to the live LLM, results checked against the data
 ./gradlew :intentflow-shop-ui:assemble     # type check and production build of the UI
 ```

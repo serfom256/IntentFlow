@@ -31,6 +31,9 @@ public sealed interface SqlExpr {
     record InZone(SqlExpr value, ZoneId zone) implements SqlExpr {
     }
 
+    record Value(Object value) implements SqlExpr {
+    }
+
     record Null() implements SqlExpr {
     }
 

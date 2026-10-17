@@ -10,14 +10,23 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
+  jpa:
+    open-in-view: false
 
 openmapper:
   dao:
-    packagesToScan: io.github.serfom256.intentflow.examples.shop.dao
+    packagesToScan: io.github.serfom256.intentflow.examples.shop.openmapper
   model:
-    packagesToScan: io.github.serfom256.intentflow.examples.shop.domain
+    packagesToScan: io.github.serfom256.intentflow.examples.shop.openmapper
 
 intentflow:
+  executor: openmapper
+  catalog:
+    packages: io.github.serfom256.intentflow.examples.shop.openmapper
   llm:
     base-url: ${LLM_URL:http://localhost:1234/v1}
     model: ${LLM_MODEL:qwen/qwen3.8-27b}
@@ -32,6 +41,48 @@ intentflow:
 logging:
   level:
     io.github.serfom256.intentflow: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: jpa
+  autoconfigure:
+    exclude: io.github.serfom256.config.OpenMapperConfig
+intentflow:
+  executor: jpa
+  catalog:
+    packages: io.github.serfom256.intentflow.examples.shop.jpa
+
+---
+spring:
+  config:
+    activate:
+      on-profile: jimmer
+  autoconfigure:
+    exclude:
+      - io.github.serfom256.config.OpenMapperConfig
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
+intentflow:
+  executor: jimmer
+  catalog:
+    packages: io.github.serfom256.intentflow.examples.shop.jimmer
+
+---
+spring:
+  config:
+    activate:
+      on-profile: jdbc
+  autoconfigure:
+    exclude:
+      - io.github.serfom256.config.OpenMapperConfig
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
+intentflow:
+  executor: jdbc
+  catalog:
+    packages: io.github.serfom256.intentflow.examples.shop.jdbc
 
 ---
 spring:

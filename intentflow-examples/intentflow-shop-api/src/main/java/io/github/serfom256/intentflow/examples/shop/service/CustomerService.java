@@ -1,9 +1,8 @@
 package io.github.serfom256.intentflow.examples.shop.service;
 
-import io.github.serfom256.intentflow.examples.shop.dao.CustomerDao;
 import io.github.serfom256.intentflow.examples.shop.domain.Customer;
+import io.github.serfom256.intentflow.examples.shop.store.CrudStore;
 import io.github.serfom256.intentflow.examples.shop.web.CustomerRequest;
-import io.github.serfom256.model.page.PageRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,12 +15,12 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class CustomerService {
 
-    private final CustomerDao customers;
+    private final CrudStore<Customer> customers;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public PageResponse<Customer> list(int page, int size) {
-        return PageResponse.of(customers.findPage(PageRequest.of(page, size)));
+        return PageResponse.of(customers.findPage(page, size), page, size, customers.count());
     }
 
     @Transactional(readOnly = true)
@@ -31,7 +30,7 @@ public class CustomerService {
 
     @Transactional(readOnly = true)
     public boolean exists(long id) {
-        return customers.countById(id) > 0;
+        return customers.exists(id);
     }
 
     @Transactional
@@ -48,7 +47,7 @@ public class CustomerService {
 
     @Transactional
     public void delete(long id) {
-        if (customers.delete(id) == 0) {
+        if (!customers.delete(id)) {
             throw new NotFoundException("Customer", id);
         }
     }

@@ -3,8 +3,8 @@ package io.github.serfom256.intentflow.openmapper;
 import io.github.serfom256.annotations.entity.Model;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
+import io.github.serfom256.intentflow.core.pipeline.RelatedRows;
 import io.github.serfom256.procedures.Procedures;
-
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -29,6 +29,17 @@ public final class OpenMapperQueryExecutor implements QueryExecutor {
 
     @Override
     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
+        return execute(query, resultType, RelatedRows.NONE);
+    }
+
+    @Override
+    public <T> List<T> execute(BoundQuery query, Class<T> resultType, RelatedRows related) {
+        List<T> items = select(query, resultType);
+        new JoinedLoader(related, this::select).load(resultType, items);
+        return items;
+    }
+
+    private <T> List<T> select(BoundQuery query, Class<T> resultType) {
         if (resultType.getAnnotation(Model.class) == null) {
             throw new IllegalArgumentException(resultType.getName() + " is not an OpenMapper @Model");
         }

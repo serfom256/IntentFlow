@@ -5,6 +5,7 @@ import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
+import io.github.serfom256.intentflow.core.schema.TableFacts;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -41,6 +42,20 @@ class JpaNameResolverTest {
         @Id
         @IntentField
         Long id;
+    }
+
+    enum Level {
+        LOW, HIGH
+    }
+
+    static class NotAnEntity {
+        long id;
+        Level level;
+    }
+
+    @Test
+    void classesThatAreNotJpaEntitiesGetNoFacts() {
+        assertThat(new JpaNameResolver().facts(NotAnEntity.class)).isEqualTo(TableFacts.UNKNOWN);
     }
 
     @Test

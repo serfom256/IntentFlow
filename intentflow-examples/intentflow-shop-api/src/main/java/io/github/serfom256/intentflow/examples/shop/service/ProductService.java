@@ -1,9 +1,8 @@
 package io.github.serfom256.intentflow.examples.shop.service;
 
-import io.github.serfom256.intentflow.examples.shop.dao.ProductDao;
 import io.github.serfom256.intentflow.examples.shop.domain.Product;
+import io.github.serfom256.intentflow.examples.shop.store.CrudStore;
 import io.github.serfom256.intentflow.examples.shop.web.ProductRequest;
-import io.github.serfom256.model.page.PageRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,12 +14,12 @@ import java.time.OffsetDateTime;
 @RequiredArgsConstructor
 public class ProductService {
 
-    private final ProductDao products;
+    private final CrudStore<Product> products;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public PageResponse<Product> list(int page, int size) {
-        return PageResponse.of(products.findPage(PageRequest.of(page, size)));
+        return PageResponse.of(products.findPage(page, size), page, size, products.count());
     }
 
     @Transactional(readOnly = true)
@@ -43,7 +42,7 @@ public class ProductService {
 
     @Transactional
     public void delete(long id) {
-        if (products.delete(id) == 0) {
+        if (!products.delete(id)) {
             throw new NotFoundException("Product", id);
         }
     }

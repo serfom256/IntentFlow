@@ -7,10 +7,10 @@ import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
-import io.github.serfom256.intentflow.examples.shop.dao.CustomerDao;
-import io.github.serfom256.intentflow.examples.shop.dao.OrderDao;
-import io.github.serfom256.intentflow.examples.shop.dao.ProductDao;
+import io.github.serfom256.intentflow.examples.shop.domain.Customer;
+import io.github.serfom256.intentflow.examples.shop.domain.Order;
 import io.github.serfom256.intentflow.examples.shop.domain.Product;
+import io.github.serfom256.intentflow.examples.shop.store.CrudStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -29,11 +29,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ContainsSearchTest extends ApiTestSupport {
 
     @Autowired
-    ProductDao products;
+    CrudStore<Product> products;
     @Autowired
-    CustomerDao customers;
+    CrudStore<Customer> customers;
     @Autowired
-    OrderDao orders;
+    CrudStore<Order> orders;
     @Autowired
     DslParser parser;
     @Autowired

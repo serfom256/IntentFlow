@@ -1,6 +1,7 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
+import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
@@ -12,6 +13,7 @@ import io.github.serfom256.intentflow.core.sql.plan.Select;
 import io.github.serfom256.intentflow.core.sql.render.SqlRenderer;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -23,6 +25,8 @@ public final class DefaultSqlBuilder implements SqlBuilder {
     private final SqlRenderer renderer;
     private final SchemaFacts facts;
     private final Set<Optimization> optimizations;
+    private static final int RELATED_CHUNK = 512;
+
     private final ZoneId zone;
 
     public DefaultSqlBuilder(SqlDialect dialect) {
@@ -58,5 +62,22 @@ public final class DefaultSqlBuilder implements SqlBuilder {
         PlanContext context = new PlanContext(facts, optimizations, shape, dialect, zone, restrictions);
         Select select = QueryPlanner.plan(query, context);
         return renderer.render(select, context.applied());
+    }
+
+    @Override
+    public List<BoundQuery> buildRelated(ServiceDescriptor target, String column, List<?> keys,
+            Function<Class<?>, List<RuntimeRestriction>> restrictions) {
+        int chunk = Math.min(RELATED_CHUNK, dialect.capabilities().maxInListSize());
+        List<BoundQuery> queries = new ArrayList<>();
+        for (int from = 0; from < keys.size(); from += chunk) {
+            List<Object> part = new ArrayList<>(keys.subList(from, Math.min(keys.size(), from + chunk)));
+            int padded = Math.min(chunk, Integer.highestOneBit(part.size() - 1) << 1);
+            while (part.size() < padded) {
+                part.add(part.getLast());
+            }
+            PlanContext context = new PlanContext(facts, optimizations, ResultShape.ROWS, dialect, zone, restrictions);
+            queries.add(renderer.render(QueryPlanner.related(target, column, part, context), context.applied()));
+        }
+        return queries;
     }
 }

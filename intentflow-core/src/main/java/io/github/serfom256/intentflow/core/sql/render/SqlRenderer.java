@@ -174,6 +174,7 @@ public final class SqlRenderer {
                     dialect.timestamp(sql, timestamp.value());
                 }
             }
+            case SqlExpr.Value value -> sql.param(new TextLiteral(String.valueOf(value.value())), value.value());
             case SqlExpr.InZone inZone -> dialect.inZone(sql, inZone.zone(), () -> expr(inZone.value(), sql));
             case SqlExpr.Null n -> sql.text("NULL");
             case SqlExpr.Inline inline -> sql.text(Long.toString(inline.value()));

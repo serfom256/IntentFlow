@@ -42,7 +42,7 @@ public class CustomerController {
     @GetMapping("/search")
     public SearchResult<?> search(@RequestParam("q") @NotBlank @Size(max = 500) String query,
             @RequestParam(defaultValue = "false") boolean debug) {
-        return searchService.search(query, Customer.class, debug);
+        return searchService.search(query, "customers", debug);
     }
 
     @GetMapping("/{id}")

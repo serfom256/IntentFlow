@@ -7,12 +7,18 @@ dependencies {
     implementation(projects.intentflowAdminSpringBootStarter)
     implementation(projects.intentflowOpenmapper)
     implementation(libs.openmapper)
+    implementation(projects.intentflowJpa)
+    implementation(projects.intentflowJimmer)
+    implementation(libs.jimmer.sql)
+    annotationProcessor(libs.jimmer.apt)
+    implementation(projects.intentflowJdbc)
     implementation(projects.intentflowPostgresql)
     implementation(projects.intentflowMysql)
 
     implementation(platform(libs.spring.boot.dependencies))
     implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.jdbc)
+    implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.liquibase)
     runtimeOnly(libs.postgresql)
@@ -28,6 +34,21 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform { excludeTags("llm") }
+}
+
+val ormTests = listOf("jpa", "jimmer", "jdbc").map { orm ->
+    tasks.register<Test>("test${orm.replaceFirstChar(Char::uppercase)}") {
+        description = "Runs the API tests with the $orm profile instead of OpenMapper."
+        group = "verification"
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        useJUnitPlatform { excludeTags("llm") }
+        systemProperty("spring.profiles.active", orm)
+    }
+}
+
+tasks.check {
+    dependsOn(ormTests)
 }
 
 tasks.register<Test>("llmTest") {

@@ -70,6 +70,9 @@ public final class JpaNameResolver implements NameResolver {
 
     @Override
     public TableFacts facts(Class<?> type) {
+        if (!type.isAnnotationPresent(Entity.class)) {
+            return TableFacts.UNKNOWN;
+        }
         List<String> primaryKey = new ArrayList<>();
         Set<String> notNull = new LinkedHashSet<>();
         Map<String, List<String>> ordinals = new LinkedHashMap<>();

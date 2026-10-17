@@ -2,27 +2,34 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: intentflow-examples/run.sh [testcontainers|postgres|mysql]"
+  echo "usage: intentflow-examples/run.sh [testcontainers|postgres|mysql] [openmapper|jpa|jimmer|jdbc]"
   echo "  testcontainers  ephemeral PostgreSQL in a container (default)"
   echo "  postgres        PostgreSQL from docker-compose.yml"
   echo "  mysql           MySQL from docker-compose.yml"
+  echo "  the second argument picks the persistence layer (default openmapper)"
 }
 
 MODE="${1:-testcontainers}"
+ORM="${2:-openmapper}"
+case "$ORM" in
+  openmapper|jpa|jimmer|jdbc) ;;
+  *) usage; exit 1 ;;
+esac
+echo "Use ORM: $ORM"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 API_PORT="${API_PORT:-8080}"
 LOG="$ROOT/intentflow-examples/intentflow-shop-api/build/run.log"
 cd "$ROOT"
 
 case "$MODE" in
-  testcontainers) API_TASK=(:intentflow-shop-api:bootTestRun) ;;
+  testcontainers) API_TASK=(:intentflow-shop-api:bootTestRun "--args=--spring.profiles.active=$ORM") ;;
   postgres)
     docker compose up -d --wait postgres
-    API_TASK=(:intentflow-shop-api:bootRun)
+    API_TASK=(:intentflow-shop-api:bootRun "--args=--spring.profiles.active=$ORM")
     ;;
   mysql)
     docker compose up -d --wait mysql
-    API_TASK=(:intentflow-shop-api:bootRun --args=--spring.profiles.active=mysql)
+    API_TASK=(:intentflow-shop-api:bootRun "--args=--spring.profiles.active=mysql,$ORM")
     ;;
   -h|--help) usage; exit 0 ;;
   *) usage; exit 1 ;;
@@ -44,7 +51,7 @@ stop() {
 }
 trap stop EXIT INT TERM
 
-echo "starting the API ($MODE), log: $LOG"
+echo "starting the API ($MODE, $ORM), log: $LOG"
 SERVER_PORT="$API_PORT" ./gradlew --console=plain "${API_TASK[@]}" > "$LOG" 2>&1 &
 API_PID=$!
 
