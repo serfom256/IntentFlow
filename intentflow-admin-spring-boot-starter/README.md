@@ -6,7 +6,10 @@ A web UI, embedded in your application, for changing at runtime what your annota
 - service paths (`uri`), which are the links returned with each answer
 
 "Try a question" shows the DSL and SQL a question produces with the current descriptions, without running the
-query.
+query. With a PostgreSQL or MySQL `DataSource` it also shows the database's plan (`EXPLAIN`, which does not run the
+query either) and suggests indexes: on the columns a full scan filters or sorts by, an expression index for
+case-insensitive matches, and a trigram index for contains searches on PostgreSQL. Columns an existing index already
+covers are skipped. Review a suggestion before applying it: a planner often prefers a full scan on small tables.
 
 ## Setup
 
@@ -95,6 +98,7 @@ Outside Spring, `ServiceCatalogs.withOverrides(catalog, overrides)` applies over
 | intentflow.admin.table                  | intentflow_catalog_override | Table for the overrides                              |
 | intentflow.admin.create-table           | true                        | Create the table if it does not exist                |
 | intentflow.admin.refresh-interval       | 30s                         | How often an instance re-reads the table             |
+| intentflow.admin.index-advisor          | true                        | Show the query plan and index suggestions            |
 | intentflow.admin.security.enabled       | true                        | `false` opens the admin to everyone                  |
 | intentflow.admin.security.authorities   | ROLE_ADMIN                  | Authorities that grant access with Spring Security   |
 | intentflow.admin.security.login-url     | -                           | Login page the UI links to                           |

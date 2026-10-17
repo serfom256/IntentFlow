@@ -6,12 +6,15 @@ import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
 import io.github.serfom256.intentflow.core.pipeline.SqlWriter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 final class SqlBuffer implements SqlWriter {
 
     private final List<String> segments = new ArrayList<>();
     private final List<DslLiteral> params = new ArrayList<>();
+    private final Map<Integer, Object> typed = new HashMap<>();
     private final StringBuilder current = new StringBuilder(128);
 
     @Override
@@ -28,9 +31,15 @@ final class SqlBuffer implements SqlWriter {
         return this;
     }
 
+    @Override
+    public SqlBuffer param(DslLiteral display, Object value) {
+        typed.put(params.size(), value);
+        return param(display);
+    }
+
     BoundQuery toBoundQuery(List<String> optimizations) {
         List<String> all = new ArrayList<>(segments);
         all.add(current.toString());
-        return BoundQueries.of(all, params, optimizations);
+        return BoundQueries.of(all, params, optimizations, typed);
     }
 }

@@ -8,6 +8,7 @@ import io.github.serfom256.intentflow.core.sql.Optimization;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -24,5 +25,10 @@ public final class SqlBuilders {
 
     public static SqlBuilder create(SqlDialect dialect, SchemaFacts facts, Set<Optimization> optimizations) {
         return new DefaultSqlBuilder(dialect, facts, optimizations);
+    }
+
+    public static SqlBuilder create(SqlDialect dialect, SchemaFacts facts, Set<Optimization> optimizations,
+            ZoneId zone) {
+        return new DefaultSqlBuilder(dialect, facts, optimizations, zone);
     }
 }

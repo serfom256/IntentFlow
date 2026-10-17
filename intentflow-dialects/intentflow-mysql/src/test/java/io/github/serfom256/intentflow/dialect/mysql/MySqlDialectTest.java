@@ -27,9 +27,14 @@ import io.github.serfom256.intentflow.core.catalog.impl.DefaultFieldMapping;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
+import io.github.serfom256.intentflow.core.schema.SchemaFacts;
+import io.github.serfom256.intentflow.core.sql.Optimization;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.EnumSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +57,8 @@ class MySqlDialectTest {
                             List.of(), "publishedAt")),
             List.of(), MaxTakes.of(50), UriTemplates.of("/books"), Object.class);
 
-    private final SqlBuilder builder = SqlBuilders.create(new MySqlDialect());
+    private final SqlBuilder builder = SqlBuilders.create(new MySqlDialect(), SchemaFacts.none(),
+            EnumSet.allOf(Optimization.class), ZoneOffset.UTC);
 
     private BoundQuery build(@Nullable FilterExpr filter, List<SortKey> sort) {
         AstQuery ast = AstQueries.of(BOOKS, filter, sort, null, null);
@@ -73,26 +79,26 @@ class MySqlDialectTest {
     }
 
     @Test
-    void timestampLiteralsAreNormalisedForDatetimeCast() {
+    void timestampLiteralsAreBoundAsLocalDateTimes() {
         BoundQuery q = build(new In(PUBLISHED, List.of(
                 new TextLiteral("2026-07-01T10:15"),
                 new TextLiteral("2026-07-01 10:15:30.5"),
                 new TextLiteral("2026-07-01T10:15:30+02:00"))), List.of());
 
-        assertThat(q.sql()).contains("`published_at` IN (CAST(? AS DATETIME(6)), CAST(? AS DATETIME(6)),");
+        assertThat(q.sql()).contains("`published_at` IN (?, ?, ?)");
         assertThat(q.values()).containsExactly(
-                "2026-07-01 10:15:00.000000",
-                "2026-07-01 10:15:30.500000",
-                "2026-07-01 10:15:30.000000");
+                LocalDateTime.parse("2026-07-01T10:15"),
+                LocalDateTime.parse("2026-07-01T10:15:30.5"),
+                LocalDateTime.parse("2026-07-01T08:15:30"));
     }
 
     @Test
     void aDateWithoutTimeCoversTheWholeDay() {
         BoundQuery q = build(new Compare(PUBLISHED, ComparisonOp.EQ, new TextLiteral("2026-07-01")), List.of());
 
-        assertThat(q.sql()).contains(
-                "(`published_at` >= CAST(? AS DATETIME(6)) AND `published_at` < CAST(? AS DATETIME(6)))");
-        assertThat(q.values()).containsExactly("2026-07-01 00:00:00.000000", "2026-07-02 00:00:00.000000");
+        assertThat(q.sql()).contains("(`published_at` >= ? AND `published_at` < ?)");
+        assertThat(q.values()).containsExactly(LocalDateTime.parse("2026-07-01T00:00"),
+                LocalDateTime.parse("2026-07-02T00:00"));
     }
 
     @Test

@@ -2,10 +2,12 @@ package io.github.serfom256.intentflow.starter.autoconfigure;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
+import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -28,6 +30,12 @@ final class LazySqlBuilder implements SqlBuilder {
     @Override
     public BoundQuery build(ValidatedQuery query, ResultShape shape) {
         return delegate().build(query, shape);
+    }
+
+    @Override
+    public BoundQuery build(ValidatedQuery query, ResultShape shape,
+            Function<Class<?>, List<RuntimeRestriction>> restrictions) {
+        return delegate().build(query, shape, restrictions);
     }
 
     private SqlBuilder delegate() {

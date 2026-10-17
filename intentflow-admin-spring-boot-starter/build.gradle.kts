@@ -21,6 +21,9 @@ dependencies {
     testImplementation(libs.h2)
     testImplementation(libs.spring.security.core)
     testImplementation(libs.spring.security.web)
+    testImplementation(testFixtures(projects.intentflowCore))
+    testRuntimeOnly(libs.postgresql)
+    testRuntimeOnly(libs.mysql)
 }
 
 val ui = layout.projectDirectory.dir("src/main/ui")

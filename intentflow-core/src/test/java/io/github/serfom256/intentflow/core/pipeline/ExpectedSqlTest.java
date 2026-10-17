@@ -13,6 +13,7 @@ import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
+import io.github.serfom256.intentflow.core.sql.Optimization;
 import io.github.serfom256.intentflow.dialect.mysql.MySqlDialect;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -24,7 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -146,7 +149,8 @@ class ExpectedSqlTest {
             Map.of(ServiceNames.of("products"), "archived = false", ServiceNames.of("orders"), "deleted_at IS NULL"));
 
     private static SqlBuilder builder(String dialect) {
-        return SqlBuilders.create(dialect.equals("postgresql") ? new PostgresDialect() : new MySqlDialect());
+        return SqlBuilders.create(dialect.equals("postgresql") ? new PostgresDialect() : new MySqlDialect(),
+                SchemaFacts.none(), EnumSet.allOf(Optimization.class), ZoneOffset.UTC);
     }
 
     private static String render(SqlBuilder builder, List<String> queries) {
@@ -180,7 +184,8 @@ class ExpectedSqlTest {
     @ValueSource(strings = { "postgresql", "mysql" })
     void sqlWithSchemaFactsMatchesTheExpectedFile(String dialect) throws IOException {
         SqlDialect sqlDialect = dialect.equals("postgresql") ? new PostgresDialect() : new MySqlDialect();
-        compare(dialect + "-facts.sql", render(SqlBuilders.create(sqlDialect, FACTS), WITH_FACTS));
+        compare(dialect + "-facts.sql", render(SqlBuilders.create(sqlDialect, FACTS, EnumSet.allOf(Optimization.class),
+                ZoneOffset.UTC), WITH_FACTS));
     }
 
     @ParameterizedTest

@@ -1,12 +1,12 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -23,7 +23,7 @@ class TypedQueryTest {
     private final SqlBuilder sqlBuilder = SqlBuilders.create(new PostgresDialect());
 
     private String sql(String filter) {
-        var validated = validator.validate(parser.parse(DslSources.of("items | filter " + filter)), CATALOG);
+        ValidatedQuery validated = validator.validate(parser.parse(DslSources.of("items | filter " + filter)), CATALOG);
         String sql = sqlBuilder.build(validated).sql();
         return sql.substring(sql.indexOf(" WHERE ") + 7, sql.indexOf(" ORDER BY "));
     }
@@ -31,13 +31,13 @@ class TypedQueryTest {
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
             "name == \"Dune\"                       | LOWER(\"item_name\") = LOWER(?)",
-            "notes != \"x\"                         | LOWER(\"notes\") <> LOWER(?)",
+            "notes != \"x\"                         | (LOWER(\"notes\") <> LOWER(?) OR \"notes\" IS NULL)",
             "category in (\"laptop\", \"PHONE\")    | LOWER(\"cat\") IN (LOWER(?), LOWER(?))",
             "price == 10                            | \"price_usd\" = ?",
             "price in (1, 2.5, -3)                  | \"price_usd\" IN (?, ?, ?)",
             "active == true                         | \"is_active\" = ?",
-            "created >= \"2026-01-01\"              | \"created_at\" >= CAST(? AS TIMESTAMP)",
-            "created in (\"2026-01-01T09:00:00\", \"2026-02-01T10:00:00\") | \"created_at\" IN (CAST(? AS TIMESTAMP), CAST(? AS TIMESTAMP))",
+            "created >= \"2026-01-01\"              | \"created_at\" >= ?",
+            "created in (\"2026-01-01T09:00:00\", \"2026-02-01T10:00:00\") | \"created_at\" IN (?, ?)",
             "name < \"M\"                           | \"item_name\" < ?",
             "name ~ \"dun\"                         | \"item_name\" ILIKE ? ESCAPE '\\'",
     })

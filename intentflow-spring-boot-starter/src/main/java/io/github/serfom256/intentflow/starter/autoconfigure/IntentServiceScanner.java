@@ -4,6 +4,7 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.util.ClassUtils;
 
@@ -25,7 +26,7 @@ final class IntentServiceScanner extends ClassPathScanningCandidateComponentProv
 
     @Override
     protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
-        var metadata = beanDefinition.getMetadata();
+        AnnotationMetadata metadata = beanDefinition.getMetadata();
         return metadata.isIndependent() && !metadata.isAnnotation();
     }
 

@@ -23,14 +23,20 @@ import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.schema.JdbcSchemaIntrospector;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
+import io.github.serfom256.intentflow.core.sql.Optimization;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +72,10 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
     @IntentService(value = "notes", table = "conf_note", uri = "/notes/{{id}}", defaultSort = "id", restriction = "deleted = FALSE")
     @IntentRelation(name = "customer", service = "customers", from = "customer_id", to = "id")
     public record Note(@IntentField long id, @IntentField long customerId, @IntentField String text) {
+    }
+
+    @IntentService(value = "events", table = "conf_event", uri = "/events/{{id}}", defaultSort = "id")
+    public record Event(@IntentField long id, @IntentField OffsetDateTime at) {
     }
 
     @Override
@@ -156,6 +166,49 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         assertThat(ids("notes | filter text ~ \"call\"", Note.class)).containsExactly(1L);
         assertThat(ids("customers | filter notes.text ~ \"call\"", Customer.class)).containsExactly(1L);
         assertThat(ids("customers | filter not (notes.text ~ \"call\")", Customer.class))
+                .containsExactly(2L, 3L, 4L);
+    }
+
+    private List<Long> events(String dsl, ZoneId zone) {
+        TestDatabase.Endpoint endpoint = database().endpoint();
+        boolean mysql = database().dialect().name().equals("mysql");
+        try (Connection c = DriverManager.getConnection(endpoint.url(), endpoint.user(), endpoint.password());
+                Statement s = c.createStatement()) {
+            s.execute("DROP TABLE IF EXISTS conf_event");
+            s.execute("CREATE TABLE conf_event (id BIGINT PRIMARY KEY, at "
+                    + (mysql ? "TIMESTAMP NULL" : "TIMESTAMP WITH TIME ZONE") + ")");
+            try (PreparedStatement insert = c.prepareStatement("INSERT INTO conf_event VALUES (?, ?)")) {
+                List<String> instants = List.of("2026-10-09T21:30:00Z", "2026-10-09T22:30:00Z",
+                        "2026-10-10T21:30:00Z", "2026-10-10T22:30:00Z");
+                for (int i = 0; i < instants.size(); i++) {
+                    insert.setLong(1, i + 1);
+                    insert.setObject(2, OffsetDateTime.parse(instants.get(i)));
+                    insert.executeUpdate();
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+        Map<String, TableFacts> facts = new HashMap<>();
+        try {
+            facts.putAll(JdbcSchemaIntrospector.introspect(new DriverManagerDataSource(endpoint),
+                    List.of("conf_event")));
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+        IntentPipeline pipeline = IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
+                (text, scope) -> DslSources.of(dsl), DslParsers.create(), AstValidators.create(),
+                SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, Map.of()),
+                        EnumSet.allOf(Optimization.class), zone),
+                new PlainJdbcExecutor(endpoint), UriBuilders.create(), ServiceCatalogs.fromAnnotated(Event.class));
+        return pipeline.resolve(IntentRequests.of("q"), Event.class).items().stream().map(Event::id).toList();
+    }
+
+    @Test
+    void wholeDaysOfAZonedColumnFollowTheConfiguredZone() {
+        assertThat(events("events | filter at == \"2026-10-10\"", ZoneId.of("Europe/Berlin"))).containsExactly(2L, 3L);
+        assertThat(events("events | filter at == \"2026-10-10\"", ZoneOffset.UTC)).containsExactly(3L, 4L);
+        assertThat(events("events | filter at >= \"2026-10-10T00:00:00+02:00\"", ZoneOffset.UTC))
                 .containsExactly(2L, 3L, 4L);
     }
 

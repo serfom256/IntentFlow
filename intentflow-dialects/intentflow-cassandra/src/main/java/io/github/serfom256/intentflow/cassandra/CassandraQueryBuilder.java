@@ -23,9 +23,9 @@ import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -37,94 +37,121 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
-@RequiredArgsConstructor
 public final class CassandraQueryBuilder implements SqlBuilder {
 
     private final CqlSession session;
+    private final ZoneId zone;
+
+    public CassandraQueryBuilder(CqlSession session) {
+        this(session, ZoneId.systemDefault());
+    }
+
+    public CassandraQueryBuilder(CqlSession session, ZoneId zone) {
+        this.session = session;
+        this.zone = zone;
+    }
 
     @Override
     public BoundQuery build(ValidatedQuery query) {
         ServiceDescriptor service = query.service();
         AstQuery ast = query.ast();
-        TableMetadata table = table(service.table().value());
-
         if (!query.related().isEmpty()) {
             throw new ValidationException("Cassandra has no joins; filter on fields of '" + service.name().value()
                     + "' only, not on " + query.related().keySet());
         }
-        Map<String, CqlIdentifier> columns = new HashMap<>();
-        Set<String> caseSensitive = new HashSet<>();
-        Map<String, FieldType> types = new HashMap<>();
-        for (FieldMapping fm : service.fields()) {
-            columns.put(fm.logical().value(), CqlIdentifier.fromInternal(fm.column().value()));
-            types.put(fm.logical().value(), fm.type());
-            if (fm.caseSensitive()) {
-                caseSensitive.add(fm.logical().value());
-            }
-        }
+        Fields fields = Fields.of(service);
+        Pushdown pushdown = pushdown(table(service.table().value()), ast.filter(), fields);
 
+        int limit = ast.take() != null ? ast.take().value() : service.maxTake().value();
+        int skip = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
+        CqlExpressions expressions = new CqlExpressions(fields.columns(), fields.types(), zone);
+        RowFilter filter = new RowFilter(ast.filter(), fields.columns(), fields.caseSensitive(), expressions);
+        Aggregate aggregate = ast.aggregate();
+        if (aggregate == null) {
+            return new CassandraQuery(pushdown.segments(), pushdown.parameters(), pushdown.bindValues(), filter,
+                    RowOrder.of(query.effectiveSort(), fields.columns(), expressions), skip, limit, null,
+                    top(query, fields.columns(), expressions));
+        }
+        return new CassandraQuery(pushdown.segments(), pushdown.parameters(), pushdown.bindValues(), filter, null,
+                skip, limit, aggregate(query, aggregate, expressions), null);
+    }
+
+    private record Fields(Map<String, CqlIdentifier> columns, Set<String> caseSensitive, Map<String, FieldType> types) {
+
+        static Fields of(ServiceDescriptor service) {
+            Map<String, CqlIdentifier> columns = new HashMap<>();
+            Set<String> caseSensitive = new HashSet<>();
+            Map<String, FieldType> types = new HashMap<>();
+            for (FieldMapping fm : service.fields()) {
+                columns.put(fm.logical().value(), CqlIdentifier.fromInternal(fm.column().value()));
+                types.put(fm.logical().value(), fm.type());
+                if (fm.caseSensitive()) {
+                    caseSensitive.add(fm.logical().value());
+                }
+            }
+            return new Fields(columns, caseSensitive, types);
+        }
+    }
+
+    private record Pushdown(List<String> segments, List<DslLiteral> parameters, List<Object> bindValues) {
+    }
+
+    private Pushdown pushdown(TableMetadata table, @Nullable FilterExpr filterExpr, Fields fields) {
         List<String> segments = new ArrayList<>();
         List<DslLiteral> parameters = new ArrayList<>();
         List<Object> bindValues = new ArrayList<>();
         StringBuilder cql = new StringBuilder("SELECT * FROM ")
                 .append(table.getKeyspace().asCql(true)).append('.').append(table.getName().asCql(true));
-
         Map<CqlIdentifier, Restriction> restrictions = new HashMap<>();
         boolean where = false;
-        if (ast.filter() != null) {
-            for (FilterExpr conjunct : conjuncts(ast.filter(), new ArrayList<>())) {
-                if (!(conjunct instanceof Compare c)) {
-                    continue;
-                }
-                CqlIdentifier column = columns.get(c.field().value());
-                ColumnMetadata metadata = column == null ? null : table.getColumn(column).orElse(null);
-                boolean dayLiteral = c.value() instanceof TextLiteral t
-                        && CqlValues.dateOnly(t.value()).isPresent();
-                if (metadata == null || !pushable(table, metadata, c.op())
-                        || (CqlValues.isText(metadata.getType()) && c.op() != ComparisonOp.EQ)
-                        || (dayLiteral && c.op() != ComparisonOp.LT && c.op() != ComparisonOp.GE)) {
-                    continue;
-                }
-                Object bound = CqlValues.bindValue(metadata.getType(), c.value(),
-                        caseSensitive.contains(c.field().value()));
-                if (bound == null || !restrictions.computeIfAbsent(column, k -> new Restriction()).accepts(c.op())) {
-                    continue;
-                }
-                cql.append(where ? " AND " : " WHERE ").append(column.asCql(true)).append(' ')
-                        .append(cqlOp(c.op())).append(' ');
-                segments.add(cql.toString());
-                cql.setLength(0);
-                parameters.add(c.value());
-                bindValues.add(bound);
-                where = true;
+        List<FilterExpr> conjuncts = filterExpr == null ? List.of() : conjuncts(filterExpr, new ArrayList<>());
+        for (FilterExpr conjunct : conjuncts) {
+            if (!(conjunct instanceof Compare c)) {
+                continue;
             }
+            CqlIdentifier column = fields.columns().get(c.field().value());
+            ColumnMetadata metadata = column == null ? null : table.getColumn(column).orElse(null);
+            if (metadata == null || !pushable(table, metadata, c)) {
+                continue;
+            }
+            Object bound = CqlValues.bindValue(metadata.getType(), c.value(),
+                    fields.caseSensitive().contains(c.field().value()), zone);
+            if (bound == null || !restrictions.computeIfAbsent(column, k -> new Restriction()).accepts(c.op())) {
+                continue;
+            }
+            cql.append(where ? " AND " : " WHERE ").append(column.asCql(true)).append(' ')
+                    .append(cqlOp(c.op())).append(' ');
+            segments.add(cql.toString());
+            cql.setLength(0);
+            parameters.add(c.value());
+            bindValues.add(bound);
+            where = true;
         }
         if (where) {
             cql.append(" ALLOW FILTERING");
         }
         segments.add(cql.toString());
+        return new Pushdown(segments, parameters, bindValues);
+    }
 
-        int limit = ast.take() != null ? ast.take().value() : service.maxTake().value();
-        int skip = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
-        CqlExpressions expressions = new CqlExpressions(columns, types);
-        RowFilter filter = new RowFilter(ast.filter(), columns, caseSensitive, expressions);
-        Aggregate aggregate = ast.aggregate();
-        if (aggregate == null) {
-            return new CassandraQuery(segments, parameters, bindValues, filter,
-                    RowOrder.of(query.effectiveSort(), columns, expressions), skip, limit, null,
-                    top(query, columns, expressions));
-        }
+    private static boolean pushable(TableMetadata table, ColumnMetadata metadata, Compare c) {
+        boolean dayLiteral = c.value() instanceof TextLiteral t && CqlValues.dateOnly(t.value()).isPresent();
+        return pushable(table, metadata, c.op())
+                && (!CqlValues.isText(metadata.getType()) || c.op() == ComparisonOp.EQ)
+                && (!dayLiteral || c.op() == ComparisonOp.LT || c.op() == ComparisonOp.GE);
+    }
+
+    private static CassandraAggregate aggregate(ValidatedQuery query, Aggregate aggregate,
+            CqlExpressions expressions) {
         List<String> rowColumns = new ArrayList<>(aggregate.groupNames());
         rowColumns.add(ValidatedQuery.valueField(aggregate).value());
-        CassandraAggregate spec = new CassandraAggregate(
+        return new CassandraAggregate(
                 aggregate.function(),
                 aggregate.groupBy().stream()
-                        .<Function<Row, @Nullable Object>>map(
-                                g -> row -> expressions.eval(g, row))
+                        .<Function<Row, @Nullable Object>>map(g -> row -> expressions.eval(g, row))
                         .toList(),
                 aggregate.argument() == null ? null : row -> expressions.eval(aggregate.argument(), row),
                 RowOrder.ofValues(query.effectiveSort(), rowColumns));
-        return new CassandraQuery(segments, parameters, bindValues, filter, null, skip, limit, spec, null);
     }
 
     private static @Nullable UnaryOperator<List<Row>> top(ValidatedQuery query, Map<String, CqlIdentifier> columns,

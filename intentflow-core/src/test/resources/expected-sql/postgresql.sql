@@ -39,28 +39,28 @@ SELECT * FROM "product" WHERE "discount" IS NOT NULL ORDER BY "id" ASC LIMIT 50
 binds: []
 
 -- products | filter created_at == "2026-10-10"
-SELECT * FROM "product" WHERE ("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP)) ORDER BY "id" ASC LIMIT 50
-binds: [2026-10-10, 2026-10-11]
+SELECT * FROM "product" WHERE ("created_at" >= ? AND "created_at" < ?) ORDER BY "id" ASC LIMIT 50
+binds: [2026-10-10T00:00, 2026-10-11T00:00]
 
 -- products | filter created_at != "2026-10-10"
-SELECT * FROM "product" WHERE ("created_at" < CAST(? AS TIMESTAMP) OR "created_at" >= CAST(? AS TIMESTAMP)) ORDER BY "id" ASC LIMIT 50
-binds: [2026-10-10, 2026-10-11]
+SELECT * FROM "product" WHERE (("created_at" < ? OR "created_at" >= ?) OR "created_at" IS NULL) ORDER BY "id" ASC LIMIT 50
+binds: [2026-10-10T00:00, 2026-10-11T00:00]
 
 -- products | filter created_at > "2026-10-10"
-SELECT * FROM "product" WHERE "created_at" >= CAST(? AS TIMESTAMP) ORDER BY "id" ASC LIMIT 50
-binds: [2026-10-11]
+SELECT * FROM "product" WHERE "created_at" >= ? ORDER BY "id" ASC LIMIT 50
+binds: [2026-10-11T00:00]
 
 -- products | filter created_at <= "2026-10-10"
-SELECT * FROM "product" WHERE "created_at" < CAST(? AS TIMESTAMP) ORDER BY "id" ASC LIMIT 50
-binds: [2026-10-11]
+SELECT * FROM "product" WHERE "created_at" < ? ORDER BY "id" ASC LIMIT 50
+binds: [2026-10-11T00:00]
 
 -- products | filter created_at < "2026-10-10T10:15:00"
-SELECT * FROM "product" WHERE "created_at" < CAST(? AS TIMESTAMP) ORDER BY "id" ASC LIMIT 50
-binds: [2026-10-10T10:15:00]
+SELECT * FROM "product" WHERE "created_at" < ? ORDER BY "id" ASC LIMIT 50
+binds: [2026-10-10T10:15]
 
 -- products | filter created_at in ("2026-10-10", "2026-10-12")
-SELECT * FROM "product" WHERE (("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP)) OR ("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP))) ORDER BY "id" ASC LIMIT 50
-binds: [2026-10-10, 2026-10-11, 2026-10-12, 2026-10-13]
+SELECT * FROM "product" WHERE (("created_at" >= ? AND "created_at" < ?) OR ("created_at" >= ? AND "created_at" < ?)) ORDER BY "id" ASC LIMIT 50
+binds: [2026-10-10T00:00, 2026-10-11T00:00, 2026-10-12T00:00, 2026-10-13T00:00]
 
 -- products | filter coalesce(discount, 0) > 10
 SELECT * FROM "product" WHERE COALESCE("discount", ?) > ? ORDER BY "id" ASC LIMIT 50
@@ -71,8 +71,8 @@ SELECT * FROM "product" WHERE ("price" * (? - (CAST(COALESCE("discount", ?) AS N
 binds: [1, 0, 100, 500]
 
 -- products | filter year(created_at) == 2025 and month(created_at) in (1, 2, 3)
-SELECT * FROM "product" WHERE ("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP) AND EXTRACT(MONTH FROM "created_at") IN (?, ?, ?)) ORDER BY "id" ASC LIMIT 50
-binds: [2025-01-01, 2026-01-01, 1, 2, 3]
+SELECT * FROM "product" WHERE ("created_at" >= ? AND "created_at" < ? AND EXTRACT(MONTH FROM "created_at") IN (?, ?, ?)) ORDER BY "id" ASC LIMIT 50
+binds: [2025-01-01T00:00, 2026-01-01T00:00, 1, 2, 3]
 optimizations: date-ranges
 
 -- products | filter lower(name) ~ "pro"
@@ -84,8 +84,8 @@ SELECT * FROM "product" WHERE (CHAR_LENGTH("name") > ? AND ROUND(CAST("price" AS
 binds: [10, 100, 10, 5]
 
 -- products | filter date_trunc("month", created_at) == "2026-01-01"
-SELECT * FROM "product" WHERE ("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP)) ORDER BY "id" ASC LIMIT 50
-binds: [2026-01-01, 2026-02-01]
+SELECT * FROM "product" WHERE ("created_at" >= ? AND "created_at" < ?) ORDER BY "id" ASC LIMIT 50
+binds: [2026-01-01T00:00, 2026-02-01T00:00]
 optimizations: date-ranges
 
 -- products | filter created_at::date == "2026-10-10"
@@ -165,16 +165,16 @@ SELECT "status", COUNT(*) FROM "orders" GROUP BY "status" ORDER BY "status" ASC 
 binds: []
 
 -- orders | filter created_at >= "2026-01-01" | group date_trunc("month", created_at) | sum total
-SELECT DATE_TRUNC('month', "created_at") AS "intentflow_g0", SUM("total") FROM "orders" WHERE "created_at" >= CAST(? AS TIMESTAMP) GROUP BY "intentflow_g0" ORDER BY SUM("total") DESC NULLS LAST, "intentflow_g0" ASC LIMIT 50
-binds: [2026-01-01]
+SELECT DATE_TRUNC('month', "created_at") AS "intentflow_g0", SUM("total") FROM "orders" WHERE "created_at" >= ? GROUP BY "intentflow_g0" ORDER BY SUM("total") DESC NULLS LAST, "intentflow_g0" ASC LIMIT 50
+binds: [2026-01-01T00:00]
 
 -- orders | filter status != "cancelled" | take 5
-SELECT * FROM "orders" WHERE LOWER("status") <> LOWER(?) ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 5
+SELECT * FROM "orders" WHERE (LOWER("status") <> LOWER(?) OR "status" IS NULL) ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 5
 binds: [cancelled]
 
 -- customers | filter name ~ "ann" and created_at >= "2025-01-01" | sort created_at desc
-SELECT * FROM "customer" WHERE ("name" ILIKE ? ESCAPE '\' AND "created_at" >= CAST(? AS TIMESTAMP)) ORDER BY "created_at" DESC NULLS LAST, "id" ASC LIMIT 50
-binds: [%ann%, 2025-01-01]
+SELECT * FROM "customer" WHERE ("name" ILIKE ? ESCAPE '\' AND "created_at" >= ?) ORDER BY "created_at" DESC NULLS LAST, "id" ASC LIMIT 50
+binds: [%ann%, 2025-01-01T00:00]
 
 -- orders | filter customer.name ~ "o" and items_count > 2
 SELECT * FROM "orders" WHERE (EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "orders"."customer_id" AND "intentflow_r"."name" ILIKE ? ESCAPE '\') AND "items_count" > ?) ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 50

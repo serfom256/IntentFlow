@@ -25,7 +25,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public final class OpenAiCompatibleLlmClient implements LlmClient {
 
@@ -112,13 +114,29 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
 
     @Override
     public DslSource generateDsl(UserText normalizedText, ServiceCatalog catalog) {
+        return complete(catalog, List.of(message("user", normalizedText.value())));
+    }
+
+    @Override
+    public DslSource repairDsl(UserText normalizedText, ServiceCatalog catalog, DslSource failed, String error) {
+        return complete(catalog, List.of(
+                message("user", normalizedText.value()),
+                message("assistant", failed.value()),
+                message("user", "That query was rejected: " + error + ". Reply with a corrected query only, "
+                        + "or unsupported \"<reason>\" if the request cannot be expressed.")));
+    }
+
+    private static String message(String role, String content) {
+        return "{\"role\":" + MiniJson.quote(role) + ",\"content\":" + MiniJson.quote(content) + "}";
+    }
+
+    private DslSource complete(ServiceCatalog catalog, List<String> messages) {
         String body = "{"
                 + "\"model\":" + MiniJson.quote(model) + ","
                 + "\"temperature\":0,"
                 + "\"messages\":["
-                + "{\"role\":\"system\",\"content\":" + MiniJson.quote(systemPrompt(catalog, LocalDate.now(clock)))
-                + "},"
-                + "{\"role\":\"user\",\"content\":" + MiniJson.quote(normalizedText.value()) + "}"
+                + message("system", systemPrompt(catalog, LocalDate.now(clock)))
+                + messages.stream().map(m -> "," + m).collect(Collectors.joining())
                 + "]}";
 
         HttpRequest.Builder request = HttpRequest.newBuilder(endpoint)
@@ -218,7 +236,7 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
 
     static String cleanup(String raw) {
         String s = THINK_BLOCK.matcher(raw).replaceAll("").strip();
-        var fence = CODE_FENCE.matcher(s);
+        Matcher fence = CODE_FENCE.matcher(s);
         if (fence.matches()) {
             s = fence.group(1).strip();
         }

@@ -4,6 +4,7 @@ import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
+import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
 import org.junit.jupiter.api.Test;
@@ -87,7 +88,7 @@ class InterfaceEntityTest {
     @Test
     void uriPlaceholdersReadAccessorMethods() {
         ServiceDescriptor books = ServiceDescriptors.fromAnnotated(Book.class);
-        var query = ValidatedQueries.of(books, AstQueries.of(books.name(), null, List.of(), null, null));
+        ValidatedQuery query = ValidatedQueries.of(books, AstQueries.of(books.name(), null, List.of(), null, null));
 
         assertThat(UriBuilders.create().build(query, List.of(new BookImpl(7, "Dune", BigDecimal.ONE, true))).value())
                 .isEqualTo("/books/7");

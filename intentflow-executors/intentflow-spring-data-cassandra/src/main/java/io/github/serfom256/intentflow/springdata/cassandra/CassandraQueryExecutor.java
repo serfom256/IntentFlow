@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 public final class CassandraQueryExecutor implements QueryExecutor {
 
@@ -70,7 +71,7 @@ public final class CassandraQueryExecutor implements QueryExecutor {
         Map<List<@Nullable Object>, Accumulator> groups = new LinkedHashMap<>();
         for (Row row : matching(q, Integer.MAX_VALUE)) {
             List<@Nullable Object> key = new ArrayList<>(aggregate.groups().size());
-            for (var group : aggregate.groups()) {
+            for (Function<Row, @Nullable Object> group : aggregate.groups()) {
                 key.add(group.apply(row));
             }
             Object value = aggregate.argument() == null ? null : aggregate.argument().apply(row);

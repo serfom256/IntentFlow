@@ -32,6 +32,7 @@ Data Cassandra) maps the rows.
 - [Cassandra](#cassandra)
 - [Admin UI](#admin-ui)
 - [Adding a database](#adding-a-database)
+- [Releasing](#releasing)
 - [Configuration](#configuration)
 - [Example application](#example-application)
 
@@ -45,7 +46,8 @@ Data Cassandra) maps the rows.
   → execute:   List<Product>, mapped by your persistence layer
 ```
 
-Translations are cached, so a repeated question skips the LLM.
+Translations are cached, so a repeated question skips the LLM. When the LLM writes a query that does not parse or
+validate, it is shown the error and asked for a corrected one, up to `intentflow.llm.max-repairs` times.
 
 ## Quick start
 
@@ -184,7 +186,11 @@ customers | filter vip == true and not (created_at < "2026-01-01")
 
 - Text comparisons ignore case unless the field is `caseSensitive`
 - NULLs sort last in both directions
-- A date without a time means the whole day: `created_at == "2026-10-10"` matches any time that day
+- `!=` and `not (...)` keep rows where the field is NULL: `status != "paid"` also returns orders without a status,
+  as a person asking would expect. Use `and status != null` to leave them out
+- A date without a time means the whole day: `created_at == "2026-10-10"` matches any time that day, from midnight
+  in `intentflow.time-zone`
+- `in (...)` takes at most `intentflow.max-in-values` values
 - If a question, or any part of it, can't be expressed with the catalog, the LLM declines instead of answering a
   narrower question
 
@@ -321,7 +327,8 @@ wins:
 
 1. The database: primary keys, unique indexes, NOT NULL columns
 2. The ORM: `@Id`, `@Column(nullable = false)`, Jimmer's non-null properties, OpenMapper's primary key
-3. The Java model: primitives are NOT NULL, enums store their constant names
+3. The Java model: primitives are NOT NULL, enums store their constant names, except JPA enums without
+   `@Enumerated(STRING)`, which store ordinals: they are compared as numbers and shown by name
 
 `intentflow.schema.introspect=false` skips the database. Anything unknown is assumed the safe way (nullable, not
 unique), which gives plain, conservative SQL.
@@ -344,8 +351,16 @@ that service, including counts and relation subqueries. It comes from Hibernate'
 **Schemas.** Tables may be schema-qualified: `@IntentService(table = "billing.invoice")` or JPA's
 `@Table(schema = "billing")`.
 
-Not handled yet: JPA enums stored as ordinals (the default), Hibernate `@Filter`s enabled per session, and the
-discriminator of single-table inheritance.
+**Time zones.** Dates are bound as typed values, never as text the database interprets in its session zone. A
+column that stores an instant (PostgreSQL `timestamptz`, MySQL `TIMESTAMP`, or a Java `Instant`, `OffsetDateTime`
+or `ZonedDateTime`) gets an `OffsetDateTime` in `intentflow.time-zone`; any other timestamp gets the local date and
+time. On PostgreSQL, `year(t)`, `hour(t)` and `date_trunc` of an instant column are taken in that zone too. MySQL
+takes them in the session's zone, so keep it equal to `intentflow.time-zone`.
+
+**Inheritance and filters.** A service on a JPA subclass in single-table inheritance sees only rows of that
+class and its subclasses (`DTYPE IN (...)`). Hibernate `@Filter`s enabled on the current session are added to the
+query with their parameters bound, as Hibernate would for its own queries. Another executor can add such
+session-dependent conditions through `QueryExecutor.restrictions`.
 
 ## Debugging
 
@@ -371,13 +386,20 @@ redeploy, and for trying questions against the live catalog. See the [admin READ
 A SQL dialect is a module with three parts:
 
 1. A `SqlDialect`: quoting, contains, timestamps, null ordering, casts, date functions and paging.
-   `PostgresDialect` and `MySqlDialect` are complete examples of about 100 lines
+   `PostgresDialect` and `MySqlDialect` are complete examples of about 100 lines. `capabilities()` declares what
+   the database lacks (window functions, native booleans) and its limits (`in` list size, bound parameters), so a
+   query it cannot run is rejected with a clear message instead of failing in the database
 2. A `META-INF/services/io.github.serfom256.intentflow.core.pipeline.SqlDialect` entry
 3. A test extending `DialectConformanceTest` that returns your `TestDatabase` (a Testcontainers container)
 
 The conformance test runs thousands of random queries against the real database and compares every result with an
 independent in-memory evaluation. `ExpectedSqlTest` pins the SQL of about 60 queries per dialect in `src/test/resources/expected-sql`, so any change to the
 generated SQL shows up as a readable diff.
+
+## Releasing
+
+The version lives only in `gradle.properties`. After changing it, `./gradlew syncVersion` writes it into the READMEs
+and the UI packages; `./gradlew build` fails while they are out of date.
 
 ## Configuration
 
@@ -388,12 +410,15 @@ generated SQL shows up as a readable diff.
 | intentflow.llm.model                  | -                           | Model id; required unless you define an `LlmClient` |
 | intentflow.llm.api-key                | empty                       | Bearer token; empty for local servers               |
 | intentflow.llm.timeout                | 60s                         | Timeout of one LLM call                             |
+| intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
 | intentflow.catalog.packages           | your application's packages | Where `@IntentService` classes are scanned          |
 | intentflow.executor                   | first available             | `openmapper`, `jpa`, `jimmer`, `spring-data-jdbc`, `cassandra` or `jdbc` |
 | intentflow.dialect                    | detected                    | `postgresql` or `mysql`                             |
 | intentflow.max-skip                   | 10000                       | Largest `skip` a query may use                      |
+| intentflow.max-in-values              | 1000                        | Most values in one `in (...)`                       |
+| intentflow.time-zone                  | the JVM's zone              | Zone for dates without an offset, e.g. `Europe/Berlin` |
 | intentflow.schema.introspect          | true                        | Read keys and NOT NULL columns from the database    |
 | intentflow.sql.disabled-optimizations | empty                       | Optimizations to switch off                         |
 | intentflow.cassandra.max-scanned-rows | 10000                       | Rows one Cassandra query may read                   |

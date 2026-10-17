@@ -43,13 +43,13 @@ binds: []
 optimizations: not-null-ordering
 
 -- orders | filter year(created_at) == 2026 and month(created_at) == 3 and day(created_at) == 9
-SELECT * FROM "orders" WHERE ("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP)) AND (deleted_at IS NULL) ORDER BY "created_at" DESC, "id" DESC LIMIT 50
-binds: [2026-03-09, 2026-03-10]
+SELECT * FROM "orders" WHERE ("created_at" >= ? AND "created_at" < ?) AND (deleted_at IS NULL) ORDER BY "created_at" DESC, "id" DESC LIMIT 50
+binds: [2026-03-09T00:00, 2026-03-10T00:00]
 optimizations: not-null-ordering, date-ranges
 
 -- orders | filter year(created_at) in (2024, 2025) or year(created_at) > 2025
-SELECT * FROM "orders" WHERE ((("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP)) OR ("created_at" >= CAST(? AS TIMESTAMP) AND "created_at" < CAST(? AS TIMESTAMP))) OR "created_at" >= CAST(? AS TIMESTAMP)) AND (deleted_at IS NULL) ORDER BY "created_at" DESC, "id" DESC LIMIT 50
-binds: [2024-01-01, 2025-01-01, 2025-01-01, 2026-01-01, 2026-01-01]
+SELECT * FROM "orders" WHERE ((("created_at" >= ? AND "created_at" < ?) OR ("created_at" >= ? AND "created_at" < ?)) OR "created_at" >= ?) AND (deleted_at IS NULL) ORDER BY "created_at" DESC, "id" DESC LIMIT 50
+binds: [2024-01-01T00:00, 2025-01-01T00:00, 2025-01-01T00:00, 2026-01-01T00:00, 2026-01-01T00:00]
 optimizations: not-null-ordering, date-ranges
 
 -- invoices | sort customer.name desc

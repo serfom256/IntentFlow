@@ -36,6 +36,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
+import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
 
 import java.util.HashMap;
@@ -46,12 +47,21 @@ import java.util.Map;
 public final class DefaultAstValidator implements AstValidator {
 
     private final int maxSkip;
+    private final int maxInValues;
 
     public DefaultAstValidator(int maxSkip) {
+        this(maxSkip, AstValidators.DEFAULT_MAX_IN_VALUES);
+    }
+
+    public DefaultAstValidator(int maxSkip, int maxInValues) {
         if (maxSkip < 0) {
             throw new IllegalArgumentException("maxSkip must not be negative: " + maxSkip);
         }
+        if (maxInValues < 1) {
+            throw new IllegalArgumentException("maxInValues must be positive: " + maxInValues);
+        }
         this.maxSkip = maxSkip;
+        this.maxInValues = maxInValues;
     }
 
     @Override
@@ -208,6 +218,12 @@ public final class DefaultAstValidator implements AstValidator {
         return fields;
     }
 
+    private void checkInSize(int size) {
+        if (size > maxInValues) {
+            throw new ValidationException("'in' takes at most " + maxInValues + " values, got " + size);
+        }
+    }
+
     private void validateFilter(FilterExpr expr, Fields fields) {
         switch (expr) {
             case And a -> {
@@ -221,6 +237,7 @@ public final class DefaultAstValidator implements AstValidator {
             case Not n -> validateFilter(n.inner(), fields);
             case Compare c -> checkCompare(c, fields.any(c.field(), "filter"));
             case In i -> {
+                checkInSize(i.values().size());
                 FieldMapping fm = fields.any(i.field(), "filter");
                 for (DslLiteral v : i.values()) {
                     checkValue(fm, ComparisonOp.EQ, v);
@@ -230,6 +247,7 @@ public final class DefaultAstValidator implements AstValidator {
             case IsNotNull i -> fields.any(i.field(), "filter");
             case ExprCompare c -> checkExprCompare(c, fields.types);
             case ExprIn i -> {
+                checkInSize(i.values().size());
                 ExprTypes.Type type = fields.types.check(i.value());
                 for (DslLiteral v : i.values()) {
                     checkOperands(fields.types, i.value(), type, ComparisonOp.EQ, new LiteralExpr(v));

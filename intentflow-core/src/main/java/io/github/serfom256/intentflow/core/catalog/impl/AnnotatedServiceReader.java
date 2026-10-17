@@ -182,6 +182,7 @@ public final class AnnotatedServiceReader {
 
     public static TableFacts facts(Class<?> type, List<NameResolver> resolvers) {
         Set<String> notNull = new HashSet<>();
+        Set<String> zoned = new HashSet<>();
         Map<String, List<String>> exactValues = new LinkedHashMap<>();
         for (FieldMapping fm : declaredMappings(type, resolvers)) {
             Class<?> javaType = javaType(type, fm.property());
@@ -191,12 +192,15 @@ public final class AnnotatedServiceReader {
             if (javaType.isPrimitive()) {
                 notNull.add(fm.column().value());
             }
+            if (javaType == Instant.class || javaType == OffsetDateTime.class || javaType == ZonedDateTime.class) {
+                zoned.add(fm.column().value());
+            }
             IntentField meta = annotation(type, fm.property());
             if (javaType.isEnum() && meta != null && meta.values().length == 0) {
                 exactValues.put(fm.column().value(), enumNames(javaType));
             }
         }
-        TableFacts facts = new TableFacts(List.of(), List.of(), notNull, exactValues);
+        TableFacts facts = new TableFacts(List.of(), List.of(), notNull, exactValues, zoned);
         for (NameResolver resolver : resolvers) {
             facts = facts.merge(resolver.facts(type));
         }

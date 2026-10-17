@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Optional;
@@ -24,7 +24,7 @@ import java.util.Optional;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class CqlValues {
 
-    public static @Nullable Comparable<?> comparable(@Nullable Object value) {
+    public static @Nullable Comparable<?> comparable(@Nullable Object value, ZoneId zone) {
         return switch (value) {
             case null -> null;
             case String s -> s;
@@ -37,15 +37,16 @@ public final class CqlValues {
             case Double n -> Double.isFinite(n) ? BigDecimal.valueOf(n) : null;
             case Float n -> Float.isFinite(n) ? new BigDecimal(Float.toString(n)) : null;
             case Boolean b -> b;
-            case Instant t -> LocalDateTime.ofInstant(t, ZoneOffset.UTC);
+            case Instant t -> LocalDateTime.ofInstant(t, zone);
             case LocalDate d -> d.atStartOfDay();
             case LocalDateTime t -> t;
             default -> value.toString();
         };
     }
 
-    static @Nullable Integer compare(Object column, DslLiteral literal, boolean equality, boolean caseSensitive) {
-        return switch (comparable(column)) {
+    static @Nullable Integer compare(Comparable<?> column, DslLiteral literal, boolean equality,
+            boolean caseSensitive) {
+        return switch (column) {
             case String s when literal instanceof TextLiteral t -> equality && !caseSensitive
                     ? lower(s).compareTo(lower(t.value()))
                     : s.compareTo(t.value());
@@ -90,7 +91,7 @@ public final class CqlValues {
         return type.equals(DataTypes.TEXT) || type.equals(DataTypes.ASCII);
     }
 
-    static @Nullable Object bindValue(DataType type, DslLiteral literal, boolean caseSensitive) {
+    static @Nullable Object bindValue(DataType type, DslLiteral literal, boolean caseSensitive, ZoneId zone) {
         if (literal instanceof TextLiteral t && isText(type)) {
             return caseSensitive ? t.value() : null;
         }
@@ -128,7 +129,7 @@ public final class CqlValues {
             return b.value();
         }
         if (literal instanceof TextLiteral t && type.equals(DataTypes.TIMESTAMP)) {
-            return parseTimestamp(t.value()).map(d -> d.toInstant(ZoneOffset.UTC)).orElse(null);
+            return parseTimestamp(t.value()).map(d -> d.atZone(zone).toInstant()).orElse(null);
         }
         return null;
     }

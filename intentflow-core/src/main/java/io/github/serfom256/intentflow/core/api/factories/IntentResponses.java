@@ -33,4 +33,9 @@ public final class IntentResponses {
             List<String> optimizations) {
         return new DefaultIntentTrace(dsl, cached, query, parameters, optimizations);
     }
+
+    public static IntentTrace trace(String dsl, boolean cached, String query, List<Object> parameters,
+            List<String> optimizations, int repairs) {
+        return new DefaultIntentTrace(dsl, cached, query, parameters, optimizations, repairs);
+    }
 }

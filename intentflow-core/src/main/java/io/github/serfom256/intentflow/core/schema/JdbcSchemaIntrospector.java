@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -48,10 +49,11 @@ public final class JdbcSchemaIntrospector {
         String catalog = connection.getCatalog();
         for (String candidate : variants(name)) {
             for (String inSchema : schemas) {
-                Set<String> notNull = notNullColumns(metaData, catalog, inSchema, candidate);
-                if (notNull != null) {
+                Columns columns = columns(metaData, catalog, inSchema, candidate);
+                if (columns != null) {
                     return new TableFacts(primaryKey(metaData, catalog, inSchema, candidate),
-                            uniqueKeys(metaData, catalog, inSchema, candidate), notNull, Map.of());
+                            uniqueKeys(metaData, catalog, inSchema, candidate), columns.notNull(), Map.of(),
+                            columns.zoned());
                 }
             }
         }
@@ -70,19 +72,34 @@ public final class JdbcSchemaIntrospector {
         }
     }
 
-    private static @Nullable Set<String> notNullColumns(DatabaseMetaData metaData, String catalog,
-            @Nullable String schema, String table) throws SQLException {
+    private record Columns(Set<String> notNull, Set<String> zoned) {
+    }
+
+    private static @Nullable Columns columns(DatabaseMetaData metaData, String catalog, @Nullable String schema,
+            String table) throws SQLException {
         Set<String> notNull = new HashSet<>();
+        Set<String> zoned = new HashSet<>();
+        boolean mysql = metaData.getDatabaseProductName().toLowerCase(Locale.ROOT).matches(".*(mysql|mariadb).*");
         boolean found = false;
         try (ResultSet rs = metaData.getColumns(catalog, schema, table, "%")) {
             while (rs.next()) {
                 found = true;
+                String column = rs.getString("COLUMN_NAME");
                 if ("NO".equals(rs.getString("IS_NULLABLE"))) {
-                    notNull.add(rs.getString("COLUMN_NAME"));
+                    notNull.add(column);
+                }
+                if (zoned(rs.getInt("DATA_TYPE"), rs.getString("TYPE_NAME"), mysql)) {
+                    zoned.add(column);
                 }
             }
         }
-        return found ? notNull : null;
+        return found ? new Columns(notNull, zoned) : null;
+    }
+
+    private static boolean zoned(int dataType, @Nullable String typeName, boolean mysql) {
+        String type = typeName == null ? "" : typeName.toLowerCase(Locale.ROOT);
+        return dataType == Types.TIMESTAMP_WITH_TIMEZONE || type.equals("timestamptz")
+                || type.equals("timestamp with time zone") || (mysql && type.equals("timestamp"));
     }
 
     private static List<String> primaryKey(DatabaseMetaData metaData, String catalog, @Nullable String schema,

@@ -10,6 +10,7 @@ import io.github.serfom256.intentflow.core.ast.ExprFunction;
 import io.github.serfom256.intentflow.core.ast.ExprIn;
 import io.github.serfom256.intentflow.core.ast.FieldRef;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
+import io.github.serfom256.intentflow.core.ast.IsNull;
 import io.github.serfom256.intentflow.core.ast.LiteralExpr;
 import io.github.serfom256.intentflow.core.ast.Not;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
@@ -40,21 +41,31 @@ final class DateRanges {
     private DateRanges() {
     }
 
-    static FilterExpr rewrite(FilterExpr expr, Predicate<LogicalFieldName> timestamp) {
+    static FilterExpr rewrite(FilterExpr expr, Predicate<LogicalFieldName> timestamp,
+            Predicate<LogicalFieldName> nullable) {
         return switch (expr) {
-            case And a -> conjunction(a, timestamp);
+            case And a -> conjunction(a, timestamp, nullable);
             case Or o -> {
-                FilterExpr left = rewrite(o.left(), timestamp);
-                FilterExpr right = rewrite(o.right(), timestamp);
+                FilterExpr left = rewrite(o.left(), timestamp, nullable);
+                FilterExpr right = rewrite(o.right(), timestamp, nullable);
                 yield left == o.left() && right == o.right() ? o : new Or(left, right);
             }
             case Not n -> {
-                FilterExpr inner = rewrite(n.inner(), timestamp);
-                yield inner == n.inner() ? n : new Not(inner);
+                FilterExpr inner = rewrite(n.inner(), timestamp, nullable);
+                if (inner == n.inner()) {
+                    yield n;
+                }
+                LogicalFieldName field = negatedField(n.inner());
+                yield field != null && nullable.test(field) ? new Or(new Not(inner), new IsNull(field))
+                        : new Not(inner);
             }
             case ExprCompare c -> {
                 FilterExpr range = single(c, timestamp);
-                yield range == null ? c : range;
+                LogicalFieldName field = rangeField(c.left());
+                if (range == null || field == null) {
+                    yield c;
+                }
+                yield c.op() == ComparisonOp.NE && nullable.test(field) ? new Or(range, new IsNull(field)) : range;
             }
             case ExprIn i -> {
                 FilterExpr range = years(i, timestamp);
@@ -64,7 +75,24 @@ final class DateRanges {
         };
     }
 
-    private static FilterExpr conjunction(And and, Predicate<LogicalFieldName> timestamp) {
+    private static @Nullable LogicalFieldName negatedField(FilterExpr inner) {
+        return switch (inner) {
+            case ExprCompare c when c.op() != ComparisonOp.NE -> rangeField(c.left());
+            case ExprIn i -> rangeField(i.value());
+            default -> null;
+        };
+    }
+
+    private static @Nullable LogicalFieldName rangeField(ValueExpr value) {
+        if (value instanceof Call call && !call.args().isEmpty()
+                && call.args().getLast() instanceof FieldRef f) {
+            return f.field();
+        }
+        return null;
+    }
+
+    private static FilterExpr conjunction(And and, Predicate<LogicalFieldName> timestamp,
+            Predicate<LogicalFieldName> nullable) {
         List<FilterExpr> parts = new ArrayList<>();
         flatten(and, parts);
         Map<LogicalFieldName, Map<ExprFunction, Integer>> positions = new LinkedHashMap<>();
@@ -103,7 +131,7 @@ final class DateRanges {
             if (rewritten[i] == null) {
                 continue;
             }
-            FilterExpr part = rewritten[i] == parts.get(i) ? rewrite(parts.get(i), timestamp) : rewritten[i];
+            FilterExpr part = rewritten[i] == parts.get(i) ? rewrite(parts.get(i), timestamp, nullable) : rewritten[i];
             changed |= part != parts.get(i);
             result = result == null ? part : new And(result, part);
         }

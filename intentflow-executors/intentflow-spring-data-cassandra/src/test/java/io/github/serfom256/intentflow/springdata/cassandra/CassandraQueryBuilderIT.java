@@ -4,6 +4,7 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import io.github.serfom256.intentflow.cassandra.CassandraQuery;
 import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
+import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
@@ -34,6 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -109,7 +111,7 @@ class CassandraQueryBuilderIT {
                 ServiceDescriptors.fromAnnotated(Reading.class, List.copyOf(resolvers)),
                 ServiceDescriptors.fromAnnotated(Plain.class, List.copyOf(resolvers)),
                 ServiceDescriptors.fromAnnotated(Item.class, List.copyOf(resolvers)));
-        builder = new CassandraQueryBuilder(session);
+        builder = new CassandraQueryBuilder(session, ZoneOffset.UTC);
     }
 
     @AfterAll
@@ -118,7 +120,7 @@ class CassandraQueryBuilderIT {
     }
 
     private CassandraQuery build(String dsl) {
-        var ast = DslParsers.create().parse(DslSources.of(dsl));
+        AstQuery ast = DslParsers.create().parse(DslSources.of(dsl));
         return (CassandraQuery) builder.build(AstValidators.create().validate(ast, catalog));
     }
 
@@ -216,7 +218,7 @@ class CassandraQueryBuilderIT {
 
     @Test
     void unknownTableFailsWithItsName() {
-        CassandraQueryBuilder other = new CassandraQueryBuilder(session);
+        CassandraQueryBuilder other = new CassandraQueryBuilder(session, ZoneOffset.UTC);
         ServiceCatalog missing = ServiceCatalogs.of(ServiceDescriptors.of(
                 ServiceNames.of("ghosts"), null,
                 TableNames.of("ghost"),
@@ -224,7 +226,7 @@ class CassandraQueryBuilderIT {
                         .orElseThrow().fields(),
                 List.of(), MaxTakes.of(10),
                 UriTemplates.of("/g"), Plain.class));
-        var ast = DslParsers.create().parse(DslSources.of("ghosts"));
+        AstQuery ast = DslParsers.create().parse(DslSources.of("ghosts"));
 
         assertThatThrownBy(() -> other.build(AstValidators.create().validate(ast, missing)))
                 .isInstanceOf(IllegalStateException.class)

@@ -49,7 +49,7 @@ class CachingAndLimitsTest {
                     return DslSources.of(answers.size() > 1 ? answers.poll() : answers.peek());
                 },
                 DslParsers.create(), validator, SqlBuilders.create(new PostgresDialect()), executor,
-                UriBuilders.create(), CATALOG);
+                UriBuilders.create(), CATALOG, 0);
     }
 
     @Test

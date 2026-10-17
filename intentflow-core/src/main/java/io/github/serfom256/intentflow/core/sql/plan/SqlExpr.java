@@ -5,6 +5,7 @@ import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.ExprFunction;
 import org.jspecify.annotations.Nullable;
 
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -20,7 +21,14 @@ public sealed interface SqlExpr {
     record Param(DslLiteral value) implements SqlExpr {
     }
 
-    record TimestampParam(DslLiteral value) implements SqlExpr {
+    record TimestampParam(DslLiteral value, @Nullable Object bound) implements SqlExpr {
+
+        public TimestampParam(DslLiteral value) {
+            this(value, null);
+        }
+    }
+
+    record InZone(SqlExpr value, ZoneId zone) implements SqlExpr {
     }
 
     record Null() implements SqlExpr {
@@ -59,6 +67,13 @@ public sealed interface SqlExpr {
     }
 
     record ExactText(SqlExpr value) implements SqlExpr {
+    }
+
+    record EnumName(SqlExpr ordinal, List<String> names) implements SqlExpr {
+
+        public EnumName {
+            names = List.copyOf(names);
+        }
     }
 
     record Subquery(Select select) implements SqlExpr {

@@ -44,6 +44,9 @@ public sealed interface SqlPredicate {
     record Raw(String sql) implements SqlPredicate {
     }
 
+    record Bound(List<String> segments, List<Object> values) implements SqlPredicate {
+    }
+
     record Exists(Select select) implements SqlPredicate {
     }
 }

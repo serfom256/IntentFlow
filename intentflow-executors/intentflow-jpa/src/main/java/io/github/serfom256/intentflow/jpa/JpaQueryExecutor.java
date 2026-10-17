@@ -4,10 +4,12 @@ import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.catalog.factories.ColumnNames;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
+import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Id;
+import jakarta.persistence.PersistenceUnitUtil;
 import jakarta.persistence.Query;
 import jakarta.persistence.TypedQuery;
 import jakarta.persistence.metamodel.BasicType;
@@ -49,6 +51,14 @@ public final class JpaQueryExecutor implements QueryExecutor {
     @Override
     public ResultShape shape(Class<?> resultType) {
         return loadsById(resultType) ? ResultShape.KEYS : ResultShape.ROWS;
+    }
+
+    @Override
+    public List<RuntimeRestriction> restrictions(Class<?> entityType) {
+        if (!HIBERNATE || entityType.getAnnotation(Entity.class) == null) {
+            return List.of();
+        }
+        return HibernateFilters.enabled(entityManager.unwrap(Session.class), entityType);
     }
 
     private boolean loadsById(Class<?> resultType) {
@@ -94,7 +104,7 @@ public final class JpaQueryExecutor implements QueryExecutor {
                 .findFirst()
                 .ifPresent(fetch -> load.unwrap(SelectionQuery.class).setEntityGraph(fetch, GraphSemantic.FETCH));
         Map<Object, T> byId = new HashMap<>();
-        var util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        PersistenceUnitUtil util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
         for (T row : load.getResultList()) {
             byId.put(util.getIdentifier(row), row);
         }

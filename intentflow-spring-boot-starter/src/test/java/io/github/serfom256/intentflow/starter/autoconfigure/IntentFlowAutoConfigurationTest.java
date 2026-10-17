@@ -470,7 +470,7 @@ class IntentFlowAutoConfigurationTest {
                 "intentflow.catalog.packages=io.github.serfom256.intentflow.starter.autoconfigure.jpa")
                 .withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
                 .run(ctx -> {
-                    var service = ctx.getBean(ServiceCatalog.class).get(ServiceNames.of("shelves"));
+                    ServiceDescriptor service = ctx.getBean(ServiceCatalog.class).get(ServiceNames.of("shelves"));
                     assertThat(service.table().value()).isEqualTo("library_shelf");
                     assertThat(service.fields()).extracting(f -> f.column().value())
                             .containsExactly("shelf_id", "label_text");

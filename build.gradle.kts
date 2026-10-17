@@ -1,6 +1,5 @@
 allprojects {
     group = "io.github.serfom256"
-    version = "0.3.0"
 
     repositories {
         mavenCentral()
@@ -93,5 +92,59 @@ subprojects {
                 }
             }
         }
+    }
+}
+
+val versionedFiles = fileTree(rootDir) {
+    include("README.md", "*/README.md", "*/*/README.md", "intentflow-examples/intentflow-shop-ui/package.json",
+        "intentflow-admin-spring-boot-starter/src/main/ui/package.json")
+    exclude("**/node_modules/**", "**/build/**")
+}
+val dependencyVersion = Regex("""(io\.github\.serfom256:intentflow-[a-z-]+:)[0-9][^"\s)]*""")
+val mavenVersion = Regex("""(<artifactId>intentflow-[a-z-]+</artifactId>\s*<version>)[^<]+""")
+val packageVersion = Regex("""("version":\s*")[^"]+""")
+
+fun versioned(text: String, file: File): String {
+    val version = project.version.toString()
+    return if (file.name == "package.json") {
+        packageVersion.replaceFirst(text, "$1$version")
+    } else {
+        mavenVersion.replace(dependencyVersion.replace(text, "$1$version"), "$1$version")
+    }
+}
+
+tasks.register("syncVersion") {
+    description = "Writes the version from gradle.properties into the READMEs and UI package.json files."
+    group = "build"
+    doLast {
+        versionedFiles.forEach { file ->
+            val text = file.readText()
+            val updated = versioned(text, file)
+            if (updated != text) {
+                file.writeText(updated)
+                logger.lifecycle("Updated ${file.relativeTo(rootDir)}")
+            }
+        }
+    }
+}
+
+val checkVersion = tasks.register("checkVersion") {
+    description = "Fails when a README or UI package.json does not match the version in gradle.properties."
+    group = "verification"
+    inputs.files(versionedFiles)
+    inputs.property("version", project.version.toString())
+    doLast {
+        val stale = versionedFiles.filter { versioned(it.readText(), it) != it.readText() }
+        if (!stale.isEmpty) {
+            throw GradleException("Version ${project.version} is not written in " + stale.joinToString {
+                it.relativeTo(rootDir).path
+            } + "; run ./gradlew syncVersion")
+        }
+    }
+}
+
+subprojects {
+    tasks.matching { it.name == "check" }.configureEach {
+        dependsOn(checkVersion)
     }
 }

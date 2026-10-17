@@ -59,7 +59,7 @@ class CassandraDifferentialIT extends DifferentialTestBase {
 
     @Override
     protected SqlBuilder sqlBuilder() {
-        return new CassandraQueryBuilder(session);
+        return new CassandraQueryBuilder(session, ZoneOffset.UTC);
     }
 
     @Override

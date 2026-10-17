@@ -30,6 +30,17 @@ public interface QueryExecutor {
     }
 
     /**
+     * Conditions that rows of {@code entityType} must meet in the session this
+     * executor runs in, such as the
+     * Hibernate filters enabled on the current session. They are added to every
+     * query of that entity, including
+     * relation subqueries. The default adds none.
+     */
+    default List<RuntimeRestriction> restrictions(Class<?> entityType) {
+        return List.of();
+    }
+
+    /**
      * Runs an aggregate query and returns its columns as plain values, in select
      * order: the group
      * fields, then the aggregated value.

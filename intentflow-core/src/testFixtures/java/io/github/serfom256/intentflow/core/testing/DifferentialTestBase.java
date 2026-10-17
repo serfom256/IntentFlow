@@ -415,6 +415,9 @@ public abstract class DifferentialTestBase {
             return op == ComparisonOp.EQ ? left == null : left != null;
         }
         Object right = value(rightExpr, row);
+        if (left == null && op == ComparisonOp.NE) {
+            return true;
+        }
         if (left == null || right == null) {
             return null;
         }
@@ -460,6 +463,9 @@ public abstract class DifferentialTestBase {
                         : l == null || r == null ? null : Boolean.FALSE;
             }
             case Not n -> {
+                if (nullOperand(n.inner(), row)) {
+                    yield true;
+                }
                 Boolean v = eval(n.inner(), row);
                 yield v == null ? null : !v;
             }
@@ -492,7 +498,7 @@ public abstract class DifferentialTestBase {
             case Compare c -> {
                 Object col = row.get(c.field().value());
                 if (col == null) {
-                    yield null;
+                    yield c.op() == ComparisonOp.NE ? Boolean.TRUE : null;
                 }
                 FieldMapping fm = fields.get(c.field().value());
                 Boolean day = fm.type() == FieldType.TIMESTAMP
@@ -511,6 +517,18 @@ public abstract class DifferentialTestBase {
                     case GE -> compare(fm, col, c.value(), false) >= 0;
                 };
             }
+        };
+    }
+
+    private boolean nullOperand(FilterExpr inner, Map<String, Object> row) {
+        return switch (inner) {
+            case Compare c when c.op() != ComparisonOp.NE -> row.get(c.field().value()) == null;
+            case In i -> row.get(i.field().value()) == null;
+            case ExprCompare c when c.op() != ComparisonOp.NE
+                    && !(c.right() instanceof LiteralExpr l && l.value() instanceof NullLiteral) ->
+                value(c.left(), row) == null;
+            case ExprIn i -> value(i.value(), row) == null;
+            default -> false;
         };
     }
 

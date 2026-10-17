@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
@@ -10,6 +11,9 @@ import io.github.serfom256.intentflow.core.sql.plan.SqlExpr;
 import io.github.serfom256.intentflow.core.sql.plan.SqlPredicate;
 import org.jspecify.annotations.Nullable;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -81,8 +85,33 @@ final class SqlScope {
         return column(field(name).column().value());
     }
 
+    SqlExpr value(LogicalFieldName name) {
+        List<String> names = ordinals(name);
+        return names.isEmpty() ? column(name) : new SqlExpr.EnumName(column(name), names);
+    }
+
+    List<String> ordinals(LogicalFieldName name) {
+        return facts.ordinalValues(field(name).column().value());
+    }
+
     SqlExpr.Column column(String column) {
         return new SqlExpr.Column(alias != null ? alias : qualified ? reference() : null, column);
+    }
+
+    SqlExpr timestamp(LogicalFieldName name, String text) {
+        return timestamp(name, Timestamps.local(text, context.zone()));
+    }
+
+    SqlExpr timestamp(LogicalFieldName name, LocalDateTime local) {
+        if (zoned(name)) {
+            OffsetDateTime at = local.atZone(context.zone()).toOffsetDateTime();
+            return new SqlExpr.TimestampParam(new TextLiteral(at.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)), at);
+        }
+        return new SqlExpr.TimestampParam(new TextLiteral(local.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)), local);
+    }
+
+    boolean zoned(LogicalFieldName name) {
+        return facts.isZoned(field(name).column().value());
     }
 
     boolean notNull(LogicalFieldName name) {
@@ -123,8 +152,18 @@ final class SqlScope {
     }
 
     List<SqlPredicate> restriction() {
+        List<SqlPredicate> restriction = new ArrayList<>();
         String sql = context.restriction(service.name());
-        return sql == null ? List.of() : List.of(new SqlPredicate.Raw(sql));
+        if (sql != null) {
+            restriction.add(new SqlPredicate.Raw(sql));
+        }
+        context.runtimeRestrictions(service).forEach(r -> restriction.add(new SqlPredicate.Bound(r.segments(),
+                r.values())));
+        return restriction;
+    }
+
+    private boolean restricted(ServiceDescriptor candidate) {
+        return context.restriction(candidate.name()) != null || !context.runtimeRestrictions(candidate).isEmpty();
     }
 
     List<SqlPredicate> where(List<SqlPredicate> conditions) {
@@ -145,8 +184,7 @@ final class SqlScope {
         TableFacts targetFacts = context.facts(target.table().value());
         String toColumn = target.fields().stream().filter(f -> f.logical().equals(relation.to())).findFirst()
                 .map(f -> f.column().value()).orElse(relation.to().value());
-        return isOuter() && context.restriction(service.name()) == null
-                && context.restriction(target.name()) == null && targetFacts.isUnique(toColumn);
+        return isOuter() && !restricted(service) && !restricted(target) && targetFacts.isUnique(toColumn);
     }
 
     SqlScope join(String relationName) {

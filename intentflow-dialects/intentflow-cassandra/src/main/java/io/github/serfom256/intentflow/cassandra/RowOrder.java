@@ -29,7 +29,7 @@ final class RowOrder {
                     throw new IllegalArgumentException(
                             "logical field '" + key.field().value() + "' has no column mapping");
                 }
-                read = row -> CqlValues.comparable(row.getObject(column));
+                read = row -> expressions.comparable(row.getObject(column));
             }
             Comparator<Comparable<?>> values = RowOrder::compareValues;
             if (key.direction() == SortKey.Direction.DESC) {

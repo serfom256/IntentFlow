@@ -127,7 +127,9 @@ class SqlBuilderTest {
         FilterExpr f = new Compare(YEAR, op, new NumberLiteral(new BigDecimal("2000")));
         BoundQuery r = build(f, List.of(), null, null,
                 booksService(100, List.of()));
-        assertThat(r.sql()).contains("WHERE \"year\" " + sqlOp + " ?");
+        assertThat(r.sql()).contains(op == ComparisonOp.NE
+                ? "WHERE (\"year\" <> ? OR \"year\" IS NULL)"
+                : "WHERE \"year\" " + sqlOp + " ?");
         assertThat(r.parameters()).containsExactly(new NumberLiteral(new BigDecimal("2000")));
     }
 
@@ -167,7 +169,7 @@ class SqlBuilderTest {
         BoundQuery r = build(f, List.of(), null, null,
                 booksService(100, List.of()));
         assertThat(r.sql()).contains(
-                "WHERE (LOWER(\"author_name\") = LOWER(?) AND (\"year\" >= ? OR NOT (\"year\" = ?)))");
+                "WHERE (LOWER(\"author_name\") = LOWER(?) AND (\"year\" >= ? OR (NOT (\"year\" = ?) OR \"year\" IS NULL)))");
         assertThat(r.parameters()).hasSize(3);
     }
 
@@ -175,7 +177,7 @@ class SqlBuilderTest {
     void textNotEqualIsCaseInsensitive() {
         BoundQuery r = build(new Compare(AUTHOR, ComparisonOp.NE, new TextLiteral("Doe")),
                 List.of(), null, null, booksService(100, List.of()));
-        assertThat(r.sql()).contains("WHERE LOWER(\"author_name\") <> LOWER(?)");
+        assertThat(r.sql()).contains("WHERE (LOWER(\"author_name\") <> LOWER(?) OR \"author_name\" IS NULL)");
     }
 
     @Test

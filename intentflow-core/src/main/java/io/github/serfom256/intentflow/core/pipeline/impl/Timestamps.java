@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -20,6 +21,19 @@ final class Timestamps {
 
     static boolean isDateOnly(String text) {
         return parses(() -> LocalDate.parse(text.strip()));
+    }
+
+    static LocalDateTime local(String text, ZoneId zone) {
+        String s = text.strip().replace(' ', 'T');
+        try {
+            return LocalDate.parse(s).atStartOfDay();
+        } catch (DateTimeParseException notDate) {
+            try {
+                return LocalDateTime.parse(s);
+            } catch (DateTimeParseException notLocal) {
+                return OffsetDateTime.parse(s).atZoneSameInstant(zone).toLocalDateTime();
+            }
+        }
     }
 
     static String nextDay(String date) {

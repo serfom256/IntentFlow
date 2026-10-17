@@ -5,13 +5,16 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import io.github.serfom256.intentflow.core.ast.And;
 import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
+import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.ExprCompare;
 import io.github.serfom256.intentflow.core.ast.ExprIn;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.In;
 import io.github.serfom256.intentflow.core.ast.IsNotNull;
 import io.github.serfom256.intentflow.core.ast.IsNull;
+import io.github.serfom256.intentflow.core.ast.LiteralExpr;
 import io.github.serfom256.intentflow.core.ast.Not;
+import io.github.serfom256.intentflow.core.ast.NullLiteral;
 import io.github.serfom256.intentflow.core.ast.Or;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
@@ -57,19 +60,22 @@ final class RowFilter implements Predicate<Row> {
                 yield Boolean.TRUE.equals(r) ? Boolean.TRUE : l == null || r == null ? null : Boolean.FALSE;
             }
             case Not n -> {
+                if (nullOperand(n.inner(), row)) {
+                    yield true;
+                }
                 Boolean v = eval(n.inner(), row);
                 yield v == null ? null : !v;
             }
             case IsNull n -> value(row, n.field()) == null;
             case IsNotNull n -> value(row, n.field()) != null;
             case In in -> {
-                Object value = value(row, in.field());
+                Comparable<?> value = value(row, in.field());
                 if (value == null) {
                     yield null;
                 }
                 boolean unknown = false;
-                for (var literal : in.values()) {
-                    if (CqlValues.comparable(value) instanceof LocalDateTime
+                for (DslLiteral literal : in.values()) {
+                    if (value instanceof LocalDateTime
                             && literal instanceof TextLiteral t && CqlValues.dateOnly(t.value()).isPresent()) {
                         Boolean sameDay = compare(new Compare(in.field(), ComparisonOp.EQ, literal), row);
                         if (Boolean.TRUE.equals(sameDay)) {
@@ -93,17 +99,29 @@ final class RowFilter implements Predicate<Row> {
         };
     }
 
+    private boolean nullOperand(FilterExpr inner, Row row) {
+        return switch (inner) {
+            case Compare c when c.op() != ComparisonOp.NE -> value(row, c.field()) == null;
+            case In i -> value(row, i.field()) == null;
+            case ExprCompare c when c.op() != ComparisonOp.NE
+                    && !(c.right() instanceof LiteralExpr l && l.value() instanceof NullLiteral) ->
+                expressions.eval(c.left(), row) == null;
+            case ExprIn i -> expressions.eval(i.value(), row) == null;
+            default -> false;
+        };
+    }
+
     private @Nullable Boolean compare(Compare c, Row row) {
-        Object value = value(row, c.field());
+        Comparable<?> value = value(row, c.field());
         if (value == null) {
-            return null;
+            return c.op() == ComparisonOp.NE ? Boolean.TRUE : null;
         }
         if (c.op() == ComparisonOp.CONTAINS) {
             return value instanceof String s && c.value() instanceof TextLiteral t
                     ? CqlValues.lower(s).contains(CqlValues.lower(t.value()))
                     : null;
         }
-        if (CqlValues.comparable(value) instanceof LocalDateTime at && c.value() instanceof TextLiteral t) {
+        if (value instanceof LocalDateTime at && c.value() instanceof TextLiteral t) {
             Optional<LocalDate> day = CqlValues.dateOnly(t.value());
             if (day.isPresent()) {
                 LocalDateTime start = day.get().atStartOfDay();
@@ -138,11 +156,11 @@ final class RowFilter implements Predicate<Row> {
         };
     }
 
-    private @Nullable Object value(Row row, LogicalFieldName field) {
+    private @Nullable Comparable<?> value(Row row, LogicalFieldName field) {
         CqlIdentifier column = columns.get(field.value());
         if (column == null) {
             throw new IllegalArgumentException("logical field '" + field.value() + "' has no column mapping");
         }
-        return row.getObject(column);
+        return expressions.comparable(row.getObject(column));
     }
 }

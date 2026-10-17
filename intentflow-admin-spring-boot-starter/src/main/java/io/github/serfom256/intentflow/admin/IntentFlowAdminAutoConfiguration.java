@@ -108,8 +108,10 @@ public class IntentFlowAdminAutoConfiguration {
         }
 
         @Bean
-        CatalogAdmin intentFlowCatalogAdmin(ServiceCatalog catalog, ObjectProvider<IntentPipeline> pipeline) {
-            return new CatalogAdmin(catalog, pipeline.getObject());
+        CatalogAdmin intentFlowCatalogAdmin(ServiceCatalog catalog, ObjectProvider<IntentPipeline> pipeline,
+                ObjectProvider<DataSource> dataSource) {
+            DataSource source = properties.indexAdvisor() ? dataSource.getIfUnique() : null;
+            return new CatalogAdmin(catalog, pipeline.getObject(), source == null ? null : new IndexAdvisor(source));
         }
 
         @Bean

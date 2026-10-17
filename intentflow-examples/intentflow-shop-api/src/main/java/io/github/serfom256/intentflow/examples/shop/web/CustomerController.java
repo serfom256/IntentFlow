@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.net.URI;
+
 @RestController
 @RequestMapping("/api/customers")
 @RequiredArgsConstructor
@@ -51,7 +53,7 @@ public class CustomerController {
     @PostMapping
     public ResponseEntity<Customer> create(@Valid @RequestBody CustomerRequest request) {
         Customer created = customerService.create(request);
-        var location = ServletUriComponentsBuilder.fromCurrentRequest()
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(created.getId()).toUri();
         return ResponseEntity.created(location).body(created);
     }

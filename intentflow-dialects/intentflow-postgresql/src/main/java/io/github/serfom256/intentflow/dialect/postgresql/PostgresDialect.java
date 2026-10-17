@@ -7,6 +7,8 @@ import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
 import io.github.serfom256.intentflow.core.pipeline.SqlWriter;
 
+import java.time.ZoneId;
+
 public final class PostgresDialect implements SqlDialect {
 
     @Override
@@ -41,6 +43,13 @@ public final class PostgresDialect implements SqlDialect {
         sql.text("DATE_TRUNC('" + unit + "', ");
         value.run();
         sql.text(")");
+    }
+
+    @Override
+    public void inZone(SqlWriter sql, ZoneId zone, Runnable value) {
+        sql.text("(");
+        value.run();
+        sql.text(" AT TIME ZONE '" + zone.getId().replace("'", "''") + "')");
     }
 
     @Override

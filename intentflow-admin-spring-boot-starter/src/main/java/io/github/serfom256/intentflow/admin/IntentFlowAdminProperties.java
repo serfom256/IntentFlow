@@ -16,6 +16,7 @@ public record IntentFlowAdminProperties(
         @DefaultValue("intentflow_catalog_override") String table,
         @DefaultValue("true") boolean createTable,
         @DefaultValue("30s") Duration refreshInterval,
+        @DefaultValue("true") boolean indexAdvisor,
         @DefaultValue Security security) {
 
     private static final Pattern PATH = Pattern.compile("(/[A-Za-z0-9._~-]+)+");

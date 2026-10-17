@@ -16,6 +16,7 @@ import io.github.serfom256.intentflow.core.dsl.StringToken;
 import io.github.serfom256.intentflow.core.dsl.Token;
 import io.github.serfom256.intentflow.core.dsl.factories.Positions;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -43,180 +44,190 @@ public final class DefaultLexer implements Lexer {
 
     @Override
     public List<Token> tokenize(DslSource source) {
-        String s = source.value();
-        List<Token> tokens = new ArrayList<>();
-        int i = 0;
-        int line = 1;
-        int column = 1;
-        int n = s.length();
+        return new Scanner(source.value()).run();
+    }
 
-        while (i < n) {
-            char c = s.charAt(i);
+    private static final class Scanner {
 
-            if (c == '\n') {
-                i++;
-                line++;
-                column = 1;
-                continue;
-            }
-            if (Character.isWhitespace(c)) {
-                i++;
-                column++;
-                continue;
-            }
+        private final String s;
+        private final int n;
+        private final List<Token> tokens = new ArrayList<>();
+        private int i;
+        private int line = 1;
+        private int column = 1;
 
-            int startOffset = i;
-            int startLine = line;
-            int startColumn = column;
-            Position pos = Positions.of(startOffset, startLine, startColumn);
-
-            if (isIdentStart(c)) {
-                while (i < n && isIdentPart(s.charAt(i))) {
-                    i++;
-                    column++;
-                }
-                String text = s.substring(startOffset, i);
-                Keyword kw = KEYWORDS.get(text.toLowerCase(Locale.ROOT));
-                tokens.add(kw != null
-                        ? new KeywordToken(kw, pos)
-                        : new IdentifierToken(text, pos));
-                continue;
-            }
-
-            boolean negative = c == '-' && i + 1 < n && Character.isDigit(s.charAt(i + 1))
-                    && !endsValue(tokens);
-            if (Character.isDigit(c) || negative) {
-                if (negative) {
-                    i++;
-                    column++;
-                }
-                while (i < n && Character.isDigit(s.charAt(i))) {
-                    i++;
-                    column++;
-                }
-                if (i < n && s.charAt(i) == '.') {
-                    i++;
-                    column++;
-                    if (i >= n || !Character.isDigit(s.charAt(i))) {
-                        throw new DslParseException(
-                                "expected digit after '.' at line " + line + ", column " + column);
-                    }
-                    while (i < n && Character.isDigit(s.charAt(i))) {
-                        i++;
-                        column++;
-                    }
-                }
-                tokens.add(new NumberToken(new BigDecimal(s.substring(startOffset, i)), pos));
-                continue;
-            }
-
-            if (c == '"') {
-                i++;
-                column++;
-                StringBuilder sb = new StringBuilder();
-                while (i < n && s.charAt(i) != '"') {
-                    char ch = s.charAt(i);
-                    if (ch == '\n') {
-                        throw new DslParseException(
-                                "unterminated string starting at line " + startLine
-                                        + ", column " + startColumn);
-                    }
-                    if (ch == '\\') {
-                        i++;
-                        column++;
-                        if (i >= n) {
-                            throw new DslParseException(
-                                    "unterminated escape at line " + line + ", column " + column);
-                        }
-                        char next = s.charAt(i);
-                        char escaped = switch (next) {
-                            case '"', '\\' -> next;
-                            case 'n' -> '\n';
-                            case 't' -> '\t';
-                            default -> throw new DslParseException(
-                                    "invalid escape '\\" + next + "' at line " + line
-                                            + ", column " + column);
-                        };
-                        sb.append(escaped);
-                    } else {
-                        sb.append(ch);
-                    }
-                    i++;
-                    column++;
-                }
-                if (i >= n) {
-                    throw new DslParseException(
-                            "unterminated string starting at line " + startLine
-                                    + ", column " + startColumn);
-                }
-                i++;
-                column++;
-                tokens.add(new StringToken(sb.toString(), pos));
-                continue;
-            }
-
-            if (c == ':' && i + 1 < n && s.charAt(i + 1) == ':') {
-                tokens.add(new PunctuationToken(Punctuation.DOUBLE_COLON, pos));
-                i += 2;
-                column += 2;
-                continue;
-            }
-
-            if (i + 1 < n) {
-                char c2 = s.charAt(i + 1);
-                Operator twoChar = switch ("" + c + c2) {
-                    case "==" -> Operator.EQ;
-                    case "!=" -> Operator.NE;
-                    case "<=" -> Operator.LE;
-                    case ">=" -> Operator.GE;
-                    default -> null;
-                };
-                if (twoChar != null) {
-                    tokens.add(new OperatorToken(twoChar, pos));
-                    i += 2;
-                    column += 2;
-                    continue;
-                }
-            }
-
-            Operator oneChar = switch (c) {
-                case '<' -> Operator.LT;
-                case '>' -> Operator.GT;
-                case '~' -> Operator.CONTAINS;
-                default -> null;
-            };
-            if (oneChar != null) {
-                tokens.add(new OperatorToken(oneChar, pos));
-                i++;
-                column++;
-                continue;
-            }
-
-            Punctuation p = switch (c) {
-                case '|' -> Punctuation.PIPE;
-                case '(' -> Punctuation.LPAREN;
-                case ')' -> Punctuation.RPAREN;
-                case ',' -> Punctuation.COMMA;
-                case '.' -> Punctuation.DOT;
-                case '+' -> Punctuation.PLUS;
-                case '-' -> Punctuation.MINUS;
-                case '*' -> Punctuation.STAR;
-                case '/' -> Punctuation.SLASH;
-                default -> null;
-            };
-            if (p != null) {
-                tokens.add(new PunctuationToken(p, pos));
-                i++;
-                column++;
-                continue;
-            }
-
-            throw new DslParseException(
-                    "unexpected character '" + c + "' at line " + line + ", column " + column);
+        Scanner(String s) {
+            this.s = s;
+            this.n = s.length();
         }
 
-        tokens.add(new EofToken(Positions.of(i, line, column)));
-        return List.copyOf(tokens);
+        List<Token> run() {
+            while (i < n) {
+                char c = s.charAt(i);
+                if (c == '\n') {
+                    i++;
+                    line++;
+                    column = 1;
+                } else if (Character.isWhitespace(c)) {
+                    advance(1);
+                } else {
+                    token(c);
+                }
+            }
+            tokens.add(new EofToken(Positions.of(i, line, column)));
+            return List.copyOf(tokens);
+        }
+
+        private void token(char c) {
+            Position pos = Positions.of(i, line, column);
+            if (isIdentStart(c)) {
+                identifier(pos);
+            } else if (Character.isDigit(c) || negativeNumber(c)) {
+                number(pos);
+            } else if (c == '"') {
+                string(pos);
+            } else if (!symbol(c, pos)) {
+                throw new DslParseException(
+                        "unexpected character '" + c + "' at line " + line + ", column " + column);
+            }
+        }
+
+        private void identifier(Position pos) {
+            int start = i;
+            while (i < n && isIdentPart(s.charAt(i))) {
+                advance(1);
+            }
+            String text = s.substring(start, i);
+            Keyword kw = KEYWORDS.get(text.toLowerCase(Locale.ROOT));
+            tokens.add(kw != null ? new KeywordToken(kw, pos) : new IdentifierToken(text, pos));
+        }
+
+        private boolean negativeNumber(char c) {
+            return c == '-' && i + 1 < n && Character.isDigit(s.charAt(i + 1)) && !endsValue(tokens);
+        }
+
+        private void number(Position pos) {
+            int start = i;
+            if (s.charAt(i) == '-') {
+                advance(1);
+            }
+            digits();
+            if (i < n && s.charAt(i) == '.') {
+                advance(1);
+                if (i >= n || !Character.isDigit(s.charAt(i))) {
+                    throw new DslParseException("expected digit after '.' at line " + line + ", column " + column);
+                }
+                digits();
+            }
+            tokens.add(new NumberToken(new BigDecimal(s.substring(start, i)), pos));
+        }
+
+        private void digits() {
+            while (i < n && Character.isDigit(s.charAt(i))) {
+                advance(1);
+            }
+        }
+
+        private void string(Position pos) {
+            String unterminated = "unterminated string starting at line " + line + ", column " + column;
+            advance(1);
+            StringBuilder sb = new StringBuilder();
+            while (i < n && s.charAt(i) != '"') {
+                char ch = s.charAt(i);
+                if (ch == '\n') {
+                    throw new DslParseException(unterminated);
+                }
+                sb.append(ch == '\\' ? escape() : ch);
+                advance(1);
+            }
+            if (i >= n) {
+                throw new DslParseException(unterminated);
+            }
+            advance(1);
+            tokens.add(new StringToken(sb.toString(), pos));
+        }
+
+        private char escape() {
+            advance(1);
+            if (i >= n) {
+                throw new DslParseException("unterminated escape at line " + line + ", column " + column);
+            }
+            char next = s.charAt(i);
+            return switch (next) {
+                case '"', '\\' -> next;
+                case 'n' -> '\n';
+                case 't' -> '\t';
+                default -> throw new DslParseException(
+                        "invalid escape '\\" + next + "' at line " + line + ", column " + column);
+            };
+        }
+
+        private boolean symbol(char c, Position pos) {
+            if (c == ':' && i + 1 < n && s.charAt(i + 1) == ':') {
+                emit(new PunctuationToken(Punctuation.DOUBLE_COLON, pos), 2);
+                return true;
+            }
+            Operator twoChar = i + 1 < n ? twoCharOperator("" + c + s.charAt(i + 1)) : null;
+            if (twoChar != null) {
+                emit(new OperatorToken(twoChar, pos), 2);
+                return true;
+            }
+            Operator oneChar = oneCharOperator(c);
+            if (oneChar != null) {
+                emit(new OperatorToken(oneChar, pos), 1);
+                return true;
+            }
+            Punctuation punctuation = punctuation(c);
+            if (punctuation != null) {
+                emit(new PunctuationToken(punctuation, pos), 1);
+                return true;
+            }
+            return false;
+        }
+
+        private void emit(Token token, int length) {
+            tokens.add(token);
+            advance(length);
+        }
+
+        private void advance(int length) {
+            i += length;
+            column += length;
+        }
+    }
+
+    private static @Nullable Operator twoCharOperator(String text) {
+        return switch (text) {
+            case "==" -> Operator.EQ;
+            case "!=" -> Operator.NE;
+            case "<=" -> Operator.LE;
+            case ">=" -> Operator.GE;
+            default -> null;
+        };
+    }
+
+    private static @Nullable Operator oneCharOperator(char c) {
+        return switch (c) {
+            case '<' -> Operator.LT;
+            case '>' -> Operator.GT;
+            case '~' -> Operator.CONTAINS;
+            default -> null;
+        };
+    }
+
+    private static @Nullable Punctuation punctuation(char c) {
+        return switch (c) {
+            case '|' -> Punctuation.PIPE;
+            case '(' -> Punctuation.LPAREN;
+            case ')' -> Punctuation.RPAREN;
+            case ',' -> Punctuation.COMMA;
+            case '.' -> Punctuation.DOT;
+            case '+' -> Punctuation.PLUS;
+            case '-' -> Punctuation.MINUS;
+            case '*' -> Punctuation.STAR;
+            case '/' -> Punctuation.SLASH;
+            default -> null;
+        };
     }
 
     private static boolean endsValue(List<Token> tokens) {

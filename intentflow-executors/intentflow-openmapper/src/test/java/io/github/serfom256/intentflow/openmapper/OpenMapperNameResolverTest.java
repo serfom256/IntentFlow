@@ -35,7 +35,7 @@ class OpenMapperNameResolverTest {
 
     @Test
     void columnsFollowOpenMapperRules() {
-        var columns = ServiceDescriptors.fromAnnotated(User.class, List.of(new OpenMapperNameResolver()))
+        List<String> columns = ServiceDescriptors.fromAnnotated(User.class, List.of(new OpenMapperNameResolver()))
                 .fields().stream().map(FieldMapping::column).map(c -> c.value()).toList();
 
         assertThat(columns).containsExactly(

@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class BoundQueries {
@@ -17,6 +18,11 @@ public final class BoundQueries {
 
     public static BoundQuery of(List<String> segments, List<DslLiteral> parameters, List<String> optimizations) {
         return new DefaultBoundQuery(segments, parameters, optimizations);
+    }
+
+    public static BoundQuery of(List<String> segments, List<DslLiteral> parameters, List<String> optimizations,
+            Map<Integer, Object> typedValues) {
+        return new DefaultBoundQuery(segments, parameters, optimizations, typedValues);
     }
 
     public static BoundQuery of(String sql) {

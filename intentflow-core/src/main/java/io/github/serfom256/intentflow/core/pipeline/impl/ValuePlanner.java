@@ -24,7 +24,7 @@ final class ValuePlanner {
 
     static SqlExpr plan(ValueExpr expr, SqlScope scope) {
         return switch (expr) {
-            case FieldRef f -> scope.column(f.field());
+            case FieldRef f -> scope.value(f.field());
             case LiteralExpr l -> l.value() instanceof NullLiteral ? new SqlExpr.Null() : new SqlExpr.Param(l.value());
             case Call c -> call(c, scope);
             case Arith a -> a.op() == ArithOp.DIVIDE
@@ -50,6 +50,13 @@ final class ValuePlanner {
         return plan(value, scope);
     }
 
+    private static SqlExpr local(ValueExpr value, SqlScope scope) {
+        SqlExpr planned = plan(value, scope);
+        return value instanceof FieldRef f && scope.zoned(f.field())
+                ? new SqlExpr.InZone(planned, scope.context().zone())
+                : planned;
+    }
+
     private static SqlExpr call(Call c, SqlScope scope) {
         List<ValueExpr> args = c.args();
         return switch (c.function()) {
@@ -59,10 +66,10 @@ final class ValuePlanner {
                 args.forEach(arg -> planned.add(typed(arg, type, scope)));
                 yield new SqlExpr.Call("COALESCE", planned);
             }
-            case YEAR, MONTH, DAY, HOUR -> new SqlExpr.Extract(c.function(), plan(args.getFirst(), scope));
+            case YEAR, MONTH, DAY, HOUR -> new SqlExpr.Extract(c.function(), local(args.getFirst(), scope));
             case DATE_TRUNC -> new SqlExpr.Truncate(
                     ((TextLiteral) ((LiteralExpr) args.getFirst()).value()).value().toLowerCase(Locale.ROOT),
-                    plan(args.get(1), scope));
+                    local(args.get(1), scope));
             case LENGTH -> new SqlExpr.Length(plan(args.getFirst(), scope));
             case LOWER, UPPER, ABS -> new SqlExpr.Call(c.function().name(), plan(args.getFirst(), scope));
             case ROUND -> {

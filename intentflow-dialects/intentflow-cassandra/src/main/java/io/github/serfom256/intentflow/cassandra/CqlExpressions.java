@@ -25,7 +25,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -33,21 +35,28 @@ final class CqlExpressions {
 
     private final Map<String, CqlIdentifier> columns;
     private final Map<String, FieldType> types;
+    private final ZoneId zone;
 
-    CqlExpressions(Map<String, CqlIdentifier> columns, Map<String, FieldType> types) {
+    CqlExpressions(Map<String, CqlIdentifier> columns, Map<String, FieldType> types, ZoneId zone) {
         this.columns = columns;
         this.types = types;
+        this.zone = zone;
     }
 
     @Nullable
     Object eval(ValueExpr expr, Row row) {
         return switch (expr) {
-            case FieldRef f -> CqlValues.comparable(row.getObject(column(f)));
+            case FieldRef f -> comparable(row.getObject(column(f)));
             case LiteralExpr l -> literal(l.value());
             case Call c -> call(c, row);
             case Arith a -> arith(a, row);
             case CastExpr c -> cast(eval(c.value(), row), c.type());
         };
+    }
+
+    @Nullable
+    Comparable<?> comparable(@Nullable Object value) {
+        return CqlValues.comparable(value, zone);
     }
 
     @Nullable
@@ -57,6 +66,9 @@ final class CqlExpressions {
             return c.op() == ComparisonOp.EQ ? left == null : left != null;
         }
         Object right = eval(c.right(), row);
+        if (left == null && c.op() == ComparisonOp.NE) {
+            return true;
+        }
         if (left == null || right == null) {
             return null;
         }
@@ -137,7 +149,7 @@ final class CqlExpressions {
     }
 
     private @Nullable Object call(Call c, Row row) {
-        var args = c.args();
+        List<ValueExpr> args = c.args();
         if (c.function() == ExprFunction.COALESCE) {
             boolean temporal = args.stream().anyMatch(this::temporal);
             for (ValueExpr arg : args) {

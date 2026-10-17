@@ -18,6 +18,7 @@ import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcNameResolver
 import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcQueryExecutor;
 import io.github.serfom256.procedures.Procedures;
 import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.metamodel.EntityType;
 import org.babyfish.jimmer.sql.JSqlClient;
 import org.babyfish.jimmer.sql.fetcher.Fetcher;
 import org.springframework.beans.factory.ObjectProvider;
@@ -31,6 +32,8 @@ import org.springframework.data.cassandra.core.convert.CassandraConverter;
 import org.springframework.data.jdbc.core.convert.JdbcConverter;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.orm.jpa.SharedEntityManagerCreator;
+
+import java.util.List;
 
 final class QueryExecutorConfigurations {
 
@@ -62,8 +65,13 @@ final class QueryExecutorConfigurations {
 
         @Bean
         @ConditionalOnMissingBean(JpaNameResolver.class)
-        NameResolver intentFlowJpaNameResolver() {
-            return new JpaNameResolver();
+        NameResolver intentFlowJpaNameResolver(ObjectProvider<EntityManagerFactory> entityManagerFactory) {
+            return new JpaNameResolver(() -> {
+                EntityManagerFactory factory = entityManagerFactory.getIfAvailable();
+                return factory == null ? List.of()
+                        : factory.getMetamodel().getEntities().stream().<Class<?>>map(EntityType::getJavaType)
+                                .toList();
+            });
         }
 
         @Bean
@@ -133,8 +141,8 @@ final class QueryExecutorConfigurations {
 
             @Bean
             @ConditionalOnMissingBean(SqlBuilder.class)
-            SqlBuilder intentFlowCassandraQueryBuilder(CqlSession session) {
-                return new CassandraQueryBuilder(session);
+            SqlBuilder intentFlowCassandraQueryBuilder(CqlSession session, IntentFlowProperties properties) {
+                return new CassandraQueryBuilder(session, properties.zone());
             }
 
             @Bean

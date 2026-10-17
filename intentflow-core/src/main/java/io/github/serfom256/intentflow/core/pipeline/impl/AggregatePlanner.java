@@ -2,7 +2,6 @@ package io.github.serfom256.intentflow.core.pipeline.impl;
 
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AggregateFunction;
-import io.github.serfom256.intentflow.core.ast.FieldRef;
 import io.github.serfom256.intentflow.core.ast.ValueExpr;
 import io.github.serfom256.intentflow.core.sql.plan.Select;
 import io.github.serfom256.intentflow.core.sql.plan.SqlExpr;
@@ -18,8 +17,8 @@ final class AggregatePlanner {
     static List<Select.Item> selectItems(Aggregate aggregate, SqlScope scope) {
         List<Select.Item> items = new ArrayList<>();
         for (int i = 0; i < aggregate.groupBy().size(); i++) {
-            ValueExpr group = aggregate.groupBy().get(i);
-            items.add(new Select.Value(ValuePlanner.plan(group, scope), group instanceof FieldRef ? null : alias(i)));
+            SqlExpr group = ValuePlanner.plan(aggregate.groupBy().get(i), scope);
+            items.add(new Select.Value(group, group instanceof SqlExpr.Column ? null : alias(i)));
         }
         items.add(new Select.Value(function(aggregate, scope), null));
         return items;
@@ -34,8 +33,8 @@ final class AggregatePlanner {
     }
 
     static SqlExpr group(Aggregate aggregate, int index, SqlScope scope) {
-        ValueExpr group = aggregate.groupBy().get(index);
-        return group instanceof FieldRef ? ValuePlanner.plan(group, scope) : new SqlExpr.Column(null, alias(index));
+        SqlExpr group = ValuePlanner.plan(aggregate.groupBy().get(index), scope);
+        return group instanceof SqlExpr.Column ? group : new SqlExpr.Column(null, alias(index));
     }
 
     static SqlExpr function(Aggregate aggregate, SqlScope scope) {

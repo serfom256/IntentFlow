@@ -21,6 +21,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
 import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslCacheKey;
+import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
@@ -30,12 +31,14 @@ import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
 import io.github.serfom256.intentflow.core.pipeline.UnsupportedRequestException;
 import io.github.serfom256.intentflow.core.pipeline.UriBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
+import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -50,6 +53,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private final QueryExecutor executor;
     private final UriBuilder uriBuilder;
     private final ServiceCatalog catalog;
+    private final int maxRepairs;
 
     @Override
     public IntentResponse<?> resolve(IntentRequest request) {
@@ -74,11 +78,11 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     }
 
     private record Compiled(UserText question, DslSource dsl, boolean cached, ValidatedQuery validated,
-            BoundQuery query, long startNanos) {
+            BoundQuery query, long startNanos, int repairs) {
 
         IntentTrace trace() {
             return IntentResponses.trace(dsl.value(), cached, query.sql(), new ArrayList<>(query.values()),
-                    query.optimizations());
+                    query.optimizations(), repairs);
         }
     }
 
@@ -101,9 +105,11 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         UserText normalized = normalizer.normalize(request.text());
         DslCacheKey key = new DslCacheKey(normalized, expected == null ? null : expected.name(), catalog.version());
 
-        DslSource dsl = cache.get(key).orElse(null);
-        boolean cached = dsl != null;
+        Optional<DslSource> hit = cache.get(key);
+        boolean cached = hit.isPresent();
+        DslSource dsl;
         if (cached) {
+            dsl = hit.get();
             log.debug("DSL cache hit for '{}': {}", normalized.value(), dsl.value());
         } else {
             long llmStart = System.nanoTime();
@@ -111,29 +117,45 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             log.debug("LLM translated '{}' in {} ms: {}", normalized.value(), millisSince(llmStart), dsl.value());
         }
 
+        int repairs = 0;
         ValidatedQuery validated;
-        try {
-            AstQuery ast = parser.parse(dsl);
-            if (expected != null && !ast.service().equals(expected.name())) {
-                throw new ServiceNotFoundException(ast.service());
+        while (true) {
+            try {
+                validated = validate(dsl, expected);
+                break;
+            } catch (UnsupportedRequestException declined) {
+                log.debug("Declined '{}': {}", normalized.value(), declined.getMessage());
+                if (!cached) {
+                    cache.put(key, dsl);
+                }
+                throw declined;
+            } catch (DslParseException | ValidationException | ServiceNotFoundException rejected) {
+                log.debug("Rejected DSL for '{}': {} ({})", normalized.value(), dsl.value(), rejected.getMessage());
+                if (cached || repairs >= maxRepairs) {
+                    throw rejected;
+                }
+                repairs++;
+                long llmStart = System.nanoTime();
+                dsl = llm.repairDsl(normalized, scope, dsl, rejected.getMessage());
+                log.debug("LLM corrected '{}' in {} ms (attempt {} of {}): {}", normalized.value(),
+                        millisSince(llmStart), repairs, maxRepairs, dsl.value());
             }
-            validated = validator.validate(ast, catalog);
-        } catch (UnsupportedRequestException declined) {
-            log.debug("Declined '{}': {}", normalized.value(), declined.getMessage());
-            if (!cached) {
-                cache.put(key, dsl);
-            }
-            throw declined;
-        } catch (RuntimeException rejected) {
-            log.debug("Rejected DSL for '{}': {} ({})", normalized.value(), dsl.value(), rejected.getMessage());
-            throw rejected;
         }
         if (!cached) {
             cache.put(key, dsl);
         }
-        BoundQuery query = sqlBuilder.build(validated, executor.shape(validated.service().resultType()));
+        BoundQuery query = sqlBuilder.build(validated, executor.shape(validated.service().resultType()),
+                executor::restrictions);
         log.debug("Query: {} binds={}", query.sql(), query.values());
-        return new Compiled(normalized, dsl, cached, validated, query, start);
+        return new Compiled(normalized, dsl, cached, validated, query, start, repairs);
+    }
+
+    private ValidatedQuery validate(DslSource dsl, @Nullable ServiceDescriptor expected) {
+        AstQuery ast = parser.parse(dsl);
+        if (expected != null && !ast.service().equals(expected.name())) {
+            throw new ServiceNotFoundException(ast.service());
+        }
+        return validator.validate(ast, catalog);
     }
 
     private <T> IntentResponse<T> execute(Compiled compiled) {

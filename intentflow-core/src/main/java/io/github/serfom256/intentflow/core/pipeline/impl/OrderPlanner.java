@@ -49,17 +49,17 @@ final class OrderPlanner {
             scope.context().applied(Optimization.NOT_NULL_ORDERING);
             nullable = false;
         }
-        return new Select.Order(scope.column(key.field()), key.direction(), nullable);
+        return new Select.Order(scope.value(key.field()), key.direction(), nullable);
     }
 
     private static SqlExpr relatedValue(String relation, SortKey key, SqlScope outer) {
         if (outer.context().enabled(Optimization.TO_ONE_JOIN) && outer.canJoin(relation)) {
             outer.context().applied(Optimization.TO_ONE_JOIN);
-            return outer.join(relation).column(RelationPaths.strip(key.field(), relation));
+            return outer.join(relation).value(RelationPaths.strip(key.field(), relation));
         }
         SqlScope inner = outer.inner(relation);
         SqlExpr value = new SqlExpr.Call(key.direction() == SortKey.Direction.DESC ? "MAX" : "MIN",
-                inner.column(RelationPaths.strip(key.field(), relation)));
+                inner.value(RelationPaths.strip(key.field(), relation)));
         return new SqlExpr.Subquery(Select.from(inner.from(), List.of(new Select.Value(value, null)),
                 inner.where(List.of(outer.correlation(relation)))));
     }

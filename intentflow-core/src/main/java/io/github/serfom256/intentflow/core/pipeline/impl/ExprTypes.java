@@ -102,61 +102,55 @@ final class ExprTypes {
     }
 
     private Type call(Call c) {
-        ExprFunction fn = c.function();
-        int arity = c.args().size();
-        switch (fn) {
-            case COALESCE -> {
-                if (arity < 2) {
-                    throw arity(fn, "at least 2");
-                }
-                Type result = Type.NULL;
-                for (ValueExpr arg : c.args()) {
-                    result = common(result, type(arg), arg, c);
-                }
-                return result == Type.NULL ? Type.ANY : result;
-            }
-            case YEAR, MONTH, DAY, HOUR -> {
-                exactly(c, 1);
-                require(c.args().getFirst(), Type.TIMESTAMP, fn.keyword(), Type.DATE);
-                return Type.NUMBER;
-            }
-            case DATE_TRUNC -> {
-                exactly(c, 2);
-                if (!(c.args().getFirst() instanceof LiteralExpr l) || !(l.value() instanceof TextLiteral unit)
-                        || !TRUNCATE_UNITS.contains(unit.value().toLowerCase(Locale.ROOT))) {
-                    throw new ValidationException("date_trunc takes \"year\", \"month\", \"day\" or \"hour\" first");
-                }
-                require(c.args().get(1), Type.TIMESTAMP, fn.keyword(), Type.DATE);
-                return Type.TIMESTAMP;
-            }
-            case LENGTH -> {
-                exactly(c, 1);
-                require(c.args().getFirst(), Type.TEXT, fn.keyword());
-                return Type.NUMBER;
-            }
-            case LOWER, UPPER -> {
-                exactly(c, 1);
-                require(c.args().getFirst(), Type.TEXT, fn.keyword());
-                return Type.TEXT;
-            }
-            case ROUND -> {
-                if (arity != 1 && arity != 2) {
-                    throw arity(fn, "1 or 2");
-                }
-                require(c.args().getFirst(), Type.NUMBER, fn.keyword());
-                if (arity == 2 && !(c.args().get(1) instanceof LiteralExpr l && l.value() instanceof NumberLiteral n
-                        && digits(n) >= 0)) {
-                    throw new ValidationException("round takes a whole number of digits from 0 to 6 second");
-                }
-                return Type.NUMBER;
-            }
-            case ABS -> {
-                exactly(c, 1);
-                require(c.args().getFirst(), Type.NUMBER, fn.keyword());
-                return Type.NUMBER;
-            }
+        return switch (c.function()) {
+            case COALESCE -> coalesce(c);
+            case YEAR, MONTH, DAY, HOUR -> unary(c, Type.NUMBER, Type.TIMESTAMP, Type.DATE);
+            case DATE_TRUNC -> dateTrunc(c);
+            case LENGTH -> unary(c, Type.NUMBER, Type.TEXT);
+            case LOWER, UPPER -> unary(c, Type.TEXT, Type.TEXT);
+            case ROUND -> round(c);
+            case ABS -> unary(c, Type.NUMBER, Type.NUMBER);
+        };
+    }
+
+    private Type unary(Call c, Type result, Type argument, Type... alternatives) {
+        exactly(c, 1);
+        require(c.args().getFirst(), argument, c.function().keyword(), alternatives);
+        return result;
+    }
+
+    private Type coalesce(Call c) {
+        if (c.args().size() < 2) {
+            throw arity(c.function(), "at least 2");
         }
-        throw new IllegalStateException(fn.name());
+        Type result = Type.NULL;
+        for (ValueExpr arg : c.args()) {
+            result = common(result, type(arg), arg, c);
+        }
+        return result == Type.NULL ? Type.ANY : result;
+    }
+
+    private Type dateTrunc(Call c) {
+        exactly(c, 2);
+        if (!(c.args().getFirst() instanceof LiteralExpr l) || !(l.value() instanceof TextLiteral unit)
+                || !TRUNCATE_UNITS.contains(unit.value().toLowerCase(Locale.ROOT))) {
+            throw new ValidationException("date_trunc takes \"year\", \"month\", \"day\" or \"hour\" first");
+        }
+        require(c.args().get(1), Type.TIMESTAMP, c.function().keyword(), Type.DATE);
+        return Type.TIMESTAMP;
+    }
+
+    private Type round(Call c) {
+        int arity = c.args().size();
+        if (arity != 1 && arity != 2) {
+            throw arity(c.function(), "1 or 2");
+        }
+        require(c.args().getFirst(), Type.NUMBER, c.function().keyword());
+        if (arity == 2 && !(c.args().get(1) instanceof LiteralExpr l && l.value() instanceof NumberLiteral n
+                && digits(n) >= 0)) {
+            throw new ValidationException("round takes a whole number of digits from 0 to 6 second");
+        }
+        return Type.NUMBER;
     }
 
     static int digits(NumberLiteral n) {

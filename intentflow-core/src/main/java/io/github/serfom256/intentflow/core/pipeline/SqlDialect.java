@@ -5,6 +5,8 @@ import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.ExprFunction;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
 
+import java.time.ZoneId;
+
 /**
  * The database-specific parts of generated SQL. {@link SqlBuilder} owns the
  * query shape (WHERE tree, case-insensitive equality through {@code LOWER()})
@@ -60,6 +62,16 @@ public interface SqlDialect {
     /** A value converted to another type, as in {@code '1234'::bigint}. */
     void cast(SqlWriter sql, CastType type, Runnable value);
 
+    /**
+     * A timestamp that stores an instant, converted to the wall-clock time of
+     * {@code zone} before a calendar part
+     * is taken from it. The default leaves it unchanged, so the database session's
+     * zone applies.
+     */
+    default void inZone(SqlWriter sql, ZoneId zone, Runnable value) {
+        value.run();
+    }
+
     /** Number of characters of a text value. */
     default void length(SqlWriter sql, Runnable value) {
         sql.text("CHAR_LENGTH(");
@@ -74,6 +86,19 @@ public interface SqlDialect {
      */
     default void exactText(SqlWriter sql, Runnable value) {
         value.run();
+    }
+
+    /**
+     * What the database supports. The planner checks it before building SQL, so a
+     * query the database cannot run
+     * fails with a clear {@code ValidationException} instead of an SQL error:
+     * {@code top} needs window functions,
+     * {@code in (...)} lists and the number of bound parameters are capped, and
+     * without native booleans boolean
+     * values are bound as 1 and 0.
+     */
+    default SqlCapabilities capabilities() {
+        return SqlCapabilities.STANDARD;
     }
 
     /** Row limit and offset; {@code offset} is 0 when there is nothing to skip. */

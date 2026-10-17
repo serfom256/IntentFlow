@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
+import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.AggregateFunction;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
@@ -157,7 +158,7 @@ class RelationsAndAggregatesTest {
                 DslParsers.create(), AstValidators.create(), SqlBuilders.create(new PostgresDialect()), executor,
                 UriBuilders.create(), CATALOG);
 
-        var response = pipeline.resolve(IntentRequests.of("count"), Order.class);
+        IntentResponse<Order> response = pipeline.resolve(IntentRequests.of("count"), Order.class);
         assertThat(seen).containsExactly("customers", "orders");
         assertThat(response.aggregation().rows().getFirst().value()).isEqualTo(BigDecimal.valueOf(3));
         assertThat(response.trace().dsl()).isEqualTo("orders | group status | count");

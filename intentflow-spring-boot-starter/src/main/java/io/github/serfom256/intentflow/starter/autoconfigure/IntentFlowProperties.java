@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.List;
 
 @ConfigurationProperties("intentflow")
@@ -14,6 +15,8 @@ public record IntentFlowProperties(
         @Nullable String executor,
         @Nullable String dialect,
         @DefaultValue("10000") int maxSkip,
+        @DefaultValue("1000") int maxInValues,
+        @Nullable String timeZone,
         @DefaultValue Llm llm,
         @DefaultValue Cache cache,
         @DefaultValue Catalog catalog,
@@ -21,11 +24,16 @@ public record IntentFlowProperties(
         @DefaultValue Sql sql,
         @DefaultValue Cassandra cassandra) {
 
+    public ZoneId zone() {
+        return timeZone == null || timeZone.isBlank() ? ZoneId.systemDefault() : ZoneId.of(timeZone.strip());
+    }
+
     public record Llm(
             @DefaultValue("http://localhost:1234/v1") URI baseUrl,
             @Nullable String model,
             @DefaultValue("") String apiKey,
-            @DefaultValue("60s") Duration timeout) {
+            @DefaultValue("60s") Duration timeout,
+            @DefaultValue("1") int maxRepairs) {
     }
 
     public record Cache(

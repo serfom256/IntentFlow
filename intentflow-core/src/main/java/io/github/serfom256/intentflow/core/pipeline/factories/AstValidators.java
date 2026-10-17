@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 public final class AstValidators {
 
     public static final int DEFAULT_MAX_SKIP = 10_000;
+    public static final int DEFAULT_MAX_IN_VALUES = 1_000;
 
     public static AstValidator create() {
         return create(DEFAULT_MAX_SKIP);
@@ -16,5 +17,9 @@ public final class AstValidators {
 
     public static AstValidator create(int maxSkip) {
         return new DefaultAstValidator(maxSkip);
+    }
+
+    public static AstValidator create(int maxSkip, int maxInValues) {
+        return new DefaultAstValidator(maxSkip, maxInValues);
     }
 }

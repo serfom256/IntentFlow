@@ -2,6 +2,7 @@ package io.github.serfom256.intentflow.core.pipeline;
 
 import com.sun.net.httpserver.HttpServer;
 import io.github.serfom256.intentflow.core.api.factories.UserTexts;
+import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
@@ -11,8 +12,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.ColumnNames;
 import io.github.serfom256.intentflow.core.catalog.factories.FieldMappings;
 import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
 import io.github.serfom256.intentflow.core.catalog.factories.MaxTakes;
-import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptions;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
+import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptions;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
@@ -114,6 +115,20 @@ class OpenAiCompatibleLlmClientTest {
 
         assertThat(dsl).isEqualTo("books | filter title ~ \"dune\"");
         assertThat(lastAuth.get()).isNull();
+    }
+
+    @Test
+    void repairShowsTheModelItsAnswerAndTheError() {
+        reply = completion("books | filter title ~ \"dune\"");
+
+        String dsl = client("").repairDsl(UserTexts.of("books about dune"), CATALOG,
+                DslSources.of("books | filter name ~ \"dune\""), "field 'name' is not declared").value();
+
+        assertThat(dsl).isEqualTo("books | filter title ~ \"dune\"");
+        assertThat(lastRequest.get())
+                .contains("{\"role\":\"user\",\"content\":\"books about dune\"}")
+                .contains("{\"role\":\"assistant\",\"content\":\"books | filter name ~ \\\"dune\\\"\"}")
+                .contains("That query was rejected: field 'name' is not declared");
     }
 
     @Test

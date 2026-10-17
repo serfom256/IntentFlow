@@ -58,16 +58,42 @@ import io.github.serfom256.intentflow.core.dsl.Token;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import io.github.serfom256.intentflow.core.pipeline.UnsupportedRequestException;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 public final class DefaultParser implements Parser {
 
     @Override
     public AstQuery parse(List<Token> tokens) {
         return new ParseState(tokens).parseQuery();
+    }
+
+    private static final class Stages {
+
+        private final Set<String> seen = new HashSet<>();
+        private @Nullable FilterExpr filter;
+        private List<SortKey> sort = List.of();
+        private @Nullable Skip skip;
+        private @Nullable Take take;
+        private @Nullable TopN top;
+        private @Nullable List<ValueExpr> groupBy;
+        private @Nullable AggregateFunction function;
+        private @Nullable ValueExpr aggregated;
+
+        AstQuery toQuery(ServiceName service) {
+            if (groupBy != null && function == null) {
+                throw new DslParseException("'group' needs an aggregate stage: count, sum, avg, min or max");
+            }
+            Aggregate aggregate = function == null ? null
+                    : new Aggregate(function, aggregated, groupBy == null ? List.of() : groupBy);
+            return AstQueries.of(service, filter, sort, skip, take, aggregate, top);
+        }
     }
 
     @RequiredArgsConstructor
@@ -81,94 +107,77 @@ public final class DefaultParser implements Parser {
                 throw parseUnsupported();
             }
             ServiceName service = parseService();
-
-            FilterExpr filter = null;
-            List<SortKey> sort = List.of();
-            Skip skip = null;
-            Take take = null;
-
-            boolean sawFilter = false;
-            boolean sawSort = false;
-            boolean sawSkip = false;
-            boolean sawTake = false;
-            TopN top = null;
-            List<ValueExpr> groupBy = null;
-            AggregateFunction function = null;
-            ValueExpr aggregated = null;
-
+            Stages stages = new Stages();
             while (peekPunct(Punctuation.PIPE)) {
                 advance();
-                Token t = peek();
-                if (t instanceof IdentifierToken id && id.name().equals("top")) {
-                    if (top != null)
-                        throw error("duplicate 'top' stage", t);
-                    advance();
-                    top = parseTop();
-                    continue;
-                }
-                if (t instanceof IdentifierToken id && id.name().equals("group")) {
-                    if (groupBy != null)
-                        throw error("duplicate 'group' stage", t);
-                    advance();
-                    groupBy = parseGroupList();
-                    continue;
-                }
-                if (t instanceof IdentifierToken id && AggregateFunction.fromKeyword(id.name()).isPresent()) {
-                    if (function != null)
-                        throw error("only one aggregate stage is allowed", t);
-                    function = AggregateFunction.fromKeyword(id.name()).orElseThrow();
-                    advance();
-                    if (function != AggregateFunction.COUNT) {
-                        if (!startsValue(peek())) {
-                            throw error("expected field after '" + function.keyword() + "'", peek());
-                        }
-                        aggregated = parseValueExpr();
-                    }
-                    continue;
-                }
-                if (!(t instanceof KeywordToken kw)) {
-                    throw error("expected stage keyword after '|'", t);
-                }
-                switch (kw.keyword()) {
-                    case FILTER -> {
-                        if (sawFilter)
-                            throw error("duplicate 'filter' stage", t);
-                        sawFilter = true;
-                        advance();
-                        filter = parseOrExpr();
-                    }
-                    case SORT -> {
-                        if (sawSort)
-                            throw error("duplicate 'sort' stage", t);
-                        sawSort = true;
-                        advance();
-                        sort = parseSort();
-                    }
-                    case SKIP -> {
-                        if (sawSkip)
-                            throw error("duplicate 'skip' stage", t);
-                        sawSkip = true;
-                        advance();
-                        skip = parseSkip();
-                    }
-                    case TAKE -> {
-                        if (sawTake)
-                            throw error("duplicate 'take' stage", t);
-                        sawTake = true;
-                        advance();
-                        take = parseTake();
-                    }
-                    default -> throw error("unknown stage keyword '" + kw.keyword() + "'", t);
-                }
+                parseStage(stages);
             }
-
             expectEof();
-            if (groupBy != null && function == null) {
-                throw new DslParseException("'group' needs an aggregate stage: count, sum, avg, min or max");
+            return stages.toQuery(service);
+        }
+
+        private void parseStage(Stages stages) {
+            Token t = peek();
+            if (t instanceof IdentifierToken id) {
+                if (id.name().equals("top")) {
+                    once(stages, "top", t);
+                    stages.top = parseTop();
+                    return;
+                }
+                if (id.name().equals("group")) {
+                    once(stages, "group", t);
+                    stages.groupBy = parseGroupList();
+                    return;
+                }
+                Optional<AggregateFunction> function = AggregateFunction.fromKeyword(id.name());
+                if (function.isPresent()) {
+                    parseAggregate(stages, function.get(), t);
+                    return;
+                }
             }
-            Aggregate aggregate = function == null ? null
-                    : new Aggregate(function, aggregated, groupBy == null ? List.of() : groupBy);
-            return AstQueries.of(service, filter, sort, skip, take, aggregate, top);
+            if (!(t instanceof KeywordToken kw)) {
+                throw error("expected stage keyword after '|'", t);
+            }
+            switch (kw.keyword()) {
+                case FILTER -> {
+                    once(stages, "filter", t);
+                    stages.filter = parseOrExpr();
+                }
+                case SORT -> {
+                    once(stages, "sort", t);
+                    stages.sort = parseSort();
+                }
+                case SKIP -> {
+                    once(stages, "skip", t);
+                    stages.skip = parseSkip();
+                }
+                case TAKE -> {
+                    once(stages, "take", t);
+                    stages.take = parseTake();
+                }
+                default -> throw error("unknown stage keyword '" + kw.keyword() + "'", t);
+            }
+        }
+
+        private void once(Stages stages, String stage, Token at) {
+            if (!stages.seen.add(stage)) {
+                throw error("duplicate '" + stage + "' stage", at);
+            }
+            advance();
+        }
+
+        private void parseAggregate(Stages stages, AggregateFunction function, Token at) {
+            if (stages.function != null) {
+                throw error("only one aggregate stage is allowed", at);
+            }
+            stages.function = function;
+            advance();
+            if (function != AggregateFunction.COUNT) {
+                if (!startsValue(peek())) {
+                    throw error("expected field after '" + function.keyword() + "'", peek());
+                }
+                stages.aggregated = parseValueExpr();
+            }
         }
 
         TopN parseTop() {

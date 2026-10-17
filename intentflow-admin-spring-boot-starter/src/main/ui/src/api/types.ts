@@ -30,11 +30,26 @@ export interface OverrideRequest {
   fields: Record<string, string>;
 }
 
+export interface IndexSuggestion {
+  table: string;
+  reason: string;
+  ddl: string;
+}
+
+export interface IndexAdvice {
+  plan: string | null;
+  suggestions: IndexSuggestion[];
+  error: string | null;
+}
+
 export interface ExplainView {
   dsl: string;
   cached: boolean;
   sql: string;
   parameters: unknown[];
+  repairs: number;
+  optimizations: string[];
+  advice: IndexAdvice | null;
 }
 
 export interface ProblemDetail {

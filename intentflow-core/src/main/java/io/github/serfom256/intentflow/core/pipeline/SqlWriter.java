@@ -9,4 +9,13 @@ public interface SqlWriter {
 
     /** Appends a bound parameter; the executor decides the placeholder syntax. */
     SqlWriter param(DslLiteral value);
+
+    /**
+     * Appends a bound parameter whose value is a typed Java object, such as an
+     * {@code OffsetDateTime};
+     * {@code display} is how the parameter appears in traces.
+     */
+    default SqlWriter param(DslLiteral display, Object value) {
+        return param(display);
+    }
 }

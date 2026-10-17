@@ -12,4 +12,15 @@ import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 public interface LlmClient {
 
     DslSource generateDsl(UserText normalizedText, ServiceCatalog catalog);
+
+    /**
+     * Asks for a corrected query after {@code failed} was rejected with
+     * {@code error}, e.g. because it used an
+     * unknown field or a function the wrong way. The default asks again from
+     * scratch; clients that keep a
+     * conversation should show the model its previous answer and the error.
+     */
+    default DslSource repairDsl(UserText normalizedText, ServiceCatalog catalog, DslSource failed, String error) {
+        return generateDsl(normalizedText, catalog);
+    }
 }

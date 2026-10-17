@@ -1,12 +1,18 @@
 package io.github.serfom256.intentflow.core.sql.render;
 
+import io.github.serfom256.intentflow.core.ast.BoolLiteral;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
+import io.github.serfom256.intentflow.core.ast.DslLiteral;
+import io.github.serfom256.intentflow.core.ast.NumberLiteral;
+import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
+import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.sql.plan.Select;
 import io.github.serfom256.intentflow.core.sql.plan.SqlExpr;
 import io.github.serfom256.intentflow.core.sql.plan.SqlPredicate;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -25,7 +31,13 @@ public final class SqlRenderer {
     public BoundQuery render(Select select, List<String> optimizations) {
         SqlBuffer sql = new SqlBuffer();
         select(select, sql);
-        return sql.toBoundQuery(optimizations);
+        BoundQuery query = sql.toBoundQuery(optimizations);
+        int max = dialect.capabilities().maxParameters();
+        if (query.parameters().size() > max) {
+            throw new ValidationException("the query needs " + query.parameters().size() + " parameters, more than "
+                    + dialect.name() + " accepts (" + max + ")");
+        }
+        return query;
     }
 
     private void select(Select select, SqlBuffer sql) {
@@ -129,6 +141,14 @@ public final class SqlRenderer {
                 sql.text(" ESCAPE '" + like.escape() + "'");
             }
             case SqlPredicate.Raw raw -> sql.text("(").text(raw.sql()).text(")");
+            case SqlPredicate.Bound bound -> {
+                sql.text("(");
+                for (int i = 0; i < bound.values().size(); i++) {
+                    Object value = bound.values().get(i);
+                    sql.text(bound.segments().get(i)).param(new TextLiteral(String.valueOf(value)), value);
+                }
+                sql.text(bound.segments().getLast()).text(")");
+            }
             case SqlPredicate.Exists exists -> {
                 sql.text("EXISTS (");
                 select(exists.select(), sql);
@@ -146,8 +166,15 @@ public final class SqlRenderer {
     private void expr(SqlExpr expr, SqlBuffer sql) {
         switch (expr) {
             case SqlExpr.Column column -> sql.text(column(column));
-            case SqlExpr.Param param -> sql.param(param.value());
-            case SqlExpr.TimestampParam timestamp -> dialect.timestamp(sql, timestamp.value());
+            case SqlExpr.Param param -> sql.param(bindable(param.value()));
+            case SqlExpr.TimestampParam timestamp -> {
+                if (timestamp.bound() != null) {
+                    sql.param(timestamp.value(), timestamp.bound());
+                } else {
+                    dialect.timestamp(sql, timestamp.value());
+                }
+            }
+            case SqlExpr.InZone inZone -> dialect.inZone(sql, inZone.zone(), () -> expr(inZone.value(), sql));
             case SqlExpr.Null n -> sql.text("NULL");
             case SqlExpr.Inline inline -> sql.text(Long.toString(inline.value()));
             case SqlExpr.Call call -> {
@@ -168,6 +195,14 @@ public final class SqlRenderer {
             case SqlExpr.Truncate truncate -> dialect.truncate(sql, truncate.unit(), () -> expr(truncate.value(), sql));
             case SqlExpr.Length length -> dialect.length(sql, () -> expr(length.value(), sql));
             case SqlExpr.ExactText exact -> dialect.exactText(sql, () -> expr(exact.value(), sql));
+            case SqlExpr.EnumName name -> {
+                sql.text("CASE ");
+                expr(name.ordinal(), sql);
+                for (int i = 0; i < name.names().size(); i++) {
+                    sql.text(" WHEN " + i + " THEN '" + name.names().get(i).replace("'", "''") + "'");
+                }
+                sql.text(" END");
+            }
             case SqlExpr.Subquery subquery -> {
                 sql.text("(");
                 select(subquery.select(), sql);
@@ -185,6 +220,13 @@ public final class SqlRenderer {
                 sql.text(")");
             }
         }
+    }
+
+    private DslLiteral bindable(DslLiteral value) {
+        if (value instanceof BoolLiteral b && !dialect.capabilities().booleans()) {
+            return new NumberLiteral(b.value() ? BigDecimal.ONE : BigDecimal.ZERO);
+        }
+        return value;
     }
 
     private String tableName(String name) {

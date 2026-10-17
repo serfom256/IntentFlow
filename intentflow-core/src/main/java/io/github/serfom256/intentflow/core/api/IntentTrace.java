@@ -27,4 +27,12 @@ public interface IntentTrace {
     default List<String> optimizations() {
         return List.of();
     }
+
+    /**
+     * How many times the LLM was asked to correct a rejected query before this one
+     * was accepted.
+     */
+    default int repairs() {
+        return 0;
+    }
 }

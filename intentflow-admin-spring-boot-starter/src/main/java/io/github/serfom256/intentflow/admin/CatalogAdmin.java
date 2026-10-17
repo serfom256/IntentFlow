@@ -31,7 +31,8 @@ public final class CatalogAdmin {
             List<FieldView> fields, List<RelationView> relations) {
     }
 
-    public record ExplainView(String dsl, boolean cached, String sql, List<Object> parameters) {
+    public record ExplainView(String dsl, boolean cached, String sql, List<Object> parameters, int repairs,
+            List<String> optimizations, IndexAdvisor.@Nullable Advice advice) {
     }
 
     public static final class InvalidOverrideException extends RuntimeException {
@@ -51,8 +52,14 @@ public final class CatalogAdmin {
     private final ServiceCatalog declared;
     private final CatalogOverrides overrides;
     private final IntentPipeline pipeline;
+    private final @Nullable IndexAdvisor advisor;
 
     public CatalogAdmin(ServiceCatalog catalog, IntentPipeline pipeline) {
+        this(catalog, pipeline, null);
+    }
+
+    public CatalogAdmin(ServiceCatalog catalog, IntentPipeline pipeline, @Nullable IndexAdvisor advisor) {
+        this.advisor = advisor;
         if (!(catalog instanceof OverlayServiceCatalog overlay)) {
             throw new IllegalStateException("The IntentFlow admin needs the catalog wrapped with CatalogOverrides; "
                     + "a user-defined ServiceCatalog bean must use ServiceCatalogs.withOverrides(...)");
@@ -106,6 +113,7 @@ public final class CatalogAdmin {
                     .orElseThrow(() -> new ServiceNotFoundException(ServiceNames.of(scope)));
             trace = pipeline.explain(IntentRequests.of(question), service.resultType());
         }
-        return new ExplainView(trace.dsl(), trace.cached(), trace.query(), trace.parameters());
+        return new ExplainView(trace.dsl(), trace.cached(), trace.query(), trace.parameters(), trace.repairs(),
+                trace.optimizations(), advisor == null ? null : advisor.advise(trace.query(), trace.parameters()));
     }
 }

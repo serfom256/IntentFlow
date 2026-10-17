@@ -7,6 +7,7 @@ import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
+import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.sql.Optimization;
 import io.github.serfom256.intentflow.core.sql.plan.Select;
 import io.github.serfom256.intentflow.core.sql.plan.SqlExpr;
@@ -52,7 +53,8 @@ final class QueryPlanner {
         if (filter == null || !scope.context().enabled(Optimization.DATE_RANGES)) {
             return filter;
         }
-        FilterExpr rewritten = DateRanges.rewrite(filter, f -> scope.field(f).type() == FieldType.TIMESTAMP);
+        FilterExpr rewritten = DateRanges.rewrite(filter, f -> scope.field(f).type() == FieldType.TIMESTAMP,
+                f -> RelationPaths.prefix(f) != null || !scope.notNull(f));
         if (rewritten != filter) {
             scope.context().applied(Optimization.DATE_RANGES);
         }
@@ -73,6 +75,10 @@ final class QueryPlanner {
     }
 
     private static Select topN(ValidatedQuery query, TopN top, List<SqlPredicate> where, SqlScope scope) {
+        if (!scope.context().capabilities().windowFunctions()) {
+            throw new ValidationException("'top' needs window functions, which " + scope.context().dialectName()
+                    + " does not support; ask for a sorted list with 'take' instead");
+        }
         SqlExpr rank = new SqlExpr.RowNumber(top.partition().stream().map(p -> ValuePlanner.plan(p, scope)).toList(),
                 OrderPlanner.plan(query.topOrder(), null, scope));
         Select ranked = Select.from(scope.from(),

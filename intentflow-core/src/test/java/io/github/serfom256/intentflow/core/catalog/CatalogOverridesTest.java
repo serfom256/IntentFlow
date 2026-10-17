@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.catalog;
 
+import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -86,7 +87,7 @@ class CatalogOverridesTest {
 
         overrides.put(BOOKS, new ServiceOverride(null, "/catalog/{{isbn}}", Map.of("title", "the full title")));
 
-        var response = pipeline.resolve(IntentRequests.of("a book"));
+        IntentResponse<?> response = pipeline.resolve(IntentRequests.of("a book"));
         assertThat(response.trace().cached()).isFalse();
         assertThat(response.uri().value()).isEqualTo("/catalog/978-0441013593");
         assertThat(promptedDescriptions).containsExactly("title as printed", "the full title");

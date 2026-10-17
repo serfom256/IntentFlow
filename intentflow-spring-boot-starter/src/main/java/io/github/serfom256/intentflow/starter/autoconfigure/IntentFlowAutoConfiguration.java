@@ -136,7 +136,7 @@ public class IntentFlowAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     AstValidator intentFlowAstValidator(IntentFlowProperties properties) {
-        return AstValidators.create(properties.maxSkip());
+        return AstValidators.create(properties.maxSkip(), properties.maxInValues());
     }
 
     @Bean
@@ -145,7 +145,7 @@ public class IntentFlowAutoConfiguration {
             SchemaFacts facts, BeanFactory beanFactory) {
         Set<Optimization> optimizations = EnumSet.allOf(Optimization.class);
         properties.sql().disabledOptimizations().forEach(id -> optimizations.remove(Optimization.byId(id)));
-        Function<SqlDialect, SqlBuilder> factory = d -> SqlBuilders.create(d, facts, optimizations);
+        Function<SqlDialect, SqlBuilder> factory = d -> SqlBuilders.create(d, facts, optimizations, properties.zone());
         SqlDialect detected = dialect.getIfAvailable();
         if (detected != null) {
             return factory.apply(detected);
@@ -174,7 +174,7 @@ public class IntentFlowAutoConfiguration {
     IntentPipeline intentFlowPipeline(TextNormalizer normalizer, DslCache cache, LlmClient llm,
             DslParser parser, AstValidator validator, SqlBuilder sqlBuilder,
             ObjectProvider<QueryExecutor> executor, UriBuilder uriBuilder,
-            ServiceCatalog catalog) {
+            ServiceCatalog catalog, IntentFlowProperties properties) {
         QueryExecutor queryExecutor = executor.getIfAvailable();
         if (queryExecutor == null) {
             throw new IllegalStateException("No QueryExecutor: configure a DataSource (spring.datasource.*) "
@@ -183,7 +183,7 @@ public class IntentFlowAutoConfiguration {
                     + "intentflow-spring-data-cassandra), or define a QueryExecutor bean.");
         }
         return IntentPipelines.create(normalizer, cache, llm, parser, validator, sqlBuilder,
-                queryExecutor, uriBuilder, catalog);
+                queryExecutor, uriBuilder, catalog, properties.llm().maxRepairs());
     }
 
 }

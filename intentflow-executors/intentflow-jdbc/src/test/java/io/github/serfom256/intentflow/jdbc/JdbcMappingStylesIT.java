@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.jdbc;
 
+import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
@@ -108,7 +109,8 @@ class JdbcMappingStylesIT {
 
     @Test
     void parametersAreBoundPositionally() {
-        var query = BoundQueries.of(List.of("SELECT * FROM item WHERE LOWER(full_name) = LOWER(", ") AND id < ", ""),
+        BoundQuery query = BoundQueries.of(
+                List.of("SELECT * FROM item WHERE LOWER(full_name) = LOWER(", ") AND id < ", ""),
                 List.of(new TextLiteral("GADGET"),
                         new NumberLiteral(BigDecimal.TEN)));
         assertThat(executor.execute(query, AsRecord.class)).extracting(AsRecord::id).containsExactly(2L);
