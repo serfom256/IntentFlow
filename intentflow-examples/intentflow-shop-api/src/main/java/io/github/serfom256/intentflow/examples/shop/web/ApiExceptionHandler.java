@@ -49,7 +49,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return pd;
     }
 
-    @ExceptionHandler({DslParseException.class, ValidationException.class, ServiceNotFoundException.class})
+    @ExceptionHandler({ DslParseException.class, ValidationException.class, ServiceNotFoundException.class })
     ProblemDetail untranslatable(RuntimeException e) {
         log.warn("search translation rejected: {}", e.getMessage());
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Couldn't understand the question",

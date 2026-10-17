@@ -21,16 +21,26 @@ class JpaNameResolverTest {
     @Table(name = "customer_account")
     @IntentService(value = "accounts", uri = "/accounts/{{id}}")
     static class Account {
-        @Id @IntentField Long id;
-        @Column(name = "display_name") @IntentField String name;
-        @Column @IntentField String countryCode;
-        @IntentField(column = "is_vip") @Column(name = "vip_flag") Boolean vip;
+        @Id
+        @IntentField
+        Long id;
+        @Column(name = "display_name")
+        @IntentField
+        String name;
+        @Column
+        @IntentField
+        String countryCode;
+        @IntentField(column = "is_vip")
+        @Column(name = "vip_flag")
+        Boolean vip;
     }
 
     @Entity
     @IntentService(value = "notes", uri = "/notes/{{id}}")
     static class AuditNote {
-        @Id @IntentField Long id;
+        @Id
+        @IntentField
+        Long id;
     }
 
     @Test

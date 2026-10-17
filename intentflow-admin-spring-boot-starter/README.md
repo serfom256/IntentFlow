@@ -1,0 +1,108 @@
+# IntentFlow Admin
+
+A web UI, embedded in your application, for changing at runtime what your annotations and builders declared:
+
+- service descriptions and field descriptions, which are what the LLM reads
+- service paths (`uri`), which are the links returned with each answer
+
+"Try a question" shows the DSL and SQL a question produces with the current descriptions, without running the
+query.
+
+## Setup
+
+```kotlin
+implementation("io.github.serfom256:intentflow-admin-spring-boot-starter:0.3.0")
+```
+
+That's all: the UI opens at `http://<host>:<port>/intentflow-admin/`. It is a static bundle inside the jar, served
+by your application, so there is no separate server or Node.js. The starter brings the IntentFlow starter with it.
+
+## Editing
+
+For each service the UI shows the declared values next to your overrides. Before an edit is stored it is checked:
+descriptions must be single lines of at most 1000 characters, field names must exist, and every `{{placeholder}}`
+in a path must be a field of the service. "Reset to declared" removes a service's overrides.
+
+A change applies to the next question. Translations made with the old descriptions are not reused.
+
+## Security
+
+The admin changes what is sent to the LLM, so it is protected by default. Which protection applies depends on your
+application:
+
+| Your application              | Who gets in                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| uses Spring Security          | users your security has authenticated, with one of `intentflow.admin.security.authorities` (default `ROLE_ADMIN`) |
+| does not use Spring Security  | HTTP Basic: user `admin`, password from `intentflow.admin.security.password`, or a generated one printed in the startup log |
+| defines an `AdminAccess` bean | whoever that bean allows                                                     |
+
+**With Spring Security** the admin authenticates nobody itself. It reads the `Authentication` your security set up,
+so any login works: form login, OAuth2/OIDC, LDAP, JWT, a custom `AuthenticationProvider` or filter. Make sure your
+security lets requests to `/intentflow-admin/**` through to it, authenticated or not, and give admin users the
+required authority:
+
+```yaml
+intentflow:
+  admin:
+    security:
+      authorities: ROLE_ADMIN, SCOPE_intentflow.admin
+      login-url: /login
+```
+
+When nobody is signed in, the UI offers a link to `login-url` and a field for a bearer token, for applications that
+authenticate API calls with tokens. Changes are sent with your application's CSRF token, so CSRF protection can stay
+on.
+
+**Without Spring Security** the starter does not add it, because Spring Security would lock your whole application.
+Only the admin is protected, with HTTP Basic. Set a password for anything beyond development:
+
+```yaml
+intentflow:
+  admin:
+    security:
+      password: ${INTENTFLOW_ADMIN_PASSWORD}
+```
+
+**Your own rule**, e.g. a claim, a tenant or the client network, is an `AdminAccess` bean:
+
+```java
+@Bean
+AdminAccess adminAccess() {
+    return request -> request.isUserInRole("CATALOG_EDITOR")
+            ? AdminAccess.Decision.allowed(request.getRemoteUser())
+            : AdminAccess.Decision.forbidden(request.getRemoteUser());
+}
+```
+
+`intentflow.admin.security.enabled=false` opens the admin to everyone, for local development only.
+
+## Storage
+
+With a `DataSource`, overrides are stored in the table `intentflow_catalog_override`, created on startup if missing.
+Each instance re-reads it every `refresh-interval`, so all instances pick up a change within that time. Without a
+`DataSource`, or with `storage: memory`, overrides live in memory and are lost on restart. A `CatalogOverrides` bean
+replaces both.
+
+Outside Spring, `ServiceCatalogs.withOverrides(catalog, overrides)` applies overrides to any catalog.
+
+## Configuration
+
+| Property                                | Default                     | Description                                          |
+| --------------------------------------- | --------------------------- | ---------------------------------------------------- |
+| intentflow.admin.enabled                | true                        | Turns the admin on or off                            |
+| intentflow.admin.path                   | /intentflow-admin           | Where the UI is served; the API is under `<path>/api` |
+| intentflow.admin.storage                | auto                        | `auto` (table with a `DataSource`, else memory), `jdbc` or `memory` |
+| intentflow.admin.table                  | intentflow_catalog_override | Table for the overrides                              |
+| intentflow.admin.create-table           | true                        | Create the table if it does not exist                |
+| intentflow.admin.refresh-interval       | 30s                         | How often an instance re-reads the table             |
+| intentflow.admin.security.enabled       | true                        | `false` opens the admin to everyone                  |
+| intentflow.admin.security.authorities   | ROLE_ADMIN                  | Authorities that grant access with Spring Security   |
+| intentflow.admin.security.login-url     | -                           | Login page the UI links to                           |
+| intentflow.admin.security.username      | admin                       | HTTP Basic user without Spring Security              |
+| intentflow.admin.security.password      | generated                   | HTTP Basic password without Spring Security          |
+
+## Developing the UI
+
+The UI lives in `src/main/ui` (React, TypeScript, Mantine, TanStack). Gradle builds it into the jar.
+`./gradlew :intentflow-admin-spring-boot-starter:devUi` starts a live-reloading dev server on port 5174 that forwards
+API calls to `INTENTFLOW_API_URL` (default `http://localhost:8080`).

@@ -2,9 +2,11 @@ package io.github.serfom256.intentflow.jimmer;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
+import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import org.babyfish.jimmer.meta.ImmutableProp;
 import org.babyfish.jimmer.meta.ImmutableType;
 import org.babyfish.jimmer.sql.JSqlClient;
+import org.babyfish.jimmer.sql.fetcher.Fetcher;
 import org.babyfish.jimmer.sql.meta.SingleColumn;
 import org.babyfish.jimmer.sql.runtime.JSqlClientImplementor;
 import org.jspecify.annotations.Nullable;
@@ -14,6 +16,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,9 +26,22 @@ import java.util.function.Function;
 public final class JimmerQueryExecutor implements QueryExecutor {
 
     private final JSqlClientImplementor sqlClient;
+    private final Map<Class<?>, Fetcher<?>> fetchers = new HashMap<>();
 
     public JimmerQueryExecutor(JSqlClient sqlClient) {
+        this(sqlClient, List.of());
+    }
+
+    public JimmerQueryExecutor(JSqlClient sqlClient, Collection<? extends Fetcher<?>> fetchers) {
         this.sqlClient = (JSqlClientImplementor) sqlClient;
+        for (Fetcher<?> fetcher : fetchers) {
+            this.fetchers.put(fetcher.getJavaClass(), fetcher);
+        }
+    }
+
+    @Override
+    public ResultShape shape(Class<?> resultType) {
+        return ResultShape.KEYS;
     }
 
     @Override
@@ -50,7 +67,11 @@ public final class JimmerQueryExecutor implements QueryExecutor {
         if (ids.isEmpty()) {
             return List.of();
         }
-        Map<Object, T> byId = sqlClient.getEntities().findMapByIds(resultType, ids);
+        @SuppressWarnings("unchecked")
+        Fetcher<T> fetcher = (Fetcher<T>) fetchers.get(resultType);
+        Map<Object, T> byId = fetcher == null
+                ? sqlClient.getEntities().findMapByIds(resultType, ids)
+                : sqlClient.getEntities().findMapByIds(fetcher, ids);
         return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
@@ -96,14 +117,22 @@ public final class JimmerQueryExecutor implements QueryExecutor {
         if (!type.isPrimitive()) {
             return type;
         }
-        if (type == long.class) return Long.class;
-        if (type == int.class) return Integer.class;
-        if (type == short.class) return Short.class;
-        if (type == byte.class) return Byte.class;
-        if (type == double.class) return Double.class;
-        if (type == float.class) return Float.class;
-        if (type == boolean.class) return Boolean.class;
-        if (type == char.class) return Character.class;
+        if (type == long.class)
+            return Long.class;
+        if (type == int.class)
+            return Integer.class;
+        if (type == short.class)
+            return Short.class;
+        if (type == byte.class)
+            return Byte.class;
+        if (type == double.class)
+            return Double.class;
+        if (type == float.class)
+            return Float.class;
+        if (type == boolean.class)
+            return Boolean.class;
+        if (type == char.class)
+            return Character.class;
         return type;
     }
 

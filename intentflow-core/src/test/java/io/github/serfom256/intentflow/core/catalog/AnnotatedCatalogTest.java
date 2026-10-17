@@ -11,6 +11,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -28,10 +29,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AnnotatedCatalogTest {
 
-    enum Category { LAPTOP, PHONE, SMART_WATCH }
+    enum Category {
+        LAPTOP, PHONE, SMART_WATCH
+    }
 
-    @IntentService(value = "products", uri = "/products/{{id}}", maxTake = 25,
-            description = "Things we sell", defaultSort = {"rating desc", "id"})
+    @IntentService(value = "products", uri = "/products/{{id}}", maxTake = 25, description = "Things we sell", defaultSort = {
+            "rating desc", "id" })
     record ProductRecord(
             @IntentField(queryable = false) long id,
             @IntentField String name,
@@ -42,7 +45,7 @@ class AnnotatedCatalogTest {
             @IntentField Instant createdAt,
             @IntentField LocalDate releaseDay,
             @IntentField UUID externalRef,
-            @IntentField(name = "tier", values = {"gold", "silver"}) String loyaltyTier,
+            @IntentField(name = "tier", values = { "gold", "silver" }) String loyaltyTier,
             String internalNotes) {
     }
 
@@ -133,8 +136,8 @@ class AnnotatedCatalogTest {
         void defaultSortParsed() {
             assertThat(d.defaultSort()).extracting(k -> k.field().value(), SortKey::direction)
                     .containsExactly(
-                            org.assertj.core.groups.Tuple.tuple("rating", SortKey.Direction.DESC),
-                            org.assertj.core.groups.Tuple.tuple("id", SortKey.Direction.ASC));
+                            Tuple.tuple("rating", SortKey.Direction.DESC),
+                            Tuple.tuple("id", SortKey.Direction.ASC));
         }
     }
 
@@ -161,7 +164,8 @@ class AnnotatedCatalogTest {
     class Errors {
 
         static class NotAService {
-            @IntentField String x;
+            @IntentField
+            String x;
         }
 
         @IntentService(value = "empty", uri = "/e")
@@ -171,33 +175,40 @@ class AnnotatedCatalogTest {
 
         @IntentService(value = "weird", uri = "/w")
         static class UnsupportedType {
-            @IntentField List<String> tags;
+            @IntentField
+            List<String> tags;
         }
 
         @IntentService(value = "weird", uri = "/w")
         static class ExplicitTypeRescuesUnsupported {
-            @IntentField(type = FieldType.TEXT) List<String> tags;
+            @IntentField(type = FieldType.TEXT)
+            List<String> tags;
         }
 
         @IntentService(value = "s", uri = "/s", defaultSort = "nope")
         static class SortOnUnknownField {
-            @IntentField String x;
+            @IntentField
+            String x;
         }
 
         @IntentService(value = "s", uri = "/s", defaultSort = "x sideways")
         static class BadSortDirection {
-            @IntentField String x;
+            @IntentField
+            String x;
         }
 
         @IntentService(value = "s", uri = "/s")
         static class DuplicateLogicalNames {
-            @IntentField(name = "x") String a;
-            @IntentField(name = "x") String b;
+            @IntentField(name = "x")
+            String a;
+            @IntentField(name = "x")
+            String b;
         }
 
         @IntentService(value = "s", uri = "/s")
         static class ValuesOnNumber {
-            @IntentField(values = {"1", "2"}) int x;
+            @IntentField(values = { "1", "2" })
+            int x;
         }
 
         @Test

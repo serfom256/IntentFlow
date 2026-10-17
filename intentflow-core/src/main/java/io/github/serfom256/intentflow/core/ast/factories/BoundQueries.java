@@ -15,6 +15,10 @@ public final class BoundQueries {
         return new DefaultBoundQuery(segments, parameters);
     }
 
+    public static BoundQuery of(List<String> segments, List<DslLiteral> parameters, List<String> optimizations) {
+        return new DefaultBoundQuery(segments, parameters, optimizations);
+    }
+
     public static BoundQuery of(String sql) {
         return new DefaultBoundQuery(List.of(sql), List.of());
     }

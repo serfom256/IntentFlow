@@ -4,13 +4,13 @@ plugins {
 
 dependencies {
     api(projects.intentflowCore)
-    api(platform(libs.spring.boot.dependencies))
-    api(libs.jimmer.sql)
-    runtimeOnly(libs.jackson.databind)
+    compileOnly(libs.jimmer.sql)
 
     testImplementation(testFixtures(projects.intentflowCore))
+    testImplementation(libs.jimmer.sql)
     testImplementation(libs.spring.jdbc)
     testAnnotationProcessor(libs.jimmer.apt)
+    testRuntimeOnly(libs.jackson3.databind)
     testRuntimeOnly(libs.postgresql)
     testRuntimeOnly(libs.mysql)
 }

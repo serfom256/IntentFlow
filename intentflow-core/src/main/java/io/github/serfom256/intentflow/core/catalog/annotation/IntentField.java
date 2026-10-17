@@ -9,13 +9,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Exposes a field (or record component) of an {@link IntentService} class, or a property
+ * Exposes a field (or record component) of an {@link IntentService} class, or a
+ * property
  * method of an {@link IntentService} interface such as a Jimmer entity.
  * Fields without this annotation are invisible to the LLM.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.FIELD, ElementType.METHOD})
+@Target({ ElementType.FIELD, ElementType.METHOD })
 public @interface IntentField {
 
     /** Logical name used in the DSL; defaults to the snake_case Java field name. */
@@ -39,6 +40,9 @@ public @interface IntentField {
     /** Overrides allowed values (enums default to their constant names). */
     String[] values() default {};
 
-    /** Compare text with {@code ==}, {@code !=} and {@code in} exactly, e.g. for codes and keys. */
+    /**
+     * Compare text with {@code ==}, {@code !=} and {@code in} exactly, e.g. for
+     * codes and keys.
+     */
     boolean caseSensitive() default false;
 }

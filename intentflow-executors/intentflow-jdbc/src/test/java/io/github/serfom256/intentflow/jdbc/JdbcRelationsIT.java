@@ -19,6 +19,7 @@ import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
 import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
+import io.github.serfom256.intentflow.core.testing.RelationTables;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -40,33 +41,22 @@ class JdbcRelationsIT {
     @IntentService(value = "customers", table = "rel_customer", uri = "/customers/{{id}}", defaultSort = "id")
     @IntentRelation(name = "orders", service = "orders", from = "id", to = "customer_id")
     record Customer(@IntentField long id, @IntentField String name, @IntentField String country,
-                    @IntentField boolean vip) {
+            @IntentField boolean vip) {
     }
 
     @IntentService(value = "orders", table = "rel_order", uri = "/orders/{{id}}", defaultSort = "id")
     @IntentRelation(name = "customer", service = "customers", from = "customer_id", to = "id")
     record Order(@IntentField long id, @IntentField long customerId, @IntentField String status,
-                 @IntentField BigDecimal total) {
+            @IntentField BigDecimal total) {
     }
 
-    private static final Map<DifferentialDatabase, JdbcQueryExecutor> EXECUTORS = new EnumMap<>(DifferentialDatabase.class);
+    private static final Map<DifferentialDatabase, JdbcQueryExecutor> EXECUTORS = new EnumMap<>(
+            DifferentialDatabase.class);
 
     private static synchronized JdbcQueryExecutor executor(DifferentialDatabase database) {
         return EXECUTORS.computeIfAbsent(database, db -> {
-            DifferentialDatabase.Endpoint e = db.endpoint();
+            DifferentialDatabase.Endpoint e = RelationTables.prepare(db);
             JdbcClient jdbc = JdbcClient.create(new DriverManagerDataSource(e.url(), e.user(), e.password()));
-            jdbc.sql("DROP TABLE IF EXISTS rel_order").update();
-            jdbc.sql("DROP TABLE IF EXISTS rel_customer").update();
-            jdbc.sql("CREATE TABLE rel_customer (id BIGINT PRIMARY KEY, name VARCHAR(40), country VARCHAR(2), vip BOOLEAN)")
-                    .update();
-            jdbc.sql("CREATE TABLE rel_order (id BIGINT PRIMARY KEY, customer_id BIGINT, status VARCHAR(20), "
-                    + "total DECIMAL(10,2))").update();
-            jdbc.sql("INSERT INTO rel_customer VALUES (1, 'Ann', 'DE', TRUE), (2, 'Bob', 'DE', FALSE), "
-                    + "(3, 'Cid', 'FR', FALSE), (4, 'Dan', 'FR', TRUE)").update();
-            jdbc.sql("INSERT INTO rel_order VALUES "
-                    + "(10, 1, 'NEW', 150.00), (11, 1, 'PAID', 50.00), "
-                    + "(12, 2, 'PAID', 150.00), "
-                    + "(13, 3, 'CANCELLED', 20.00), (14, 3, 'PAID', 300.00)").update();
             return new JdbcQueryExecutor(jdbc);
         });
     }
@@ -124,7 +114,8 @@ class JdbcRelationsIT {
                 .resolve(IntentRequests.of("q"), Order.class);
 
         assertThat(response.items()).isEmpty();
-        assertThat(response.aggregation().rows()).extracting(AggregateRow::group, r -> ((BigDecimal) r.value()).setScale(2))
+        assertThat(response.aggregation().rows())
+                .extracting(AggregateRow::group, r -> ((BigDecimal) r.value()).setScale(2))
                 .containsExactly(
                         tuple(List.of("PAID"), new BigDecimal("200.00")),
                         tuple(List.of("NEW"), new BigDecimal("150.00")));
@@ -132,9 +123,50 @@ class JdbcRelationsIT {
 
     @ParameterizedTest
     @EnumSource(DifferentialDatabase.class)
-    void relatedFieldsCannotBeSorted(DifferentialDatabase db) {
-        assertThatThrownBy(() -> customers(db, "customers | sort orders.total"))
+    void sortsByAManyToOneField(DifferentialDatabase db) {
+        assertThat(answering(db, "orders | sort customer.name desc").resolve(IntentRequests.of("q"), Order.class)
+                .items()).extracting(Order::id).containsExactly(13L, 14L, 12L, 10L, 11L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifferentialDatabase.class)
+    void sortsByTheLargestOrSmallestRelatedValueOfAOneToMany(DifferentialDatabase db) {
+        assertThat(customers(db, "customers | sort orders.total desc")).containsExactly(3L, 1L, 2L, 4L);
+        assertThat(customers(db, "customers | sort orders.total")).containsExactly(3L, 1L, 2L, 4L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifferentialDatabase.class)
+    void relatedFieldsCannotBeGroupedBy(DifferentialDatabase db) {
+        assertThatThrownBy(() -> answering(db, "orders | group customer.country | count")
+                .resolve(IntentRequests.of("q"), Order.class))
                 .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("related field 'orders.total'");
+                .hasMessageContaining("related field 'customer.country'");
+    }
+
+    private static List<Long> orders(DifferentialDatabase db, String dsl) {
+        return answering(db, dsl).resolve(IntentRequests.of("q"), Order.class).items().stream()
+                .map(Order::id).toList();
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifferentialDatabase.class)
+    void keepsTheTopRowsOfEachPartition(DifferentialDatabase db) {
+        assertThat(orders(db, "orders | top 1 per customer_id by total desc")).containsExactly(10L, 12L, 14L);
+        assertThat(orders(db, "orders | filter status == \"PAID\" | top 1 per customer_id by total | sort total desc"))
+                .containsExactly(14L, 12L, 11L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifferentialDatabase.class)
+    void topWithoutPartitionBreaksTiesByTheDefaultSort(DifferentialDatabase db) {
+        assertThat(orders(db, "orders | top 2 by total desc")).containsExactly(10L, 14L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifferentialDatabase.class)
+    void topCombinesWithRelationFilters(DifferentialDatabase db) {
+        assertThat(orders(db, "orders | filter customer.country == \"DE\" | top 1 per customer_id by total"))
+                .containsExactly(11L, 12L);
     }
 }

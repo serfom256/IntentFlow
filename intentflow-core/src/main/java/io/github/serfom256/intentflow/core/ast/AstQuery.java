@@ -6,7 +6,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
-/** Parsed DSL query: service, optional filter, sort and pagination. Results are always whole entities. */
+/**
+ * Parsed DSL query: service, optional filter, sort and pagination. Results are
+ * always whole entities.
+ */
 public interface AstQuery {
 
     ServiceName service();
@@ -22,8 +25,19 @@ public interface AstQuery {
     @Nullable
     Take take();
 
-    /** Grouping and aggregate function; {@code null} when the query returns entities. */
+    /**
+     * Grouping and aggregate function; {@code null} when the query returns
+     * entities.
+     */
     default @Nullable Aggregate aggregate() {
+        return null;
+    }
+
+    /**
+     * Keeps only the first rows of each partition, as in "top 3 products per
+     * category"; {@code null} when unused.
+     */
+    default @Nullable TopN top() {
         return null;
     }
 }

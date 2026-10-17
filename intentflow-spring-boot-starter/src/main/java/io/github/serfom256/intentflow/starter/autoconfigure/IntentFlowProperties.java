@@ -13,9 +13,12 @@ public record IntentFlowProperties(
         @DefaultValue("true") boolean enabled,
         @Nullable String executor,
         @Nullable String dialect,
+        @DefaultValue("10000") int maxSkip,
         @DefaultValue Llm llm,
         @DefaultValue Cache cache,
         @DefaultValue Catalog catalog,
+        @DefaultValue Schema schema,
+        @DefaultValue Sql sql,
         @DefaultValue Cassandra cassandra) {
 
     public record Llm(
@@ -31,6 +34,12 @@ public record IntentFlowProperties(
     }
 
     public record Catalog(@DefaultValue List<String> packages) {
+    }
+
+    public record Schema(@DefaultValue("true") boolean introspect) {
+    }
+
+    public record Sql(@DefaultValue List<String> disabledOptimizations) {
     }
 
     public record Cassandra(@DefaultValue("10000") int maxScannedRows) {

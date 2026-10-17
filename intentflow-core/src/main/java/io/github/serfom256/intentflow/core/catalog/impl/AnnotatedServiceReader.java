@@ -1,16 +1,20 @@
 package io.github.serfom256.intentflow.core.catalog.impl;
 
+import io.github.serfom256.intentflow.core.catalog.DiscoveredRelation;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
+import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
-import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.catalog.ServiceRelation;
+import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentRelation;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
+import io.github.serfom256.intentflow.core.schema.TableFacts;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -18,6 +22,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,10 +31,14 @@ import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Deque;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -46,7 +55,7 @@ public final class AnnotatedServiceReader {
 
     private static final Set<Class<?>> TIMESTAMP_TYPES = Set.of(
             Instant.class, LocalDate.class, LocalDateTime.class, OffsetDateTime.class,
-            ZonedDateTime.class, Date.class, java.sql.Date.class, java.sql.Timestamp.class);
+            ZonedDateTime.class, Date.class, java.sql.Date.class, Timestamp.class);
 
     public static ServiceDescriptor read(Class<?> type, List<NameResolver> resolvers) {
         IntentService service = type.getAnnotation(IntentService.class);
@@ -55,6 +64,74 @@ public final class AnnotatedServiceReader {
                     type.getName() + " is not annotated with @" + IntentService.class.getSimpleName());
         }
 
+        List<FieldMapping> fields = declaredMappings(type, resolvers);
+        if (fields.isEmpty()) {
+            throw new IllegalArgumentException(
+                    type.getName() + " has no @" + IntentField.class.getSimpleName() + " fields");
+        }
+
+        String table = !service.table().isEmpty() ? service.table()
+                : resolve(resolvers, r -> r.tableName(type)).orElseGet(() -> snakeCase(type.getSimpleName()));
+        List<ServiceRelation> relations = relations(type, fields, resolvers);
+        return new DefaultServiceDescriptor(
+                new DefaultServiceName(service.value()),
+                service.description().isBlank() ? null : new DefaultServiceDescription(service.description()),
+                new DefaultTableName(table),
+                fields,
+                Arrays.stream(service.defaultSort()).map(AnnotatedServiceReader::sortKey).toList(),
+                new DefaultMaxTake(service.maxTake()),
+                new DefaultUriTemplate(service.uri()),
+                type,
+                relations);
+    }
+
+    private static List<ServiceRelation> relations(Class<?> type, List<FieldMapping> fields,
+            List<NameResolver> resolvers) {
+        List<ServiceRelation> relations = new ArrayList<>(Arrays.stream(type.getAnnotationsByType(IntentRelation.class))
+                .map(AnnotatedServiceReader::relation)
+                .toList());
+        Set<String> names = new HashSet<>();
+        relations.forEach(r -> names.add(r.name()));
+        for (NameResolver resolver : resolvers) {
+            for (DiscoveredRelation discovered : resolver.relations(type)) {
+                IntentService target = discovered.target().getAnnotation(IntentService.class);
+                if (target == null || !names.add(discovered.name())) {
+                    continue;
+                }
+                LogicalFieldName from = linkField(fields, discovered.fromColumn());
+                LogicalFieldName to = new DefaultLogicalFieldName(
+                        logicalForColumn(declaredMappings(discovered.target(), resolvers), discovered.toColumn()));
+                relations.add(new DefaultServiceRelation(discovered.name(), new DefaultServiceName(target.value()),
+                        from, to));
+            }
+        }
+        return relations;
+    }
+
+    private static LogicalFieldName linkField(List<FieldMapping> fields, String column) {
+        for (FieldMapping fm : fields) {
+            if (fm.column().value().equals(column)) {
+                return fm.logical();
+            }
+        }
+        String logical = column;
+        Set<String> taken = new HashSet<>();
+        fields.forEach(fm -> taken.add(fm.logical().value()));
+        while (taken.contains(logical)) {
+            logical = "_" + logical;
+        }
+        DefaultFieldMapping hidden = new DefaultFieldMapping(new DefaultLogicalFieldName(logical),
+                new DefaultColumnName(column), false, FieldType.ANY, null, List.of(), null);
+        fields.add(hidden);
+        return hidden.logical();
+    }
+
+    private static String logicalForColumn(List<FieldMapping> fields, String column) {
+        return fields.stream().filter(fm -> fm.column().value().equals(column))
+                .map(fm -> fm.logical().value()).findFirst().orElse(column);
+    }
+
+    private static List<FieldMapping> declaredMappings(Class<?> type, List<NameResolver> resolvers) {
         List<FieldMapping> fields = new ArrayList<>();
         if (type.isInterface()) {
             for (Method method : propertyMethods(type)) {
@@ -73,25 +150,7 @@ public final class AnnotatedServiceReader {
                 }
             }
         }
-        if (fields.isEmpty()) {
-            throw new IllegalArgumentException(
-                    type.getName() + " has no @" + IntentField.class.getSimpleName() + " fields");
-        }
-
-        String table = !service.table().isEmpty() ? service.table()
-                : resolve(resolvers, r -> r.tableName(type)).orElseGet(() -> snakeCase(type.getSimpleName()));
-        return new DefaultServiceDescriptor(
-                new DefaultServiceName(service.value()),
-                service.description().isBlank() ? null : new DefaultServiceDescription(service.description()),
-                new DefaultTableName(table),
-                fields,
-                Arrays.stream(service.defaultSort()).map(AnnotatedServiceReader::sortKey).toList(),
-                new DefaultMaxTake(service.maxTake()),
-                new DefaultUriTemplate(service.uri()),
-                type,
-                Arrays.stream(type.getAnnotationsByType(IntentRelation.class))
-                        .map(AnnotatedServiceReader::relation)
-                        .toList());
+        return fields;
     }
 
     private static ServiceRelation relation(IntentRelation r) {
@@ -100,7 +159,7 @@ public final class AnnotatedServiceReader {
     }
 
     private static FieldMapping mapping(Class<?> owner, String property, Class<?> javaType, IntentField meta,
-                                        Supplier<Optional<String>> resolvedColumn) {
+            Supplier<Optional<String>> resolvedColumn) {
         String logical = meta.name().isEmpty() ? snakeCase(property) : meta.name();
         String column = !meta.column().isEmpty() ? meta.column()
                 : resolvedColumn.get().orElseGet(() -> snakeCase(property));
@@ -121,7 +180,63 @@ public final class AnnotatedServiceReader {
                 meta.caseSensitive());
     }
 
-    private static Optional<String> resolve(List<NameResolver> resolvers, Function<NameResolver, Optional<String>> lookup) {
+    public static TableFacts facts(Class<?> type, List<NameResolver> resolvers) {
+        Set<String> notNull = new HashSet<>();
+        Map<String, List<String>> exactValues = new LinkedHashMap<>();
+        for (FieldMapping fm : declaredMappings(type, resolvers)) {
+            Class<?> javaType = javaType(type, fm.property());
+            if (javaType == null) {
+                continue;
+            }
+            if (javaType.isPrimitive()) {
+                notNull.add(fm.column().value());
+            }
+            IntentField meta = annotation(type, fm.property());
+            if (javaType.isEnum() && meta != null && meta.values().length == 0) {
+                exactValues.put(fm.column().value(), enumNames(javaType));
+            }
+        }
+        TableFacts facts = new TableFacts(List.of(), List.of(), notNull, exactValues);
+        for (NameResolver resolver : resolvers) {
+            facts = facts.merge(resolver.facts(type));
+        }
+        return facts;
+    }
+
+    public static Optional<String> restriction(Class<?> type, List<NameResolver> resolvers) {
+        IntentService service = type.getAnnotation(IntentService.class);
+        if (service != null && !service.restriction().isBlank()) {
+            return Optional.of(service.restriction().strip());
+        }
+        return resolve(resolvers, r -> r.restriction(type));
+    }
+
+    private static @Nullable Class<?> javaType(Class<?> owner, @Nullable String property) {
+        if (property == null) {
+            return null;
+        }
+        if (owner.isInterface()) {
+            return propertyMethods(owner).stream().filter(m -> propertyName(m).equals(property)).findFirst()
+                    .<Class<?>>map(Method::getReturnType).orElse(null);
+        }
+        return declaredFields(owner).stream().filter(f -> f.getName().equals(property)).findFirst()
+                .<Class<?>>map(Field::getType).orElse(null);
+    }
+
+    private static @Nullable IntentField annotation(Class<?> owner, @Nullable String property) {
+        if (property == null) {
+            return null;
+        }
+        if (owner.isInterface()) {
+            return propertyMethods(owner).stream().filter(m -> propertyName(m).equals(property)).findFirst()
+                    .map(m -> m.getAnnotation(IntentField.class)).orElse(null);
+        }
+        return declaredFields(owner).stream().filter(f -> f.getName().equals(property)).findFirst()
+                .map(f -> f.getAnnotation(IntentField.class)).orElse(null);
+    }
+
+    private static Optional<String> resolve(List<NameResolver> resolvers,
+            Function<NameResolver, Optional<String>> lookup) {
         for (NameResolver r : resolvers) {
             Optional<String> name = lookup.apply(r).filter(n -> !n.isBlank());
             if (name.isPresent()) {
@@ -173,12 +288,13 @@ public final class AnnotatedServiceReader {
         Deque<Class<?>> hierarchy = new ArrayDeque<>();
         collectInterfaces(type, hierarchy);
         List<Method> out = new ArrayList<>();
-        Set<String> seen = new java.util.HashSet<>();
+        Set<String> seen = new HashSet<>();
         for (Class<?> c : hierarchy) {
             Method[] methods = c.getDeclaredMethods();
-            Arrays.sort(methods, java.util.Comparator.comparing(AnnotatedServiceReader::propertyName));
+            Arrays.sort(methods, Comparator.comparing(AnnotatedServiceReader::propertyName));
             for (Method m : methods) {
-                if (m.getParameterCount() == 0 && m.getReturnType() != void.class && !Modifier.isStatic(m.getModifiers())
+                if (m.getParameterCount() == 0 && m.getReturnType() != void.class
+                        && !Modifier.isStatic(m.getModifiers())
                         && !m.isSynthetic() && seen.add(m.getName())) {
                     out.add(m);
                 }
@@ -199,7 +315,7 @@ public final class AnnotatedServiceReader {
 
     static String propertyName(Method method) {
         String name = method.getName();
-        for (String prefix : new String[]{"get", "is"}) {
+        for (String prefix : new String[] { "get", "is" }) {
             if (name.length() > prefix.length() && name.startsWith(prefix)
                     && Character.isUpperCase(name.charAt(prefix.length()))) {
                 return Character.toLowerCase(name.charAt(prefix.length())) + name.substring(prefix.length() + 1);
@@ -235,7 +351,7 @@ public final class AnnotatedServiceReader {
         return out;
     }
 
-    static String snakeCase(String name) {
+    public static String snakeCase(String name) {
         StringBuilder sb = new StringBuilder(name.length() + 4);
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);

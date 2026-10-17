@@ -18,14 +18,14 @@ import lombok.NoArgsConstructor;
 public final class IntentPipelines {
 
     public static IntentPipeline create(TextNormalizer normalizer,
-                                        DslCache cache,
-                                        LlmClient llm,
-                                        DslParser parser,
-                                        AstValidator validator,
-                                        SqlBuilder sqlBuilder,
-                                        QueryExecutor executor,
-                                        UriBuilder uriBuilder,
-                                        ServiceCatalog catalog) {
+            DslCache cache,
+            LlmClient llm,
+            DslParser parser,
+            AstValidator validator,
+            SqlBuilder sqlBuilder,
+            QueryExecutor executor,
+            UriBuilder uriBuilder,
+            ServiceCatalog catalog) {
         return new DefaultIntentPipeline(
                 normalizer, cache, llm, parser, validator,
                 sqlBuilder, executor, uriBuilder, catalog);

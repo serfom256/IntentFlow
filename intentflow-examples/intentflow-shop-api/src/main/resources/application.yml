@@ -25,6 +25,9 @@ intentflow:
     timeout: 120s
   cache:
     ttl: 30m
+  admin:
+    security:
+      password: ${INTENTFLOW_ADMIN_PASSWORD:admin}
 
 logging:
   level:

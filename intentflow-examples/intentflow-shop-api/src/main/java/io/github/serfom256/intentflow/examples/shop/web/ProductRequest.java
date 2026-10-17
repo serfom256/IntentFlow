@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 
@@ -16,6 +17,7 @@ public record ProductRequest(
         @NotBlank @Size(max = 60) String brand,
         @NotNull Category category,
         @NotNull @DecimalMin("0.00") @Digits(integer = 8, fraction = 2) BigDecimal price,
+        @Nullable @DecimalMin("0.0") @DecimalMax("90.0") @Digits(integer = 2, fraction = 1) BigDecimal discount,
         @NotNull @DecimalMin("0.0") @DecimalMax("5.0") @Digits(integer = 1, fraction = 1) BigDecimal rating,
         @PositiveOrZero int stock,
         boolean active,

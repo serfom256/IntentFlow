@@ -13,6 +13,10 @@
       "description": "SQL dialect. When unset, it is detected from the DataSource, or taken from the only dialect module on the classpath."
     },
     {
+      "name": "intentflow.max-skip",
+      "description": "Largest skip (row offset) a generated query may use. Larger offsets are rejected, so one question cannot force a deep scan."
+    },
+    {
       "name": "intentflow.llm.base-url",
       "description": "Base URL of an OpenAI-compatible chat completions API, e.g. http://localhost:1234/v1 (LM Studio), http://localhost:11434/v1 (Ollama) or https://api.openai.com/v1."
     },

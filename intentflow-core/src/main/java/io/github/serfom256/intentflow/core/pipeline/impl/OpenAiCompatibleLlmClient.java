@@ -37,7 +37,11 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
             Reply with the DSL query only: no explanation, no markdown, no code fences.
 
             DSL grammar:
-              <service> [| filter <expr>] [| sort <field> [asc|desc], ...] [| skip <int>] [| take <int>]
+              <service> [| filter <expr>] [| top <n> [per <field>, ...] by <field> [asc|desc], ...]
+                        [| sort <field> [asc|desc], ...] [| skip <int>] [| take <int>]
+            Best or latest rows within each group ("top 3 products per category", "latest order of each
+            customer") use top: it keeps the first <n> rows of every 'per' group in the 'by' order and still
+            returns whole records. It cannot be combined with group or count/sum/avg/min/max.
             Counting and totals ("how many", "total", "average", "per", "by"):
               <service> [| filter <expr>] [| group <field>, ...] | count|sum <field>|avg <field>|min <field>|max <field>
                         [| sort <group field or the function name> [asc|desc]] [| take <int>]
@@ -48,15 +52,24 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                            <field> in (<value>, ...)
                            <field> == null  /  <field> != null
             - Values: "double-quoted text" (no double quotes inside), numbers like 42 or 9.99, true, false, null.
+            - Wherever a field can appear (filter, sort, group, sum/avg/min/max) you may also use an expression:
+                arithmetic + - * / and parentheses, casts cast(x as number|integer|text|timestamp|date) or x::bigint,
+                coalesce(a, b, ...), year(t), month(t), day(t), hour(t), date_trunc("month", t),
+                length(s), lower(s), upper(s), round(n), round(n, 2), abs(n).
+              Use expressions only on fields of the service itself, not on relation fields.
             - Respect field types: text fields take "text", number fields take numbers, boolean fields
               take true/false, timestamp fields take quoted ISO dates like "2026-01-31" or "2026-01-31T10:15:00".
             - A date without a time means that whole day: created_at == "2026-10-10" matches any time on that
               day, > "2026-10-10" means after it and <= "2026-10-10" includes it.
             - For fields with a fixed list of values, use one of the listed values.
+            - Compare text with values as they are stored, which is usually English: translate names the user
+              writes in another language or script, e.g. "Мадрид" -> "Madrid", "東京" -> "Tokyo".
+            - Every condition in the request becomes part of the filter: "Google phones" is the brand Google and
+              the category of phones, not only the brand.
             - Only use services and fields listed below. Omit 'take' unless the user asks for a specific count.
             - Text comparisons with == != in are case-insensitive, except for fields marked case-sensitive.
             - A service's relations let filters use the related service's fields as <relation>.<field>,
-              e.g. customer.country == "DE". Only filters can use them, not sort or group.
+              e.g. customer.country == "DE", and sort by them, e.g. sort customer.name. Not group by them.
             - If the request needs a service or field that is not listed, or cannot be expressed
               with this grammar, reply exactly: unsupported "<short reason>"
               Never substitute a different field for the one the user asked about, and never answer a
@@ -69,7 +82,10 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
               books | filter genre in ("fantasy", "sci-fi") | sort title
               books | filter author.country == "UK" | sort year desc
               books | group genre | count | sort count desc
+              books | top 3 per genre by rating desc | sort genre
               books | filter in_stock == true | avg price
+              books | filter coalesce(discount, 0) > 10 and year(published_at) == 2025
+              books | group month(published_at) | sum price * copies_sold
               unsupported "books have no publisher field"
             """;
 
@@ -100,7 +116,8 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 + "\"model\":" + MiniJson.quote(model) + ","
                 + "\"temperature\":0,"
                 + "\"messages\":["
-                + "{\"role\":\"system\",\"content\":" + MiniJson.quote(systemPrompt(catalog, LocalDate.now(clock))) + "},"
+                + "{\"role\":\"system\",\"content\":" + MiniJson.quote(systemPrompt(catalog, LocalDate.now(clock)))
+                + "},"
                 + "{\"role\":\"user\",\"content\":" + MiniJson.quote(normalizedText.value()) + "}"
                 + "]}";
 
@@ -193,7 +210,8 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
             }
             return s;
         } catch (RuntimeException e) {
-            if (e instanceof LlmException le) throw le;
+            if (e instanceof LlmException le)
+                throw le;
             throw new LlmException("Unexpected LLM response shape: " + responseBody, e);
         }
     }

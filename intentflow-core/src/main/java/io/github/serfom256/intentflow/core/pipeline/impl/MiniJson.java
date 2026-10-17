@@ -49,7 +49,8 @@ final class MiniJson {
 
     private Object value() {
         ws();
-        if (pos >= s.length()) throw error("unexpected end of input");
+        if (pos >= s.length())
+            throw error("unexpected end of input");
         char c = s.charAt(pos);
         return switch (c) {
             case '{' -> object();
@@ -111,12 +112,14 @@ final class MiniJson {
         StringBuilder sb = new StringBuilder();
         while (pos < s.length()) {
             char c = s.charAt(pos++);
-            if (c == '"') return sb.toString();
+            if (c == '"')
+                return sb.toString();
             if (c != '\\') {
                 sb.append(c);
                 continue;
             }
-            if (pos >= s.length()) break;
+            if (pos >= s.length())
+                break;
             char e = s.charAt(pos++);
             switch (e) {
                 case '"', '\\', '/' -> sb.append(e);
@@ -126,7 +129,8 @@ final class MiniJson {
                 case 'r' -> sb.append('\r');
                 case 't' -> sb.append('\t');
                 case 'u' -> {
-                    if (pos + 4 > s.length()) throw error("bad unicode escape");
+                    if (pos + 4 > s.length())
+                        throw error("bad unicode escape");
                     sb.append((char) Integer.parseInt(s.substring(pos, pos + 4), 16));
                     pos += 4;
                 }
@@ -141,12 +145,14 @@ final class MiniJson {
         while (pos < s.length() && "+-0123456789.eE".indexOf(s.charAt(pos)) >= 0) {
             pos++;
         }
-        if (start == pos) throw error("unexpected character '" + s.charAt(pos) + "'");
+        if (start == pos)
+            throw error("unexpected character '" + s.charAt(pos) + "'");
         return new BigDecimal(s.substring(start, pos));
     }
 
     private Object literal(String word, Object result) {
-        if (!s.startsWith(word, pos)) throw error("expected '" + word + "'");
+        if (!s.startsWith(word, pos))
+            throw error("expected '" + word + "'");
         pos += word.length();
         return result;
     }
@@ -162,7 +168,8 @@ final class MiniJson {
     }
 
     private void expect(char c) {
-        if (!peek(c)) throw error("expected '" + c + "'");
+        if (!peek(c))
+            throw error("expected '" + c + "'");
         pos++;
     }
 

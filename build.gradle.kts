@@ -1,6 +1,6 @@
 allprojects {
     group = "io.github.serfom256"
-    version = "0.2.0"
+    version = "0.3.0"
 
     repositories {
         mavenCentral()
@@ -8,7 +8,7 @@ allprojects {
 }
 
 subprojects {
-    if (name == "intentflow-shop-ui") {
+    if (name.endsWith("-ui")) {
         return@subprojects
     }
 
@@ -37,6 +37,17 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+    }
+
+    if (!projectDir.parentFile.name.equals("intentflow-examples") && name != "intentflow-core") {
+        val springBoot = providers.gradleProperty("springBoot").orElse(libs.versions.springBoot).get()
+        val bom = dependencies.platform("org.springframework.boot:spring-boot-dependencies:$springBoot")
+        listOf("compileOnly", "annotationProcessor", "testImplementation", "testAnnotationProcessor").forEach {
+            dependencies.add(it, bom)
+        }
+        pluginManager.withPlugin("java-test-fixtures") {
+            dependencies.add("testFixturesImplementation", bom)
+        }
     }
 
     if (!projectDir.parentFile.name.equals("intentflow-examples")) {

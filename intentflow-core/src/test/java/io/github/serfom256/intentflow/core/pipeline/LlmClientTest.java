@@ -16,6 +16,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.pipeline.factories.LlmClients;
+import io.github.serfom256.intentflow.core.pipeline.impl.StubLlmClient;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -86,7 +87,7 @@ class LlmClientTest {
         assertThatThrownBy(() -> client.generateDsl(extra, EMPTY_CATALOG))
                 .isInstanceOf(LlmException.class);
 
-        ((io.github.serfom256.intentflow.core.pipeline.impl.StubLlmClient) client).register(extra, extraDsl);
+        ((StubLlmClient) client).register(extra, extraDsl);
 
         assertThat(client.generateDsl(extra, EMPTY_CATALOG).value()).isEqualTo("books");
     }
@@ -96,7 +97,7 @@ class LlmClientTest {
         LlmClient client = LlmClients.stub(Map.of(FIND_BOOKS, BOOKS_DSL));
 
         DslSource updated = DslSources.of("books | take 99");
-        ((io.github.serfom256.intentflow.core.pipeline.impl.StubLlmClient) client).register(FIND_BOOKS, updated);
+        ((StubLlmClient) client).register(FIND_BOOKS, updated);
 
         assertThat(client.generateDsl(FIND_BOOKS, EMPTY_CATALOG).value()).isEqualTo("books | take 99");
     }

@@ -283,15 +283,15 @@ class ParserTest {
     @Test
     void unsupportedWithReasonThrowsUnsupportedRequest() {
         assertThatThrownBy(() -> parse("unsupported \"no publisher field\""))
-                .isInstanceOfSatisfying(UnsupportedRequestException.class, e ->
-                        assertThat(e.reason()).isEqualTo("no publisher field"));
+                .isInstanceOfSatisfying(UnsupportedRequestException.class,
+                        e -> assertThat(e.reason()).isEqualTo("no publisher field"));
     }
 
     @Test
     void unsupportedWithoutReasonIsAccepted() {
         assertThatThrownBy(() -> parse("unsupported"))
-                .isInstanceOfSatisfying(UnsupportedRequestException.class, e ->
-                        assertThat(e.reason()).isEqualTo("no reason given"));
+                .isInstanceOfSatisfying(UnsupportedRequestException.class,
+                        e -> assertThat(e.reason()).isEqualTo("no reason given"));
     }
 
     @Test

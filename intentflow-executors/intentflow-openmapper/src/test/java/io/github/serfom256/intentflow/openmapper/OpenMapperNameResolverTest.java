@@ -17,11 +17,20 @@ class OpenMapperNameResolverTest {
     @Model(primaryKey = "id")
     @IntentService(value = "users", table = "app_user", uri = "/users/{{id}}")
     static class User {
-        @Field @IntentField Long id;
-        @Field(name = "full_name") @IntentField String fullName;
-        @Field @IntentField String nickName;
-        @Field(name = "e_mail") @IntentField(column = "email_override") String email;
-        @IntentField Integer loginCount;
+        @Field
+        @IntentField
+        Long id;
+        @Field(name = "full_name")
+        @IntentField
+        String fullName;
+        @Field
+        @IntentField
+        String nickName;
+        @Field(name = "e_mail")
+        @IntentField(column = "email_override")
+        String email;
+        @IntentField
+        Integer loginCount;
     }
 
     @Test

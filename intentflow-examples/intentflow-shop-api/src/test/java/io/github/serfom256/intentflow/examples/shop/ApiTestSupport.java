@@ -14,7 +14,7 @@ import java.io.UnsupportedEncodingException;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({PostgresContainerConfig.class, ApiTestSupport.ScriptedLlmConfig.class})
+@Import({ PostgresContainerConfig.class, ApiTestSupport.ScriptedLlmConfig.class })
 public abstract class ApiTestSupport {
 
     @Autowired

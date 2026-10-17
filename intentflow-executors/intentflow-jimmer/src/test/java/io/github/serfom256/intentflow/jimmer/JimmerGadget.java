@@ -22,21 +22,27 @@ public interface JimmerGadget {
     long id();
 
     @IntentField
-    @Nullable String name();
+    @Nullable
+    String name();
 
     @IntentField(caseSensitive = true)
-    @Nullable GadgetKind kind();
+    @Nullable
+    GadgetKind kind();
 
     @IntentField
-    @Nullable BigDecimal price();
+    @Nullable
+    BigDecimal price();
 
     @IntentField
-    @Nullable Integer stock();
+    @Nullable
+    Integer stock();
 
     @IntentField
-    @Nullable Boolean active();
+    @Nullable
+    Boolean active();
 
     @Column(name = "created_at")
     @IntentField
-    @Nullable LocalDateTime createdAt();
+    @Nullable
+    LocalDateTime createdAt();
 }

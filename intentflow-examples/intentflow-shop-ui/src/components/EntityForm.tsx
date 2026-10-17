@@ -29,6 +29,7 @@ function rule(field: FormField) {
         return null;
       }
       case "number": {
+        if (value === "" && field.optional) return null;
         const number = Number(value);
         if (value === "" || Number.isNaN(number)) return `${field.label} is required`;
         if (field.min !== undefined && number < field.min) return `Must be at least ${field.min}`;
@@ -94,7 +95,7 @@ export function EntityForm({ title, opened, fields, initial, saving, error, onCl
                       step={field.step}
                       decimalScale={field.decimals}
                       thousandSeparator=","
-                      withAsterisk
+                      withAsterisk={!field.optional}
                       {...form.getInputProps(field.name)}
                     />
                   );

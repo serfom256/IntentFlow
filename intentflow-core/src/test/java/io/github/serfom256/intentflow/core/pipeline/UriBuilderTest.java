@@ -31,10 +31,12 @@ class UriBuilderTest {
 
     private static final ServiceName BOOKS = ServiceNames.of("books");
 
-    enum Genre { SCI_FI }
+    enum Genre {
+        SCI_FI
+    }
 
     record Book(long id, String title, String authorName, BigDecimal price, boolean inStock,
-                Instant publishedAt, Genre genre, String isbn) {
+            Instant publishedAt, Genre genre, String isbn) {
     }
 
     static class BeanBook {

@@ -60,8 +60,8 @@ public record DefaultServiceDescriptor(
     }
 
     public DefaultServiceDescriptor(ServiceName name, @Nullable ServiceDescription description, TableName table,
-                                    List<FieldMapping> fields, List<SortKey> defaultSort, MaxTake maxTake,
-                                    UriTemplate uriTemplate, Class<?> resultType) {
+            List<FieldMapping> fields, List<SortKey> defaultSort, MaxTake maxTake,
+            UriTemplate uriTemplate, Class<?> resultType) {
         this(name, description, table, fields, defaultSort, maxTake, uriTemplate, resultType, List.of());
     }
 }

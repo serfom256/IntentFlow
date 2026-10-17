@@ -3,15 +3,27 @@ package io.github.serfom256.intentflow.core.dsl.impl;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AggregateFunction;
 import io.github.serfom256.intentflow.core.ast.And;
+import io.github.serfom256.intentflow.core.ast.Arith;
+import io.github.serfom256.intentflow.core.ast.ArithOp;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoolLiteral;
+import io.github.serfom256.intentflow.core.ast.Call;
+import io.github.serfom256.intentflow.core.ast.CastExpr;
+import io.github.serfom256.intentflow.core.ast.CastType;
 import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
+import io.github.serfom256.intentflow.core.ast.ExprCompare;
+import io.github.serfom256.intentflow.core.ast.ExprFunction;
+import io.github.serfom256.intentflow.core.ast.ExprIn;
+import io.github.serfom256.intentflow.core.ast.ExprSortKey;
+import io.github.serfom256.intentflow.core.ast.Expressions;
+import io.github.serfom256.intentflow.core.ast.FieldRef;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.In;
 import io.github.serfom256.intentflow.core.ast.IsNotNull;
 import io.github.serfom256.intentflow.core.ast.IsNull;
+import io.github.serfom256.intentflow.core.ast.LiteralExpr;
 import io.github.serfom256.intentflow.core.ast.Not;
 import io.github.serfom256.intentflow.core.ast.NullLiteral;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
@@ -19,6 +31,8 @@ import io.github.serfom256.intentflow.core.ast.Or;
 import io.github.serfom256.intentflow.core.ast.Skip;
 import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
+import io.github.serfom256.intentflow.core.ast.TopN;
+import io.github.serfom256.intentflow.core.ast.ValueExpr;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
 import io.github.serfom256.intentflow.core.ast.factories.Takes;
@@ -77,25 +91,38 @@ public final class DefaultParser implements Parser {
             boolean sawSort = false;
             boolean sawSkip = false;
             boolean sawTake = false;
-            List<LogicalFieldName> groupBy = null;
+            TopN top = null;
+            List<ValueExpr> groupBy = null;
             AggregateFunction function = null;
-            LogicalFieldName aggregated = null;
+            ValueExpr aggregated = null;
 
             while (peekPunct(Punctuation.PIPE)) {
                 advance();
                 Token t = peek();
-                if (t instanceof IdentifierToken id && id.name().equals("group")) {
-                    if (groupBy != null) throw error("duplicate 'group' stage", t);
+                if (t instanceof IdentifierToken id && id.name().equals("top")) {
+                    if (top != null)
+                        throw error("duplicate 'top' stage", t);
                     advance();
-                    groupBy = parseFieldList();
+                    top = parseTop();
+                    continue;
+                }
+                if (t instanceof IdentifierToken id && id.name().equals("group")) {
+                    if (groupBy != null)
+                        throw error("duplicate 'group' stage", t);
+                    advance();
+                    groupBy = parseGroupList();
                     continue;
                 }
                 if (t instanceof IdentifierToken id && AggregateFunction.fromKeyword(id.name()).isPresent()) {
-                    if (function != null) throw error("only one aggregate stage is allowed", t);
+                    if (function != null)
+                        throw error("only one aggregate stage is allowed", t);
                     function = AggregateFunction.fromKeyword(id.name()).orElseThrow();
                     advance();
                     if (function != AggregateFunction.COUNT) {
-                        aggregated = parseFieldName("expected field after '" + function.keyword() + "'");
+                        if (!startsValue(peek())) {
+                            throw error("expected field after '" + function.keyword() + "'", peek());
+                        }
+                        aggregated = parseValueExpr();
                     }
                     continue;
                 }
@@ -104,25 +131,29 @@ public final class DefaultParser implements Parser {
                 }
                 switch (kw.keyword()) {
                     case FILTER -> {
-                        if (sawFilter) throw error("duplicate 'filter' stage", t);
+                        if (sawFilter)
+                            throw error("duplicate 'filter' stage", t);
                         sawFilter = true;
                         advance();
                         filter = parseOrExpr();
                     }
                     case SORT -> {
-                        if (sawSort) throw error("duplicate 'sort' stage", t);
+                        if (sawSort)
+                            throw error("duplicate 'sort' stage", t);
                         sawSort = true;
                         advance();
                         sort = parseSort();
                     }
                     case SKIP -> {
-                        if (sawSkip) throw error("duplicate 'skip' stage", t);
+                        if (sawSkip)
+                            throw error("duplicate 'skip' stage", t);
                         sawSkip = true;
                         advance();
                         skip = parseSkip();
                     }
                     case TAKE -> {
-                        if (sawTake) throw error("duplicate 'take' stage", t);
+                        if (sawTake)
+                            throw error("duplicate 'take' stage", t);
                         sawTake = true;
                         advance();
                         take = parseTake();
@@ -137,17 +168,43 @@ public final class DefaultParser implements Parser {
             }
             Aggregate aggregate = function == null ? null
                     : new Aggregate(function, aggregated, groupBy == null ? List.of() : groupBy);
-            return AstQueries.of(service, filter, sort, skip, take, aggregate);
+            return AstQueries.of(service, filter, sort, skip, take, aggregate, top);
         }
 
-        List<LogicalFieldName> parseFieldList() {
-            List<LogicalFieldName> fields = new ArrayList<>();
-            fields.add(parseFieldName("expected field to group by"));
+        TopN parseTop() {
+            Token at = peek();
+            int count = toInt(expectNumber("expected a count after 'top'"), "top");
+            if (count <= 0) {
+                throw error("'top' must be positive, got " + count, at);
+            }
+            List<ValueExpr> partition = List.of();
+            if (peek() instanceof IdentifierToken per && per.name().equals("per")) {
+                advance();
+                partition = parseGroupList();
+            }
+            Token by = peek();
+            if (!(by instanceof IdentifierToken byWord) || !byWord.name().equals("by")) {
+                throw error("expected 'by' and an order in 'top', e.g. top 3 per category by rating desc", by);
+            }
+            advance();
+            return new TopN(count, partition, parseSort());
+        }
+
+        List<ValueExpr> parseGroupList() {
+            List<ValueExpr> groups = new ArrayList<>();
+            groups.add(parseGroupItem());
             while (peekPunct(Punctuation.COMMA)) {
                 advance();
-                fields.add(parseFieldName("expected field to group by"));
+                groups.add(parseGroupItem());
             }
-            return fields;
+            return groups;
+        }
+
+        ValueExpr parseGroupItem() {
+            if (!startsValue(peek())) {
+                throw error("expected field to group by", peek());
+            }
+            return parseValueExpr();
         }
 
         LogicalFieldName parseFieldName(String message) {
@@ -223,41 +280,148 @@ public final class DefaultParser implements Parser {
         FilterExpr parsePrimary() {
             Token t = peek();
             if (t instanceof PunctuationToken p && p.punctuation() == Punctuation.LPAREN) {
+                int mark = pos;
+                try {
+                    advance();
+                    FilterExpr inner = parseOrExpr();
+                    expectPunct(Punctuation.RPAREN, "expected ')'");
+                    return inner;
+                } catch (DslParseException notAGroup) {
+                    pos = mark;
+                }
+            }
+            if (!startsValue(t)) {
+                throw error("expected filter expression", t);
+            }
+            ValueExpr left = parseValueExpr();
+
+            if (peekKeyword(Keyword.IN)) {
                 advance();
-                FilterExpr inner = parseOrExpr();
+                List<DslLiteral> values = parseLiteralList();
+                return left instanceof FieldRef f ? new In(f.field(), values) : new ExprIn(left, values);
+            }
+
+            Token next = peek();
+            if (!(next instanceof OperatorToken op)) {
+                throw error("expected comparison operator or 'in' after '" + Expressions.print(left) + "'", next);
+            }
+            advance();
+
+            if (peekKeyword(Keyword.NULL)) {
+                advance();
+                if (op.operator() != Operator.EQ && op.operator() != Operator.NE) {
+                    throw error("'null' is only valid with '==' or '!='", next);
+                }
+                if (left instanceof FieldRef f) {
+                    return op.operator() == Operator.EQ ? new IsNull(f.field()) : new IsNotNull(f.field());
+                }
+                return new ExprCompare(left, mapOp(op.operator()), new LiteralExpr(new NullLiteral()));
+            }
+
+            ValueExpr right = parseValueExpr();
+            if (left instanceof FieldRef f && right instanceof LiteralExpr l) {
+                return new Compare(f.field(), mapOp(op.operator()), l.value());
+            }
+            return new ExprCompare(left, mapOp(op.operator()), right);
+        }
+
+        boolean startsValue(Token t) {
+            return t instanceof IdentifierToken || t instanceof NumberToken || t instanceof StringToken
+                    || (t instanceof PunctuationToken p
+                            && (p.punctuation() == Punctuation.LPAREN || p.punctuation() == Punctuation.MINUS))
+                    || (t instanceof KeywordToken k && (k.keyword() == Keyword.TRUE || k.keyword() == Keyword.FALSE));
+        }
+
+        ValueExpr parseValueExpr() {
+            ValueExpr left = parseTerm();
+            while (peekPunct(Punctuation.PLUS) || peekPunct(Punctuation.MINUS)) {
+                ArithOp op = peekPunct(Punctuation.PLUS) ? ArithOp.ADD : ArithOp.SUBTRACT;
+                advance();
+                left = new Arith(op, left, parseTerm());
+            }
+            return left;
+        }
+
+        ValueExpr parseTerm() {
+            ValueExpr left = parseUnary();
+            while (peekPunct(Punctuation.STAR) || peekPunct(Punctuation.SLASH)) {
+                ArithOp op = peekPunct(Punctuation.STAR) ? ArithOp.MULTIPLY : ArithOp.DIVIDE;
+                advance();
+                left = new Arith(op, left, parseUnary());
+            }
+            return left;
+        }
+
+        ValueExpr parseUnary() {
+            if (peekPunct(Punctuation.MINUS)) {
+                advance();
+                return new Arith(ArithOp.SUBTRACT, new LiteralExpr(new NumberLiteral(BigDecimal.ZERO)), parseUnary());
+            }
+            ValueExpr value = parseValuePrimary();
+            while (peekPunct(Punctuation.DOUBLE_COLON)) {
+                advance();
+                value = new CastExpr(value, parseCastType());
+            }
+            return value;
+        }
+
+        ValueExpr parseValuePrimary() {
+            Token t = peek();
+            if (t instanceof PunctuationToken p && p.punctuation() == Punctuation.LPAREN) {
+                advance();
+                ValueExpr inner = parseValueExpr();
                 expectPunct(Punctuation.RPAREN, "expected ')'");
                 return inner;
             }
             if (t instanceof IdentifierToken id) {
                 advance();
-                LogicalFieldName field = LogicalFieldNames.of(dotted(id.name()));
-
-                if (peekKeyword(Keyword.IN)) {
-                    advance();
-                    return parseInList(field);
+                if (peekPunct(Punctuation.LPAREN)) {
+                    return parseCall(id);
                 }
-
-                Token next = peek();
-                if (!(next instanceof OperatorToken op)) {
-                    throw error("expected comparison operator or 'in' after field '"
-                            + id.name() + "'", next);
-                }
-                advance();
-
-                if (peekKeyword(Keyword.NULL)) {
-                    advance();
-                    if (op.operator() == Operator.EQ) return new IsNull(field);
-                    if (op.operator() == Operator.NE) return new IsNotNull(field);
-                    throw error("'null' is only valid with '==' or '!='", next);
-                }
-
-                DslLiteral value = parseValue();
-                return new Compare(field, mapOp(op.operator()), value);
+                return new FieldRef(LogicalFieldNames.of(dotted(id.name())));
             }
-            throw error("expected filter expression", t);
+            return new LiteralExpr(parseValue());
         }
 
-        FilterExpr parseInList(LogicalFieldName field) {
+        ValueExpr parseCall(IdentifierToken name) {
+            expectPunct(Punctuation.LPAREN, "expected '('");
+            if (name.name().equalsIgnoreCase("cast")) {
+                ValueExpr value = parseValueExpr();
+                Token as = peek();
+                if (!(as instanceof IdentifierToken asWord) || !asWord.name().equalsIgnoreCase("as")) {
+                    throw error("expected 'as' in cast", as);
+                }
+                advance();
+                CastType type = parseCastType();
+                expectPunct(Punctuation.RPAREN, "expected ')'");
+                return new CastExpr(value, type);
+            }
+            ExprFunction function = ExprFunction.fromKeyword(name.name())
+                    .orElseThrow(() -> error("unknown function '" + name.name() + "'", name));
+            List<ValueExpr> args = new ArrayList<>();
+            if (!peekPunct(Punctuation.RPAREN)) {
+                args.add(parseValueExpr());
+                while (peekPunct(Punctuation.COMMA)) {
+                    advance();
+                    args.add(parseValueExpr());
+                }
+            }
+            expectPunct(Punctuation.RPAREN, "expected ')'");
+            return new Call(function, args);
+        }
+
+        CastType parseCastType() {
+            Token t = peek();
+            if (!(t instanceof IdentifierToken id)) {
+                throw error("expected a type: number, integer, text, timestamp or date", t);
+            }
+            advance();
+            return CastType.fromName(id.name())
+                    .orElseThrow(() -> error("unknown type '" + id.name()
+                            + "'; use number, integer, text, timestamp or date", id));
+        }
+
+        List<DslLiteral> parseLiteralList() {
             expectPunct(Punctuation.LPAREN, "expected '(' after 'in'");
             List<DslLiteral> values = new ArrayList<>();
             values.add(parseValue());
@@ -266,7 +430,7 @@ public final class DefaultParser implements Parser {
                 values.add(parseValue());
             }
             expectPunct(Punctuation.RPAREN, "expected ')'");
-            return new In(field, values);
+            return values;
         }
 
         DslLiteral parseValue() {
@@ -281,10 +445,20 @@ public final class DefaultParser implements Parser {
             }
             if (t instanceof KeywordToken kw) {
                 switch (kw.keyword()) {
-                    case TRUE  -> { advance(); return new BoolLiteral(true); }
-                    case FALSE -> { advance(); return new BoolLiteral(false); }
-                    case NULL  -> { advance(); return new NullLiteral(); }
-                    default    -> { }
+                    case TRUE -> {
+                        advance();
+                        return new BoolLiteral(true);
+                    }
+                    case FALSE -> {
+                        advance();
+                        return new BoolLiteral(false);
+                    }
+                    case NULL -> {
+                        advance();
+                        return new NullLiteral();
+                    }
+                    default -> {
+                    }
                 }
             }
             throw error("expected value literal (string, number, true, false, null)", t);
@@ -302,11 +476,10 @@ public final class DefaultParser implements Parser {
 
         SortKey parseSortItem() {
             Token t = peek();
-            if (!(t instanceof IdentifierToken id)) {
+            if (!startsValue(t)) {
                 throw error("expected sort field", t);
             }
-            advance();
-            LogicalFieldName field = LogicalFieldNames.of(dotted(id.name()));
+            ValueExpr value = parseValueExpr();
             SortKey.Direction dir = SortKey.Direction.ASC;
             if (peek() instanceof KeywordToken kw) {
                 if (kw.keyword() == Keyword.ASC) {
@@ -316,7 +489,7 @@ public final class DefaultParser implements Parser {
                     dir = SortKey.Direction.DESC;
                 }
             }
-            return SortKeys.of(field, dir);
+            return value instanceof FieldRef f ? SortKeys.of(f.field(), dir) : new ExprSortKey(value, dir);
         }
 
         Skip parseSkip() {

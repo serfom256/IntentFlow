@@ -59,7 +59,7 @@ final class EntityProperties {
                 }
             }
             String suffix = Character.toUpperCase(property.charAt(0)) + property.substring(1);
-            for (String name : new String[]{"get" + suffix, "is" + suffix}) {
+            for (String name : new String[] { "get" + suffix, "is" + suffix }) {
                 Method getter = publicNoArg(type, name);
                 if (getter != null) {
                     getter.setAccessible(true);

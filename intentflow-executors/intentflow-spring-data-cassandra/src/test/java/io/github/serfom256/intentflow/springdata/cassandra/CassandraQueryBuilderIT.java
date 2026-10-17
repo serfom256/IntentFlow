@@ -1,9 +1,9 @@
 package io.github.serfom256.intentflow.springdata.cassandra;
 
-import io.github.serfom256.intentflow.cassandra.CassandraQuery;
-import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import io.github.serfom256.intentflow.cassandra.CassandraQuery;
+import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
 import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
@@ -46,27 +46,43 @@ class CassandraQueryBuilderIT {
     @Table("reading")
     @IntentService(value = "readings", uri = "/readings/{{sensor}}", maxTake = 100)
     public static class Reading {
-        @PrimaryKeyColumn(type = PrimaryKeyType.PARTITIONED) @IntentField String sensor;
-        @PrimaryKeyColumn(name = "taken_at", ordinal = 0, type = PrimaryKeyType.CLUSTERED) @IntentField Instant takenAt;
-        @IntentField BigDecimal value;
-        @IntentField Boolean ok;
-        @Column("note") @IntentField String note;
+        @PrimaryKeyColumn(type = PrimaryKeyType.PARTITIONED)
+        @IntentField
+        String sensor;
+        @PrimaryKeyColumn(name = "taken_at", ordinal = 0, type = PrimaryKeyType.CLUSTERED)
+        @IntentField
+        Instant takenAt;
+        @IntentField
+        BigDecimal value;
+        @IntentField
+        Boolean ok;
+        @Column("note")
+        @IntentField
+        String note;
     }
 
     @Table("plain")
     @IntentService(value = "plains", uri = "/plains/{{id}}", maxTake = 100)
     public static class Plain {
-        @PrimaryKeyColumn(type = PrimaryKeyType.PARTITIONED) @IntentField Long id;
-        @IntentField Integer score;
+        @PrimaryKeyColumn(type = PrimaryKeyType.PARTITIONED)
+        @IntentField
+        Long id;
+        @IntentField
+        Integer score;
     }
 
     @Table("item")
     @IntentService(value = "items", uri = "/items/{{code}}", maxTake = 100)
     @IntentRelation(name = "owner", service = "plains", from = "owner_id", to = "id")
     public static class Item {
-        @PrimaryKeyColumn(type = PrimaryKeyType.PARTITIONED) @IntentField(caseSensitive = true) String code;
-        @IntentField String label;
-        @Column("owner_id") @IntentField Long ownerId;
+        @PrimaryKeyColumn(type = PrimaryKeyType.PARTITIONED)
+        @IntentField(caseSensitive = true)
+        String code;
+        @IntentField
+        String label;
+        @Column("owner_id")
+        @IntentField
+        Long ownerId;
     }
 
     private CqlSession session;

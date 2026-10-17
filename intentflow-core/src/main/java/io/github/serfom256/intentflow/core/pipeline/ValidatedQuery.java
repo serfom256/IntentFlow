@@ -2,6 +2,9 @@ package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
+import io.github.serfom256.intentflow.core.ast.ExprSortKey;
+import io.github.serfom256.intentflow.core.ast.FieldRef;
+import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
@@ -26,8 +29,10 @@ public interface ValidatedQuery {
     }
 
     /**
-     * The ordering to apply: the requested sort, or the default one, followed by tie-breakers so
-     * pages never overlap. Entity queries append the service's {@code defaultSort}; aggregate queries
+     * The ordering to apply: the requested sort, or the default one, followed by
+     * tie-breakers so
+     * pages never overlap. Entity queries append the service's {@code defaultSort};
+     * aggregate queries
      * sort by the aggregated value (descending) and then by every group field.
      */
     default List<SortKey> effectiveSort() {
@@ -43,7 +48,11 @@ public interface ValidatedQuery {
             if (sort.isEmpty() && !aggregate.groupBy().isEmpty()) {
                 sort.add(SortKeys.of(valueField(aggregate), SortKey.Direction.DESC));
             }
-            tieBreakers = aggregate.groupBy().stream().map(f -> SortKeys.of(f, SortKey.Direction.ASC)).toList();
+            tieBreakers = aggregate.groupBy().stream()
+                    .<SortKey>map(g -> g instanceof FieldRef f
+                            ? SortKeys.of(f.field(), SortKey.Direction.ASC)
+                            : new ExprSortKey(g, SortKey.Direction.ASC))
+                    .toList();
         }
         Set<String> used = new HashSet<>();
         sort.forEach(k -> used.add(k.field().value()));
@@ -55,7 +64,30 @@ public interface ValidatedQuery {
         return List.copyOf(sort);
     }
 
-    /** The name sort keys use for the aggregated value, e.g. {@code count} or {@code sum}. */
+    /**
+     * The ordering inside each {@code top} partition: the requested order followed
+     * by the default sort.
+     */
+    default List<SortKey> topOrder() {
+        TopN top = ast().top();
+        if (top == null) {
+            return List.of();
+        }
+        List<SortKey> order = new ArrayList<>(top.order());
+        Set<String> used = new HashSet<>();
+        order.forEach(k -> used.add(k.field().value()));
+        for (SortKey key : service().defaultSort()) {
+            if (used.add(key.field().value())) {
+                order.add(key);
+            }
+        }
+        return List.copyOf(order);
+    }
+
+    /**
+     * The name sort keys use for the aggregated value, e.g. {@code count} or
+     * {@code sum}.
+     */
     static LogicalFieldName valueField(Aggregate aggregate) {
         return LogicalFieldNames.of(aggregate.function().keyword());
     }

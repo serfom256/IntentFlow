@@ -21,12 +21,25 @@ public @interface IntentService {
     /** What the service contains, for the LLM. */
     String description() default "";
 
-    /** URI template with {@code {{field}}} placeholders, e.g. {@code "/products/{{id}}"}. */
+    /**
+     * URI template with {@code {{field}}} placeholders, e.g.
+     * {@code "/products/{{id}}"}.
+     */
     String uri();
 
     /** Upper bound for {@code take}; also the default LIMIT. */
     int maxTake() default 50;
 
-    /** Default ordering as {@code "field"} or {@code "field desc"}, by logical name. */
+    /**
+     * Default ordering as {@code "field"} or {@code "field desc"}, by logical name.
+     */
     String[] defaultSort() default {};
+
+    /**
+     * SQL condition every row of this service satisfies, e.g.
+     * {@code deleted_at IS NULL}, ANDed into every query on
+     * the table. ORM restrictions such as Hibernate's {@code @SQLRestriction} are
+     * picked up without it.
+     */
+    String restriction() default "";
 }

@@ -60,7 +60,8 @@ class InterfaceEntityTest {
         ServiceDescriptor books = ServiceDescriptors.fromAnnotated(Book.class);
 
         assertThat(books.fields())
-                .extracting(f -> f.logical().value(), f -> f.column().value(), FieldMapping::type, FieldMapping::property)
+                .extracting(f -> f.logical().value(), f -> f.column().value(), FieldMapping::type,
+                        FieldMapping::property)
                 .containsExactly(
                         tuple("name", "name", FieldType.TEXT, "name"),
                         tuple("id", "id", FieldType.NUMBER, "id"),

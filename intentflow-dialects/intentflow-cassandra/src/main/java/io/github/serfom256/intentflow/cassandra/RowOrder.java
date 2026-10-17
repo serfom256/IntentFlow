@@ -2,6 +2,7 @@ package io.github.serfom256.intentflow.cassandra;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.cql.Row;
+import io.github.serfom256.intentflow.core.ast.ExprSortKey;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -10,29 +11,37 @@ import org.jspecify.annotations.Nullable;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class RowOrder {
 
-    static @Nullable Comparator<Row> of(List<SortKey> keys, Map<String, CqlIdentifier> columns) {
+    static @Nullable Comparator<Row> of(List<SortKey> keys, Map<String, CqlIdentifier> columns,
+            CqlExpressions expressions) {
         Comparator<Row> order = null;
         for (SortKey key : keys) {
-            CqlIdentifier column = columns.get(key.field().value());
-            if (column == null) {
-                throw new IllegalArgumentException("logical field '" + key.field().value() + "' has no column mapping");
+            Function<Row, Comparable<?>> read;
+            if (key instanceof ExprSortKey e) {
+                read = row -> (Comparable<?>) expressions.eval(e.expression(), row);
+            } else {
+                CqlIdentifier column = columns.get(key.field().value());
+                if (column == null) {
+                    throw new IllegalArgumentException(
+                            "logical field '" + key.field().value() + "' has no column mapping");
+                }
+                read = row -> CqlValues.comparable(row.getObject(column));
             }
             Comparator<Comparable<?>> values = RowOrder::compareValues;
             if (key.direction() == SortKey.Direction.DESC) {
                 values = values.reversed();
             }
-            Comparator<Row> byKey = Comparator.comparing(
-                    (Row row) -> CqlValues.comparable(row.getObject(column)), Comparator.nullsLast(values));
+            Comparator<Row> byKey = Comparator.comparing(read, Comparator.nullsLast(values));
             order = order == null ? byKey : order.thenComparing(byKey);
         }
         return order;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private static int compareValues(Comparable a, Comparable b) {
         return a.compareTo(b);
     }

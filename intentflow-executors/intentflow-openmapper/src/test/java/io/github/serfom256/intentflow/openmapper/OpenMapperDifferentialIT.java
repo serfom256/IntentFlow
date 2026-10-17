@@ -18,7 +18,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import javax.sql.DataSource;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,13 +27,27 @@ class OpenMapperDifferentialIT extends ExecutorDifferentialTest {
     @Model(primaryKey = "id")
     @IntentService(value = "gadgets", table = "gadget", uri = "/gadgets/{{id}}", maxTake = 500, defaultSort = "id")
     static class Gadget {
-        @Field @IntentField Long id;
-        @Field @IntentField String name;
-        @Field @IntentField(caseSensitive = true) GadgetKind kind;
-        @Field @IntentField BigDecimal price;
-        @Field @IntentField Integer stock;
-        @Field @IntentField Boolean active;
-        @Field(name = "created_at") @IntentField LocalDateTime createdAt;
+        @Field
+        @IntentField
+        Long id;
+        @Field
+        @IntentField
+        String name;
+        @Field
+        @IntentField(caseSensitive = true)
+        GadgetKind kind;
+        @Field
+        @IntentField
+        BigDecimal price;
+        @Field
+        @IntentField
+        Integer stock;
+        @Field
+        @IntentField
+        Boolean active;
+        @Field(name = "created_at")
+        @IntentField
+        LocalDateTime createdAt;
     }
 
     @Override

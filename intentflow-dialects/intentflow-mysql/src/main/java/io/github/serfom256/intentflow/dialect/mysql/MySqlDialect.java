@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.dialect.mysql;
 
+import io.github.serfom256.intentflow.core.ast.CastType;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
@@ -37,9 +38,50 @@ public final class MySqlDialect implements SqlDialect {
     }
 
     @Override
-    public void orderBy(SqlWriter sql, String column, SortKey.Direction direction) {
-        sql.text(column).text(" IS NULL, ").text(column)
-                .text(direction == SortKey.Direction.DESC ? " DESC" : " ASC");
+    public void orderBy(SqlWriter sql, Runnable value, SortKey.Direction direction) {
+        value.run();
+        sql.text(" IS NULL, ");
+        value.run();
+        sql.text(direction == SortKey.Direction.DESC ? " DESC" : " ASC");
+    }
+
+    @Override
+    public void truncate(SqlWriter sql, String unit, Runnable value) {
+        if (unit.equals("day")) {
+            sql.text("CAST(DATE(");
+            value.run();
+            sql.text(") AS DATETIME(6))");
+            return;
+        }
+        String format = switch (unit) {
+            case "year" -> "%Y-01-01";
+            case "month" -> "%Y-%m-01";
+            case "hour" -> "%Y-%m-%d %H:00:00";
+            default -> throw new IllegalArgumentException("unsupported date_trunc unit: " + unit);
+        };
+        sql.text("CAST(DATE_FORMAT(");
+        value.run();
+        sql.text(", '" + format + "') AS DATETIME(6))");
+    }
+
+    @Override
+    public void exactText(SqlWriter sql, Runnable value) {
+        sql.text("CAST(");
+        value.run();
+        sql.text(" AS BINARY)");
+    }
+
+    @Override
+    public void cast(SqlWriter sql, CastType type, Runnable value) {
+        sql.text("CAST(");
+        value.run();
+        sql.text(switch (type) {
+            case NUMBER -> " AS DECIMAL(38, 10))";
+            case INTEGER -> " AS SIGNED)";
+            case TEXT -> " AS CHAR)";
+            case TIMESTAMP -> " AS DATETIME(6))";
+            case DATE -> " AS DATE)";
+        });
     }
 
     @Override

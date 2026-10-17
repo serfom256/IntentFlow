@@ -60,6 +60,7 @@ for _ in $(seq 1 180); do
   sleep 2
 done
 echo "API ready on http://localhost:$API_PORT"
+echo "catalog admin on http://localhost:$API_PORT/intentflow-admin/"
 echo "UI starting on http://localhost:5173 (Ctrl+C stops both)"
 
 SHOP_API_URL="http://localhost:$API_PORT" ./gradlew --console=plain :intentflow-shop-ui:dev

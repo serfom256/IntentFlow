@@ -12,14 +12,24 @@ import io.github.serfom256.intentflow.core.catalog.TableName;
 import io.github.serfom256.intentflow.core.catalog.UriTemplate;
 import io.github.serfom256.intentflow.core.catalog.impl.AnnotatedServiceReader;
 import io.github.serfom256.intentflow.core.catalog.impl.DefaultServiceDescriptor;
+import io.github.serfom256.intentflow.core.schema.TableFacts;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ServiceDescriptors {
+
+    public static TableFacts factsOf(Class<?> type, List<NameResolver> resolvers) {
+        return AnnotatedServiceReader.facts(type, resolvers);
+    }
+
+    public static Optional<String> restrictionOf(Class<?> type, List<NameResolver> resolvers) {
+        return AnnotatedServiceReader.restriction(type, resolvers);
+    }
 
     public static ServiceDescriptor of(
             ServiceName name,

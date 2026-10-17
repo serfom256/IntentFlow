@@ -33,13 +33,13 @@ public class OrderController {
 
     @GetMapping
     public PageResponse<Order> list(@RequestParam(defaultValue = "0") @Min(0) int page,
-                                   @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return orderService.list(page, size);
     }
 
     @GetMapping("/search")
-    public SearchResult<Order> search(@RequestParam("q") @NotBlank @Size(max = 500) String query,
-                                            @RequestParam(defaultValue = "false") boolean debug) {
+    public SearchResult<?> search(@RequestParam("q") @NotBlank @Size(max = 500) String query,
+            @RequestParam(defaultValue = "false") boolean debug) {
         return searchService.search(query, Order.class, debug);
     }
 

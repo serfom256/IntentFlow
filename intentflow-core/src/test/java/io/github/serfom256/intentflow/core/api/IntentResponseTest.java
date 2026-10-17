@@ -19,7 +19,8 @@ class IntentResponseTest {
     @Test
     void carriesServiceTypeItemsAndUri() {
         IntentResponse<Book> response = IntentResponses.of(
-                ServiceNames.of("books"), Book.class, List.of(new Book(1), new Book(2)), MicroFrontendUris.of("/books/1"));
+                ServiceNames.of("books"), Book.class, List.of(new Book(1), new Book(2)),
+                MicroFrontendUris.of("/books/1"));
 
         assertThat(response.service().value()).isEqualTo("books");
         assertThat(response.type()).isEqualTo(Book.class);
@@ -39,7 +40,7 @@ class IntentResponseTest {
     }
 
     @Test
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     void rejectsItemsOfAnotherType() {
         List raw = List.of("not a book");
         assertThatThrownBy(() -> IntentResponses.of(

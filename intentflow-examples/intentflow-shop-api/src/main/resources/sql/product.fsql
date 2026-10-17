@@ -19,11 +19,11 @@ product.exists = {
 }
 
 product.insert = {
-    INSERT INTO product (name, brand, category, price, rating, stock, active, supplier_cost, created_at) VALUES ([name], [brand], [category], [price], [rating], [stock], [active], [supplier_cost], [created_at])
+    INSERT INTO product (name, brand, category, price, discount, rating, stock, active, supplier_cost, created_at) VALUES ([name], [brand], [category], [price], [discount], [rating], [stock], [active], [supplier_cost], [created_at])
 }
 
 product.update = {
-    UPDATE product SET name = [name], brand = [brand], category = [category], price = [price], rating = [rating], stock = [stock], active = [active], supplier_cost = [supplier_cost] WHERE id = [id]
+    UPDATE product SET name = [name], brand = [brand], category = [category], price = [price], discount = [discount], rating = [rating], stock = [stock], active = [active], supplier_cost = [supplier_cost] WHERE id = [id]
 }
 
 product.delete = {

@@ -30,13 +30,13 @@ public record DefaultFieldMapping(
     }
 
     public DefaultFieldMapping(LogicalFieldName logical, ColumnName column, boolean queryable,
-                               FieldType type, @Nullable String description, List<String> allowedValues,
-                               @Nullable String property) {
+            FieldType type, @Nullable String description, List<String> allowedValues,
+            @Nullable String property) {
         this(logical, column, queryable, type, description, allowedValues, property, false);
     }
 
     public DefaultFieldMapping(LogicalFieldName logical, ColumnName column, boolean queryable,
-                               FieldType type, @Nullable String description, List<String> allowedValues) {
+            FieldType type, @Nullable String description, List<String> allowedValues) {
         this(logical, column, queryable, type, description, allowedValues, null, false);
     }
 

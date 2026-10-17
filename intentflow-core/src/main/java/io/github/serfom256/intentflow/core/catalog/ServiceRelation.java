@@ -2,12 +2,16 @@ package io.github.serfom256.intentflow.core.catalog;
 
 /**
  * A link from one service to another, e.g. {@code orders.customer → customers}.
- * Filters address the target's fields as {@code <name>.<field>}; a row matches when
+ * Filters address the target's fields as {@code <name>.<field>}; a row matches
+ * when
  * some target row with {@code target.to == this.from} satisfies the condition.
  */
 public interface ServiceRelation {
 
-    /** Prefix used in filters, e.g. {@code customer} in {@code customer.vip == true}. */
+    /**
+     * Prefix used in filters, e.g. {@code customer} in
+     * {@code customer.vip == true}.
+     */
     String name();
 
     ServiceName target();

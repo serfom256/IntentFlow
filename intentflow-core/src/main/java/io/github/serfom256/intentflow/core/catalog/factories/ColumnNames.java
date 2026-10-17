@@ -1,6 +1,7 @@
 package io.github.serfom256.intentflow.core.catalog.factories;
 
 import io.github.serfom256.intentflow.core.catalog.ColumnName;
+import io.github.serfom256.intentflow.core.catalog.impl.AnnotatedServiceReader;
 import io.github.serfom256.intentflow.core.catalog.impl.DefaultColumnName;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -10,5 +11,9 @@ public final class ColumnNames {
 
     public static ColumnName of(String value) {
         return new DefaultColumnName(value);
+    }
+
+    public static String snakeCase(String javaName) {
+        return AnnotatedServiceReader.snakeCase(javaName);
     }
 }

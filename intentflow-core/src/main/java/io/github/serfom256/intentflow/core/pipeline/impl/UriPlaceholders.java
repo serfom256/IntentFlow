@@ -24,7 +24,8 @@ final class UriPlaceholders {
             if (PLACEHOLDER.matcher(segments[i]).find()) {
                 break;
             }
-            if (i > 0) out.append('/');
+            if (i > 0)
+                out.append('/');
             out.append(segments[i]);
         }
         if (out.isEmpty() && path.startsWith("/")) {

@@ -4,7 +4,9 @@ plugins {
 
 dependencies {
     implementation(projects.intentflowSpringBootStarter)
+    implementation(projects.intentflowAdminSpringBootStarter)
     implementation(projects.intentflowOpenmapper)
+    implementation(libs.openmapper)
     implementation(projects.intentflowPostgresql)
     implementation(projects.intentflowMysql)
 

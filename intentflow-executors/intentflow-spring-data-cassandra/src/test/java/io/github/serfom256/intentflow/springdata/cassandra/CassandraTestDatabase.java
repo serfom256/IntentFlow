@@ -25,7 +25,8 @@ final class CassandraTestDatabase {
                 datacenter = "datacenter1";
             } else {
                 CassandraContainer c = new CassandraContainer(
-                        DockerImageName.parse("mirror.gcr.io/library/cassandra:5.0").asCompatibleSubstituteFor("cassandra"));
+                        DockerImageName.parse("mirror.gcr.io/library/cassandra:5.0")
+                                .asCompatibleSubstituteFor("cassandra"));
                 c.start();
                 contactPoint = c.getContactPoint();
                 datacenter = c.getLocalDatacenter();

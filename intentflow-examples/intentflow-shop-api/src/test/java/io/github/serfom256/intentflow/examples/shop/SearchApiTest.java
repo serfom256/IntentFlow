@@ -114,7 +114,7 @@ class SearchApiTest extends ApiTestSupport {
     class Answers {
 
         @Test
-        void returnsWholeEntitiesAsTheApiSerializesThem() {
+        void returnsEntitiesWithoutFieldsHiddenFromSearch() {
             Product macbook = products.findById(1).orElseThrow();
 
             MvcTestResult r = search("the first product", "products | filter id == 1");
@@ -124,7 +124,7 @@ class SearchApiTest extends ApiTestSupport {
                     .hasPathSatisfying("$.uri", u -> assertThat(u).isEqualTo("/products/1"))
                     .hasPathSatisfying("$.items[0].name", n -> assertThat(n).isEqualTo(macbook.getName()))
                     .hasPathSatisfying("$.items[0].category", c -> assertThat(c).isEqualTo("LAPTOP"))
-                    .hasPathSatisfying("$.items[0].supplierCost", c -> assertThat(c).isNotNull())
+                    .doesNotHavePath("$.items[0].supplierCost")
                     .extractingPath("$.items[0].createdAt").isNotNull();
         }
 
@@ -134,7 +134,8 @@ class SearchApiTest extends ApiTestSupport {
                     .filter(p -> p.getBrand().equals("Apple") && p.getCategory() == Category.LAPTOP)
                     .map(Product::getId).sorted().limit(50).toList();
 
-            MvcTestResult r = search("apple laptops", "products | filter brand == \"apple\" and category == \"laptop\"");
+            MvcTestResult r = search("apple laptops",
+                    "products | filter brand == \"apple\" and category == \"laptop\"");
 
             assertThat(ids(r)).isNotEmpty().containsExactlyElementsOf(expected);
             assertThat(r).bodyJson().extractingPath("$.uri").isEqualTo("/products/" + expected.getFirst());
@@ -178,7 +179,18 @@ class SearchApiTest extends ApiTestSupport {
                     .map(Order::getId).limit(50).toList();
 
             assertThat(ids(search("delivered orders of vip customers",
-                    "orders | filter customer.vip == true and status == \"delivered\""))).containsExactlyElementsOf(expected);
+                    "orders | filter customer.vip == true and status == \"delivered\"")))
+                    .containsExactlyElementsOf(expected);
+        }
+
+        @Test
+        void fieldsHiddenFromTheLlmAreNotReturnedBySearch() {
+            MvcTestResult r = search("/api/products/search", "first apple products",
+                    "products | filter brand == \"apple\" | take 3");
+
+            assertThat(r).hasStatusOk().bodyJson()
+                    .hasPathSatisfying("$.items[0].name", n -> assertThat(n).isNotNull())
+                    .doesNotHavePath("$.items[0].supplierCost");
         }
 
         @Test
@@ -256,7 +268,8 @@ class SearchApiTest extends ApiTestSupport {
             search("in stock monitors", "products | filter category == \"monitor\" and stock > 0");
             int before = llm.calls();
 
-            assertThat(mvc.get().uri("/api/search").queryParam("q", "  in   stock\tmonitors ").exchange()).hasStatusOk();
+            assertThat(mvc.get().uri("/api/search").queryParam("q", "  in   stock\tmonitors ").exchange())
+                    .hasStatusOk();
             assertThat(mvc.get().uri("/api/search").queryParam("q", "in stock monitors").exchange()).hasStatusOk();
 
             assertThat(llm.calls()).isEqualTo(before);
@@ -264,8 +277,133 @@ class SearchApiTest extends ApiTestSupport {
 
         @Test
         void injectionInsideLiteralsIsInert() {
-            assertThat(ids(search("robert tables", "products | filter name == \"x'; DROP TABLE product; --\""))).isEmpty();
+            assertThat(ids(search("robert tables", "products | filter name == \"x'; DROP TABLE product; --\"")))
+                    .isEmpty();
             assertThat(jdbc.sql("SELECT count(*) FROM product").query(Long.class).single()).isGreaterThan(0);
+        }
+    }
+
+    @Nested
+    class ComplexQueries {
+
+        private static final Comparator<Order> NEWEST_FIRST = Comparator.comparing(Order::getCreatedAt).reversed()
+                .thenComparing(Order::getId, Comparator.reverseOrder());
+
+        private static BigDecimal effectivePrice(Product p) {
+            BigDecimal discount = p.getDiscount() == null ? BigDecimal.ZERO : p.getDiscount();
+            return p.getPrice().multiply(BigDecimal.ONE.subtract(discount.movePointLeft(2)));
+        }
+
+        @Test
+        void coalesceTreatsMissingDiscountsAsZero() {
+            List<Product> phones = products.findAll().stream().filter(p -> p.getCategory() == Category.PHONE).toList();
+            List<Long> expected = phones.stream()
+                    .filter(p -> effectivePrice(p).compareTo(new BigDecimal("500")) < 0)
+                    .map(Product::getId).sorted().limit(50).toList();
+            assertThat(phones).anySatisfy(p -> {
+                assertThat(p.getDiscount()).isNotNull();
+                assertThat(p.getPrice()).isGreaterThanOrEqualTo(new BigDecimal("500"));
+                assertThat(expected).contains(p.getId());
+            });
+
+            assertThat(ids(search("phones under 500 after discount",
+                    "products | filter category == \"PHONE\" and price * (1 - coalesce(discount, 0) / 100) < 500")))
+                    .containsExactlyElementsOf(expected);
+        }
+
+        @Test
+        void keepsTheBestRatedProductOfEachCategory() {
+            List<Long> expected = products.findAll().stream()
+                    .collect(Collectors.groupingBy(Product::getCategory, Collectors.minBy(
+                            Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId))))
+                    .values().stream().map(p -> p.orElseThrow().getId()).sorted().toList();
+
+            MvcTestResult r = search("the best rated product in each category",
+                    "products | top 1 per category by rating desc");
+
+            assertThat(ids(r)).hasSize(Category.values().length).containsExactlyElementsOf(expected);
+        }
+
+        @Test
+        void topByAnExpressionPerBrand() {
+            List<Long> expected = products.findAll().stream()
+                    .filter(p -> p.getCategory() == Category.PHONE)
+                    .collect(Collectors.groupingBy(Product::getBrand))
+                    .values().stream()
+                    .flatMap(list -> list.stream()
+                            .sorted(Comparator.comparing(ComplexQueries::effectivePrice).thenComparing(Product::getId))
+                            .limit(2))
+                    .sorted(Comparator.comparing(Product::getBrand).thenComparing(ComplexQueries::effectivePrice)
+                            .thenComparing(Product::getId))
+                    .map(Product::getId).toList();
+
+            assertThat(ids(search("the 2 cheapest phones of each brand after discount",
+                    "products | filter category == \"PHONE\" "
+                            + "| top 2 per brand by price * (1 - coalesce(discount, 0) / 100) "
+                            + "| sort brand, price * (1 - coalesce(discount, 0) / 100)")))
+                    .containsExactlyElementsOf(expected);
+        }
+
+        @Test
+        void latestOrderOfEveryVipCustomer() {
+            Set<Long> vip = customers.findAll().stream().filter(Customer::isVip).map(Customer::getId)
+                    .collect(Collectors.toSet());
+            List<Long> expected = orders.findAll().stream()
+                    .filter(o -> vip.contains(o.getCustomerId()))
+                    .collect(Collectors.groupingBy(Order::getCustomerId,
+                            Collectors.minBy(NEWEST_FIRST)))
+                    .values().stream().map(o -> o.orElseThrow())
+                    .sorted(NEWEST_FIRST).map(Order::getId).limit(50).toList();
+
+            assertThat(ids(search("the latest order of every vip customer",
+                    "orders | filter customer.vip == true | top 1 per customer_id by created_at desc")))
+                    .hasSize(50).containsExactlyElementsOf(expected);
+        }
+
+        @Test
+        void sortsByARelatedFieldLikeAJoinWould() {
+            List<Long> joined = jdbc.sql("SELECT o.id FROM orders o JOIN customer c ON c.id = o.customer_id "
+                    + "WHERE o.status = 'PAID' ORDER BY c.full_name, o.created_at DESC, o.id DESC LIMIT 50")
+                    .query(Long.class).list();
+
+            assertThat(ids(search("paid orders sorted by customer name",
+                    "orders | filter status == \"PAID\" | sort customer.name")))
+                    .containsExactlyElementsOf(joined);
+        }
+
+        @Test
+        void sortsCustomersByTheirLargestOrderWithoutDuplicates() {
+            Map<Long, BigDecimal> largest = orders.findAll().stream().collect(Collectors.toMap(
+                    Order::getCustomerId, Order::getTotal, BigDecimal::max));
+            List<Long> expected = largest.entrySet().stream()
+                    .filter(e -> e.getValue().compareTo(new BigDecimal("5000")) > 0)
+                    .sorted(Map.Entry.<Long, BigDecimal>comparingByValue().reversed()
+                            .thenComparing(Map.Entry.comparingByKey()))
+                    .map(Map.Entry::getKey).limit(50).toList();
+
+            assertThat(ids(search("customers with an order over 5000, biggest order first",
+                    "customers | filter orders.total > 5000 | sort orders.total desc")))
+                    .doesNotHaveDuplicates().containsExactlyElementsOf(expected);
+        }
+
+        @Test
+        void groupsByAnExpression() {
+            List<Map<String, Object>> reference = jdbc.sql("SELECT date_trunc('month', created_at) AS month, "
+                    + "sum(total) AS revenue FROM orders WHERE created_at >= CAST('2026-01-01' AS TIMESTAMP) "
+                    + "GROUP BY 1")
+                    .query().listOfRows();
+
+            MvcTestResult r = search("revenue per month in 2026", "orders | filter created_at >= \"2026-01-01\" "
+                    + "| group date_trunc(\"month\", created_at) | sum total | sort date_trunc(\"month\", created_at)");
+
+            assertThat(r).hasStatusOk();
+            List<Number> values = JsonPath.read(body(r), "$.aggregation.rows[*].value");
+            assertThat(values).hasSize(reference.size());
+            assertThat(values.stream().map(v -> new BigDecimal(v.toString())).reduce(BigDecimal.ZERO, BigDecimal::add))
+                    .isEqualByComparingTo(reference.stream().map(m -> (BigDecimal) m.get("revenue"))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add));
+            assertThat(JsonPath.<List<String>>read(body(r), "$.aggregation.groupBy"))
+                    .containsExactly("date_trunc(\"month\", created_at)");
         }
     }
 

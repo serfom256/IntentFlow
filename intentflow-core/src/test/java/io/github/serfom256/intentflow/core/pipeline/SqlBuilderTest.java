@@ -1,9 +1,9 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import io.github.serfom256.intentflow.core.ast.And;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoolLiteral;
+import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
@@ -14,7 +14,8 @@ import io.github.serfom256.intentflow.core.ast.IsNull;
 import io.github.serfom256.intentflow.core.ast.Not;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
 import io.github.serfom256.intentflow.core.ast.Or;
-import io.github.serfom256.intentflow.core.ast.BoundQuery;
+import io.github.serfom256.intentflow.core.ast.Skip;
+import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
@@ -39,6 +40,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -76,7 +78,7 @@ class SqlBuilderTest {
     }
 
     private BoundQuery build(FilterExpr filter, List<SortKey> sort,
-            io.github.serfom256.intentflow.core.ast.Skip skip, io.github.serfom256.intentflow.core.ast.Take take,
+            Skip skip, Take take,
             ServiceDescriptor svc) {
         AstQuery ast = AstQueries.of(BOOKS, filter, sort, skip, take);
         return sqlBuilder.build(ValidatedQueries.of(svc, ast));

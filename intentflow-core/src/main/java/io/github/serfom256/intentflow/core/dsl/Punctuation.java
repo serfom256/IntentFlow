@@ -5,5 +5,10 @@ public enum Punctuation {
     LPAREN,
     RPAREN,
     COMMA,
-    DOT
+    DOT,
+    PLUS,
+    MINUS,
+    STAR,
+    SLASH,
+    DOUBLE_COLON
 }

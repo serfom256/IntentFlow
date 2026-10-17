@@ -1,8 +1,8 @@
 package io.github.serfom256.intentflow.springdata.cassandra;
 
-import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
 import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
@@ -27,13 +27,22 @@ class CassandraDifferentialIT extends DifferentialTestBase {
     @Table("gadget")
     @IntentService(value = "gadgets", uri = "/gadgets/{{id}}", maxTake = 500, defaultSort = "id")
     public static class Gadget {
-        @PrimaryKey @IntentField Long id;
-        @IntentField String name;
-        @IntentField(caseSensitive = true) GadgetKind kind;
-        @IntentField BigDecimal price;
-        @IntentField Integer stock;
-        @IntentField Boolean active;
-        @Column("created_at") @IntentField Instant createdAt;
+        @PrimaryKey
+        @IntentField
+        Long id;
+        @IntentField
+        String name;
+        @IntentField(caseSensitive = true)
+        GadgetKind kind;
+        @IntentField
+        BigDecimal price;
+        @IntentField
+        Integer stock;
+        @IntentField
+        Boolean active;
+        @Column("created_at")
+        @IntentField
+        Instant createdAt;
     }
 
     private CqlSession session;

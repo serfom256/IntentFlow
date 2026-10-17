@@ -5,6 +5,8 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import io.github.serfom256.intentflow.core.ast.And;
 import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
+import io.github.serfom256.intentflow.core.ast.ExprCompare;
+import io.github.serfom256.intentflow.core.ast.ExprIn;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.In;
 import io.github.serfom256.intentflow.core.ast.IsNotNull;
@@ -29,6 +31,7 @@ final class RowFilter implements Predicate<Row> {
     private final @Nullable FilterExpr filter;
     private final Map<String, CqlIdentifier> columns;
     private final Set<String> caseSensitive;
+    private final CqlExpressions expressions;
 
     @Override
     public boolean test(Row row) {
@@ -85,6 +88,8 @@ final class RowFilter implements Predicate<Row> {
                 yield unknown ? null : Boolean.FALSE;
             }
             case Compare c -> compare(c, row);
+            case ExprCompare c -> expressions.compare(c, row);
+            case ExprIn i -> expressions.in(i, row);
         };
     }
 

@@ -1,8 +1,8 @@
 package io.github.serfom256.intentflow.core.dsl;
 
-import io.github.serfom256.intentflow.core.dsl.factories.Positions;
-import io.github.serfom256.intentflow.core.dsl.factories.Lexers;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
+import io.github.serfom256.intentflow.core.dsl.factories.Lexers;
+import io.github.serfom256.intentflow.core.dsl.factories.Positions;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import org.junit.jupiter.api.Test;
 
@@ -322,7 +322,10 @@ class LexerTest {
     }
 
     @Test
-    void loneMinusIsRejected() {
-        assertThatThrownBy(() -> lex("x == - 5")).isInstanceOf(DslParseException.class);
+    void minusAfterAValueIsSubtractionAndOtherwiseANegativeNumber() {
+        assertThat(lex("x - 5")).extracting(t -> t.getClass().getSimpleName())
+                .containsExactly("IdentifierToken", "PunctuationToken", "NumberToken", "EofToken");
+        assertThat(lex("x == -5")).extracting(t -> t.getClass().getSimpleName())
+                .containsExactly("IdentifierToken", "OperatorToken", "NumberToken", "EofToken");
     }
 }

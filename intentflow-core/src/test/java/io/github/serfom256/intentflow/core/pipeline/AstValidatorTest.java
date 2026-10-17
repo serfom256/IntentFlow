@@ -9,6 +9,8 @@ import io.github.serfom256.intentflow.core.ast.In;
 import io.github.serfom256.intentflow.core.ast.IsNull;
 import io.github.serfom256.intentflow.core.ast.Not;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
+import io.github.serfom256.intentflow.core.ast.Or;
+import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
@@ -70,14 +72,25 @@ class AstValidatorTest {
                 Object.class);
         Map<ServiceName, ServiceDescriptor> entries = Map.of(BOOKS, svc);
         return new ServiceCatalog() {
-            @Override public Optional<ServiceDescriptor> find(ServiceName name) { return Optional.ofNullable(entries.get(name)); }
-            @Override public Set<ServiceName> names() { return entries.keySet(); }
-            @Override public int version() { return 1; }
+            @Override
+            public Optional<ServiceDescriptor> find(ServiceName name) {
+                return Optional.ofNullable(entries.get(name));
+            }
+
+            @Override
+            public Set<ServiceName> names() {
+                return entries.keySet();
+            }
+
+            @Override
+            public int version() {
+                return 1;
+            }
         };
     }
 
     private static AstQuery query(FilterExpr filter, List<SortKey> sort,
-            io.github.serfom256.intentflow.core.ast.Take take) {
+            Take take) {
         return AstQueries.of(BOOKS, filter, sort, null, take);
     }
 
@@ -178,7 +191,7 @@ class AstValidatorTest {
     @Test
     void deepFilterTreeChecksAllLeaves() {
         FilterExpr filter = new And(
-                new io.github.serfom256.intentflow.core.ast.Or(
+                new Or(
                         new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("X")),
                         new Compare(TITLE, ComparisonOp.EQ, new TextLiteral("Y"))),
                 new Not(new Compare(GHOST, ComparisonOp.EQ, new NumberLiteral(BigDecimal.ONE))));

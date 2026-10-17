@@ -31,14 +31,18 @@ public interface FieldMapping {
         return null;
     }
 
-    /** Closed set of text values (e.g. enum constants); empty means unrestricted. */
+    /**
+     * Closed set of text values (e.g. enum constants); empty means unrestricted.
+     */
     default List<String> allowedValues() {
         return List.of();
     }
 
     /**
-     * {@code true} compares text with {@code ==}, {@code !=} and {@code in} exactly as written
-     * instead of ignoring case, so plain column indexes apply. {@code ~} always ignores case.
+     * {@code true} compares text with {@code ==}, {@code !=} and {@code in} exactly
+     * as written
+     * instead of ignoring case, so plain column indexes apply. {@code ~} always
+     * ignores case.
      */
     default boolean caseSensitive() {
         return false;

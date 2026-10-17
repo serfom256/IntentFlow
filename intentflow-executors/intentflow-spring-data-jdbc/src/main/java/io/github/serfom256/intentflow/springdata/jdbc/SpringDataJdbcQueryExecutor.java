@@ -36,8 +36,8 @@ public final class SpringDataJdbcQueryExecutor implements QueryExecutor {
     @Override
     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
         @SuppressWarnings("unchecked")
-        RelationalPersistentEntity<T> entity =
-                (RelationalPersistentEntity<T>) converter.getMappingContext().getRequiredPersistentEntity(resultType);
+        RelationalPersistentEntity<T> entity = (RelationalPersistentEntity<T>) converter.getMappingContext()
+                .getRequiredPersistentEntity(resultType);
         return jdbcClient.sql(query.sql())
                 .params(query.values())
                 .query(new EntityRowMapper<>(entity, converter))

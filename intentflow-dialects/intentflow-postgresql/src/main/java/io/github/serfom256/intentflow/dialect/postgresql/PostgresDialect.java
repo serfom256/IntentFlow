@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.dialect.postgresql;
 
+import io.github.serfom256.intentflow.core.ast.CastType;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
@@ -30,8 +31,29 @@ public final class PostgresDialect implements SqlDialect {
     }
 
     @Override
-    public void orderBy(SqlWriter sql, String column, SortKey.Direction direction) {
-        sql.text(column).text(direction == SortKey.Direction.DESC ? " DESC NULLS LAST" : " ASC");
+    public void orderBy(SqlWriter sql, Runnable value, SortKey.Direction direction) {
+        value.run();
+        sql.text(direction == SortKey.Direction.DESC ? " DESC NULLS LAST" : " ASC");
+    }
+
+    @Override
+    public void truncate(SqlWriter sql, String unit, Runnable value) {
+        sql.text("DATE_TRUNC('" + unit + "', ");
+        value.run();
+        sql.text(")");
+    }
+
+    @Override
+    public void cast(SqlWriter sql, CastType type, Runnable value) {
+        sql.text("CAST(");
+        value.run();
+        sql.text(switch (type) {
+            case NUMBER -> " AS NUMERIC)";
+            case INTEGER -> " AS BIGINT)";
+            case TEXT -> " AS TEXT)";
+            case TIMESTAMP -> " AS TIMESTAMP)";
+            case DATE -> " AS DATE)";
+        });
     }
 
     @Override

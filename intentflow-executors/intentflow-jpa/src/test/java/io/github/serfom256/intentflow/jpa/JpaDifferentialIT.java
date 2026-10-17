@@ -12,7 +12,6 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
-import jakarta.persistence.PersistenceConfiguration;
 import jakarta.persistence.Table;
 import org.junit.jupiter.api.AfterAll;
 
@@ -26,13 +25,23 @@ class JpaDifferentialIT extends ExecutorDifferentialTest {
     @Table(name = "gadget")
     @IntentService(value = "gadgets", uri = "/gadgets/{{id}}", maxTake = 500, defaultSort = "id")
     public static class Gadget {
-        @Id @IntentField Long id;
-        @IntentField String name;
-        @Enumerated(EnumType.STRING) @IntentField(caseSensitive = true) GadgetKind kind;
-        @IntentField BigDecimal price;
-        @IntentField Integer stock;
-        @IntentField Boolean active;
-        @Column(name = "created_at") @IntentField LocalDateTime createdAt;
+        @Id
+        @IntentField
+        Long id;
+        @IntentField
+        String name;
+        @Enumerated(EnumType.STRING)
+        @IntentField(caseSensitive = true)
+        GadgetKind kind;
+        @IntentField
+        BigDecimal price;
+        @IntentField
+        Integer stock;
+        @IntentField
+        Boolean active;
+        @Column(name = "created_at")
+        @IntentField
+        LocalDateTime createdAt;
     }
 
     private EntityManagerFactory emf;
@@ -49,13 +58,7 @@ class JpaDifferentialIT extends ExecutorDifferentialTest {
 
     @Override
     protected QueryExecutor createExecutor(String jdbcUrl, String user, String password) {
-        emf = new PersistenceConfiguration("differential")
-                .managedClass(Gadget.class)
-                .property(PersistenceConfiguration.JDBC_URL, jdbcUrl)
-                .property(PersistenceConfiguration.JDBC_USER, user)
-                .property(PersistenceConfiguration.JDBC_PASSWORD, password)
-                .property("hibernate.hbm2ddl.auto", "none")
-                .createEntityManagerFactory();
+        emf = TestEntityManagers.create(jdbcUrl, user, password, Gadget.class);
         return new JpaQueryExecutor(emf.createEntityManager());
     }
 

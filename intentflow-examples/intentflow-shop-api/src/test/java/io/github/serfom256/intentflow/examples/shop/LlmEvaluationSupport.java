@@ -1,14 +1,14 @@
 package io.github.serfom256.intentflow.examples.shop;
 
 import com.jayway.jsonpath.JsonPath;
+import io.github.serfom256.intentflow.examples.shop.dao.CustomerDao;
+import io.github.serfom256.intentflow.examples.shop.dao.OrderDao;
+import io.github.serfom256.intentflow.examples.shop.dao.ProductDao;
 import io.github.serfom256.intentflow.examples.shop.domain.Category;
 import io.github.serfom256.intentflow.examples.shop.domain.Customer;
 import io.github.serfom256.intentflow.examples.shop.domain.Order;
 import io.github.serfom256.intentflow.examples.shop.domain.OrderStatus;
 import io.github.serfom256.intentflow.examples.shop.domain.Product;
-import io.github.serfom256.intentflow.examples.shop.dao.CustomerDao;
-import io.github.serfom256.intentflow.examples.shop.dao.OrderDao;
-import io.github.serfom256.intentflow.examples.shop.dao.ProductDao;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
@@ -16,8 +16,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -30,15 +34,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.OffsetDateTime;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -64,11 +71,13 @@ abstract class LlmEvaluationSupport {
     CustomerDao customers;
     @Autowired
     OrderDao orders;
+    @Autowired
+    JdbcClient jdbc;
 
-    @org.springframework.boot.test.context.TestConfiguration(proxyBeanMethods = false)
+    @TestConfiguration(proxyBeanMethods = false)
     static class FixedClock {
-        @org.springframework.context.annotation.Bean
-        @org.springframework.context.annotation.Primary
+        @Bean
+        @Primary
         Clock fixedClock() {
             return Clock.fixed(TODAY.atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
         }
@@ -87,61 +96,67 @@ abstract class LlmEvaluationSupport {
         }
     }
 
-    record Case(String question, @Nullable Supplier<List<Long>> expectedIds, boolean ordered,
-                @Nullable Supplier<Map<String, BigDecimal>> expectedGroups) {
+    record Case(String language, String question, @Nullable Supplier<List<Long>> expectedIds, boolean ordered,
+            @Nullable Supplier<Map<String, BigDecimal>> expectedGroups) {
 
         static Case set(String q, Supplier<List<Long>> ids) {
-            return new Case(q, ids, false, null);
+            return new Case("en", q, ids, false, null);
         }
 
         static Case ordered(String q, Supplier<List<Long>> ids) {
-            return new Case(q, ids, true, null);
+            return new Case("en", q, ids, true, null);
         }
 
         static Case declined(String q) {
-            return new Case(q, null, false, null);
+            return new Case("en", q, null, false, null);
         }
 
         static Case groups(String q, Supplier<Map<String, BigDecimal>> groups) {
-            return new Case(q, null, false, groups);
+            return new Case("en", q, null, false, groups);
+        }
+
+        Case in(String language) {
+            return new Case(language, question, expectedIds, ordered, expectedGroups);
         }
     }
 
-    private List<Case> cases() {
+    List<Case> cases() {
         OffsetDateTime threeMonthsAgo = TODAY.minusMonths(3).atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime y2025 = LocalDate.of(2025, 1, 1).atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime y2026 = LocalDate.of(2026, 1, 1).atStartOfDay().atOffset(ZoneOffset.UTC);
         return List.of(
-                Case.set("apple laptops under 2000", () -> productIds(p ->
-                        p.getBrand().equals("Apple") && p.getCategory() == Category.LAPTOP
+                Case.set("apple laptops under 2000",
+                        () -> productIds(p -> p.getBrand().equals("Apple") && p.getCategory() == Category.LAPTOP
                                 && p.getPrice().compareTo(new BigDecimal("2000")) < 0)),
                 Case.set("which products are out of stock?", () -> productIds(p -> p.getStock() == 0)),
                 Case.set("discontinued products", () -> productIds(p -> !p.isActive())),
-                Case.set("samsung or google phones", () -> productIds(p ->
-                        Set.of("Samsung", "Google").contains(p.getBrand()) && p.getCategory() == Category.PHONE)),
-                Case.set("headphones rated 4.5 or higher", () -> productIds(p ->
-                        p.getCategory() == Category.HEADPHONES && p.getRating().compareTo(new BigDecimal("4.5")) >= 0)),
+                Case.set("samsung or google phones", () -> productIds(
+                        p -> Set.of("Samsung", "Google").contains(p.getBrand()) && p.getCategory() == Category.PHONE)),
+                Case.set("headphones rated 4.5 or higher",
+                        () -> productIds(p -> p.getCategory() == Category.HEADPHONES
+                                && p.getRating().compareTo(new BigDecimal("4.5")) >= 0)),
                 Case.ordered("the 3 most expensive monitors", () -> products.findAll().stream()
                         .filter(p -> p.getCategory() == Category.MONITOR)
                         .sorted(Comparator.comparing(Product::getPrice).reversed())
                         .limit(3).map(Product::getId).toList()),
-                Case.set("products added to the catalog in 2025", () -> productIds(p ->
-                        !p.getCreatedAt().isBefore(y2025) && p.getCreatedAt().isBefore(y2026))),
+                Case.set("products added to the catalog in 2025",
+                        () -> productIds(p -> !p.getCreatedAt().isBefore(y2025) && p.getCreatedAt().isBefore(y2026))),
                 Case.set("vip customers from germany or france", () -> customers.findAll().stream()
                         .filter(c -> c.isVip() && Set.of("DE", "FR").contains(c.getCountry()))
                         .map(Customer::getId).sorted().limit(PAGE).toList()),
                 Case.set("customers living in the United States", () -> customers.findAll().stream()
                         .filter(c -> c.getCountry().equals("US")).map(Customer::getId).sorted().limit(PAGE).toList()),
-                Case.set("samsung galaxy a56", () -> productIds(p ->
-                        p.getName().toLowerCase(java.util.Locale.ROOT).contains("galaxy a56"))),
-                Case.set("products with ultra in the name", () -> productIds(p ->
-                        p.getName().toLowerCase(java.util.Locale.ROOT).contains("ultra"))),
-                Case.set("cancelled orders over 1000 dollars", () -> orderIds(o ->
-                        o.getStatus() == OrderStatus.CANCELLED && o.getTotal().compareTo(new BigDecimal("1000")) > 0)),
+                Case.set("samsung galaxy a56",
+                        () -> productIds(p -> p.getName().toLowerCase(Locale.ROOT).contains("galaxy a56"))),
+                Case.set("products with ultra in the name",
+                        () -> productIds(p -> p.getName().toLowerCase(Locale.ROOT).contains("ultra"))),
+                Case.set("cancelled orders over 1000 dollars",
+                        () -> orderIds(o -> o.getStatus() == OrderStatus.CANCELLED
+                                && o.getTotal().compareTo(new BigDecimal("1000")) > 0)),
                 Case.set("orders with exactly 5 items", () -> orderIds(o -> o.getItemsCount() == 5)),
                 Case.set("orders placed by customer 5", () -> orderIds(o -> o.getCustomerId() == 5)),
-                Case.set("orders placed in the last 3 months", () -> orderIds(o ->
-                        !o.getCreatedAt().isBefore(threeMonthsAgo))),
+                Case.set("orders placed in the last 3 months",
+                        () -> orderIds(o -> !o.getCreatedAt().isBefore(threeMonthsAgo))),
                 Case.set("delivered orders from customers in Germany", () -> {
                     Set<Long> german = customers.findAll().stream().filter(c -> c.getCountry().equals("DE"))
                             .map(Customer::getId).collect(Collectors.toSet());
@@ -160,6 +175,42 @@ abstract class LlmEvaluationSupport {
                 Case.groups("average order total", () -> Map.of("", orders.findAll().stream().map(Order::getTotal)
                         .reduce(BigDecimal.ZERO, BigDecimal::add)
                         .divide(BigDecimal.valueOf(orders.findAll().size()), 2, RoundingMode.HALF_UP))),
+                Case.set("orders where the average price per item is above 1000 dollars",
+                        () -> orderIds(o -> o.getTotal().compareTo(BigDecimal.valueOf(1000L * o.getItemsCount())) > 0)),
+                Case.set("orders whose total with 20% tax exceeds 5000", () -> orderIds(
+                        o -> o.getTotal().multiply(new BigDecimal("1.2")).compareTo(new BigDecimal("5000")) > 0)),
+                Case.set("phones under 500 after discount",
+                        () -> productIds(p -> p.getCategory() == Category.PHONE
+                                && effectivePrice(p).compareTo(new BigDecimal("500")) < 0)),
+                Case.groups("how many discounted products are there per category?", () -> products.findAll().stream()
+                        .filter(p -> p.getDiscount() != null)
+                        .collect(Collectors.groupingBy(p -> p.getCategory().name(),
+                                Collectors.collectingAndThen(Collectors.counting(), BigDecimal::valueOf)))),
+                Case.set("the best rated product in each category", () -> products.findAll().stream()
+                        .collect(Collectors.groupingBy(Product::getCategory, Collectors.minBy(
+                                Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId))))
+                        .values().stream().map(p -> p.orElseThrow().getId()).sorted().toList()),
+                Case.set("the latest order of every vip customer", () -> {
+                    Set<Long> vip = customers.findAll().stream().filter(Customer::isVip).map(Customer::getId)
+                            .collect(Collectors.toSet());
+                    Comparator<Order> newest = Comparator.comparing(Order::getCreatedAt).reversed()
+                            .thenComparing(Order::getId, Comparator.reverseOrder());
+                    return orders.findAll().stream().filter(o -> vip.contains(o.getCustomerId()))
+                            .collect(Collectors.groupingBy(Order::getCustomerId, Collectors.minBy(newest)))
+                            .values().stream().map(o -> o.orElseThrow()).sorted(newest).map(Order::getId)
+                            .limit(PAGE).toList();
+                }),
+                Case.ordered("customers with an order over 5000, biggest order first", () -> orders.findAll().stream()
+                        .collect(Collectors.toMap(Order::getCustomerId, Order::getTotal, BigDecimal::max))
+                        .entrySet().stream()
+                        .filter(e -> e.getValue().compareTo(new BigDecimal("5000")) > 0)
+                        .sorted(Map.Entry.<Long, BigDecimal>comparingByValue().reversed()
+                                .thenComparing(Map.Entry.comparingByKey()))
+                        .map(Map.Entry::getKey).limit(PAGE).toList()),
+                Case.ordered("paid orders sorted by customer name", () -> jdbc.sql(
+                        "SELECT o.id FROM orders o JOIN customer c ON c.id = o.customer_id WHERE o.status = 'PAID' "
+                                + "ORDER BY c.full_name, o.created_at DESC, o.id DESC LIMIT " + PAGE)
+                        .query(Long.class).list()),
                 Case.declined("my orders"),
                 Case.declined("my orders for October 10"),
                 Case.declined("products sorted by supplier cost"),
@@ -170,6 +221,7 @@ abstract class LlmEvaluationSupport {
     @Test
     void answersMatchTheData() {
         List<String> report = new ArrayList<>();
+        Map<String, int[]> perLanguage = new TreeMap<>();
         int passed = 0;
         List<Case> all = cases();
         for (Case c : all) {
@@ -185,8 +237,8 @@ abstract class LlmEvaluationSupport {
             } else if (c.expectedGroups() != null) {
                 Map<String, BigDecimal> expected = c.expectedGroups().get();
                 Map<String, BigDecimal> got = groups(r);
-                boolean ok = got.keySet().equals(expected.keySet()) && expected.entrySet().stream().allMatch(e ->
-                        got.get(e.getKey()).subtract(e.getValue()).abs().compareTo(new BigDecimal("0.01")) <= 0);
+                boolean ok = got.keySet().equals(expected.keySet()) && expected.entrySet().stream().allMatch(
+                        e -> got.get(e.getKey()).subtract(e.getValue()).abs().compareTo(new BigDecimal("0.01")) <= 0);
                 verdict = ok ? "PASS" : "FAIL (expected " + expected + ", got " + got + ")";
             } else if (status != 200) {
                 verdict = "FAIL (HTTP " + status + ": " + body(r) + ")";
@@ -199,15 +251,24 @@ abstract class LlmEvaluationSupport {
                         : Set.copyOf(got).equals(Set.copyOf(expected)) && got.size() == expected.size();
                 verdict = ok ? "PASS" : "FAIL (expected " + expected + ", got " + got + ")";
             }
+            int[] score = perLanguage.computeIfAbsent(c.language(), l -> new int[2]);
+            score[1]++;
             if (verdict.equals("PASS")) {
                 passed++;
+                score[0]++;
             }
-            report.add("%-50s %6d ms  %s".formatted(c.question(), ms, verdict));
+            report.add("%-3s %-60s %6d ms  %s".formatted(c.language(), c.question(), ms, verdict));
         }
         double accuracy = (double) passed / all.size();
-        log.info("LLM evaluation: {}/{} ({}%)\n{}", passed, all.size(), Math.round(accuracy * 100),
+        String summary = perLanguage.entrySet().stream()
+                .map(e -> "%s %d/%d (%d%%)".formatted(e.getKey(), e.getValue()[0], e.getValue()[1],
+                        Math.round(100.0 * e.getValue()[0] / e.getValue()[1])))
+                .collect(Collectors.joining(", "));
+        log.info("LLM evaluation: {}/{} ({}%): {}\n{}", passed, all.size(), Math.round(accuracy * 100), summary,
                 String.join("\n", report));
-        assertThat(accuracy).as(String.join("\n", report)).isGreaterThanOrEqualTo(PASS_THRESHOLD);
+        perLanguage.forEach((language, score) -> assertThat((double) score[0] / score[1])
+                .as("%s accuracy; %s%n%s", language, summary, String.join("\n", report))
+                .isGreaterThanOrEqualTo(PASS_THRESHOLD));
     }
 
     private static Map<String, BigDecimal> groups(MvcTestResult r) {
@@ -221,11 +282,16 @@ abstract class LlmEvaluationSupport {
         return out;
     }
 
-    private List<Long> productIds(java.util.function.Predicate<Product> p) {
+    static BigDecimal effectivePrice(Product p) {
+        BigDecimal discount = p.getDiscount() == null ? BigDecimal.ZERO : p.getDiscount();
+        return p.getPrice().multiply(BigDecimal.ONE.subtract(discount.movePointLeft(2)));
+    }
+
+    List<Long> productIds(Predicate<Product> p) {
         return products.findAll().stream().filter(p).map(Product::getId).sorted().limit(PAGE).toList();
     }
 
-    private List<Long> orderIds(java.util.function.Predicate<Order> p) {
+    List<Long> orderIds(Predicate<Order> p) {
         return orders.findAll().stream().filter(p)
                 .sorted(Comparator.comparing(Order::getCreatedAt).reversed()
                         .thenComparing(Order::getId, Comparator.reverseOrder()))

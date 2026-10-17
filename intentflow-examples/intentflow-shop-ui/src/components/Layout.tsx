@@ -3,6 +3,7 @@ import {
   AppShell,
   Burger,
   Group,
+  Image,
   Kbd,
   NavLink,
   Stack,
@@ -14,6 +15,7 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { spotlight } from "@mantine/spotlight";
 import {
+  IconAdjustments,
   IconBox,
   IconLayoutDashboard,
   IconMoon,
@@ -24,6 +26,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import logo from "../assets/intentflow.svg";
 
 const links = [
   { to: "/", label: "Ask", icon: IconSparkles },
@@ -48,7 +51,7 @@ export function Layout() {
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-            <IconSparkles size={24} color="var(--mantine-color-indigo-6)" />
+            <Image src={logo} alt="" w={30} h={30} radius="sm" />
             <Text fw={700} size="lg">
               IntentFlow Shop
             </Text>
@@ -69,6 +72,18 @@ export function Layout() {
                 <Kbd size="xs">⌘ K</Kbd>
               </Group>
             </UnstyledButton>
+            <Tooltip label="Catalog admin: descriptions and paths">
+              <ActionIcon
+                component="a"
+                href="/intentflow-admin/"
+                target="_blank"
+                variant="default"
+                size="lg"
+                aria-label="Open the catalog admin"
+              >
+                <IconAdjustments size={18} />
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label={colorScheme === "dark" ? "Light theme" : "Dark theme"}>
               <ActionIcon variant="default" size="lg" onClick={toggleColorScheme} aria-label="Toggle color scheme">
                 {colorScheme === "dark" ? <IconSun size={18} /> : <IconMoon size={18} />}

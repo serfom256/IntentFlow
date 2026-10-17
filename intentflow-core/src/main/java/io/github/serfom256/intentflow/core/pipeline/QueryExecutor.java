@@ -12,11 +12,26 @@ import java.util.List;
  */
 public interface QueryExecutor {
 
-    /** Runs an entity query ({@code SELECT *}) and maps every row onto {@code resultType}. */
+    /**
+     * Runs an entity query ({@code SELECT *}) and maps every row onto
+     * {@code resultType}.
+     */
     <T> List<T> execute(BoundQuery query, Class<T> resultType);
 
     /**
-     * Runs an aggregate query and returns its columns as plain values, in select order: the group
+     * What an entity query for {@code resultType} has to select: every column
+     * ({@link ResultShape#ROWS}, the
+     * default), or only the primary key when the executor loads the entities itself
+     * ({@link ResultShape#KEYS}).
+     * A query selects every column anyway when the key is not known.
+     */
+    default ResultShape shape(Class<?> resultType) {
+        return ResultShape.ROWS;
+    }
+
+    /**
+     * Runs an aggregate query and returns its columns as plain values, in select
+     * order: the group
      * fields, then the aggregated value.
      */
     default List<List<@Nullable Object>> rows(BoundQuery query) {

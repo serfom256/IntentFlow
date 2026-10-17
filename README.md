@@ -6,33 +6,34 @@
   <a href="https://central.sonatype.com/artifact/io.github.serfom256/intentflow-spring-boot-starter"><img alt="Maven Central" src="https://img.shields.io/maven-central/v/io.github.serfom256/intentflow-spring-boot-starter?style=flat-square&color=6366F1"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6366F1?style=flat-square"></a>
   <img alt="Java 21+" src="https://img.shields.io/badge/Java-21%2B-6366F1?style=flat-square">
-  <img alt="Spring Boot 4.x" src="https://img.shields.io/badge/Spring%20Boot-4.x-6366F1?style=flat-square">
+  <img alt="Spring Boot 3.2+ and 4.x" src="https://img.shields.io/badge/Spring%20Boot-3.2%2B%20%7C%204.x-6366F1?style=flat-square">
 </p>
 
-**IntentFlow** translates natural-language queries into parameterized SQL and maps the result onto
-your own entity classes. The query *"apple laptops under 2000, best rated first"* returns a `List<Product>`
+**IntentFlow** answers plain-language questions with your own entity classes. *"Apple laptops under 2000, best
+rated first"* returns a `List<Product>`.
 
-The LLM never generates SQL. It emits a constrained query DSL, which IntentFlow parses, validates
-against the declared catalog and compiles into SQL with bound parameters. Rows are mapped by the
-persistence layer the application already uses: JDBC, Spring Data JDBC, OpenMapper, JPA, Jimmer or Spring Data Cassandra
+The LLM never writes SQL. It writes a small query language (DSL) that IntentFlow validates against your catalog and
+compiles into parameterized SQL. Your persistence layer (JDBC, Spring Data JDBC, JPA, Jimmer, OpenMapper or Spring
+Data Cassandra) maps the rows.
 
 ## Contents
 
 - [How it works](#how-it-works)
 - [Quick start](#quick-start)
-- [Entity declaration](#entity-declaration)
-- [Usage](#usage)
+- [Declaring entities](#declaring-entities)
+- [Querying](#querying)
 - [Query DSL](#query-dsl)
 - [Relations](#relations)
-- [Aggregations](#aggregations)
-- [Executors](#executors)
-- [SQL dialects](#sql-dialects)
+- [Aggregations and top rows](#aggregations-and-top-rows)
+- [Limitations](#limitations)
+- [Modules](#modules)
+- [How SQL is generated](#how-sql-is-generated)
+- [Debugging](#debugging)
 - [Cassandra](#cassandra)
-- [Exceptions](#exceptions)
-- [IntentFlow configuration](#intentflow-configuration)
+- [Admin UI](#admin-ui)
+- [Adding a database](#adding-a-database)
+- [Configuration](#configuration)
 - [Example application](#example-application)
-
----
 
 ## How it works
 
@@ -41,51 +42,29 @@ persistence layer the application already uses: JDBC, Spring Data JDBC, OpenMapp
   → LLM:       products | filter brand == "apple" and category == "laptop" and price < 2000
   → validate:  declared fields only, type checks, allowed values
   → compile:   SELECT * FROM "product" WHERE LOWER("brand") = LOWER(?) AND ... LIMIT 50
-  → execute:   List<Product>, mapped by the configured QueryExecutor
+  → execute:   List<Product>, mapped by your persistence layer
 ```
 
-The DSL produced for a query is cached, so repeated queries skip the LLM call
+Translations are cached, so a repeated question skips the LLM.
 
 ## Quick start
 
-Requirements: Java 21+, Spring Boot 4.x, an OpenAI-compatible chat completions endpoint
+Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (OpenAI, LM Studio, Ollama, ...).
 
-### 1. Add the dependencies
-
-The starter provides auto-configuration only. Add exactly one executor (maps result rows onto
-entities) and one dialect (generates engine-specific SQL):
+**1. Add the starter, one executor and one dialect:**
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.1.0")
-    implementation("io.github.serfom256:intentflow-jdbc:0.1.0")
-    implementation("io.github.serfom256:intentflow-postgresql:0.1.0")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.3.0")
+    implementation("io.github.serfom256:intentflow-jdbc:0.3.0")
+    implementation("io.github.serfom256:intentflow-postgresql:0.3.0")
 }
 ```
 
-```xml
-<dependency>
-    <groupId>io.github.serfom256</groupId>
-    <artifactId>intentflow-spring-boot-starter</artifactId>
-    <version>0.1.0</version>
-</dependency>
-<dependency>
-    <groupId>io.github.serfom256</groupId>
-    <artifactId>intentflow-jdbc</artifactId>
-    <version>0.1.0</version>
-</dependency>
-<dependency>
-    <groupId>io.github.serfom256</groupId>
-    <artifactId>intentflow-postgresql</artifactId>
-    <version>0.1.0</version>
-</dependency>
-```
+The executor maps rows onto entities, the dialect writes engine-specific SQL; see [Modules](#modules). IntentFlow
+brings no Spring, ORM or driver of its own and uses the versions your application has.
 
-Available modules are listed in [Executors](#executors) and [SQL dialects](#sql-dialects)
-
-### 2. Configure the LLM endpoint
-
-Any OpenAI-compatible chat completions API is supported (LM Studio, Ollama, OpenAI):
+**2. Point it at an LLM:**
 
 ```yaml
 intentflow:
@@ -94,9 +73,7 @@ intentflow:
     model: qwen/qwen3.8-27b
 ```
 
-Queries run on the application's own `DataSource` or `CqlSession`; IntentFlow opens no connections of its own
-
-### 3. Declare a queryable entity
+**3. Mark an entity as queryable:**
 
 ```java
 @IntentService(value = "products", uri = "/products/{{id}}", defaultSort = "id")
@@ -108,157 +85,92 @@ public record Product(
 }
 ```
 
-Classes annotated with `@IntentService` are discovered by classpath scanning of the application's
-auto-configuration packages (override with `intentflow.catalog.packages`)
-
-### 4. Inject the pipeline
+**4. Ask:**
 
 ```java
-@Service
-@RequiredArgsConstructor
-public class ProductSearch {
-
-    private final IntentPipeline pipeline;
-
-    public List<Product> find(String query) {
-        return pipeline.resolve(IntentRequests.of(query), Product.class).items();
-    }
-}
+List<Product> products = pipeline.resolve(IntentRequests.of(question), Product.class).items();
 ```
 
-### Core abstractions
+`IntentPipeline` is auto-configured. Queries run on your `DataSource` or `CqlSession`; every auto-configured bean
+can be replaced by your own.
 
-| Type                             | Responsibility                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------------- |
-| `IntentPipeline`                 | Entry point: natural-language request in, `IntentResponse` out                   |
-| `IntentRequests.of(String)`      | Creates an `IntentRequest` from raw user input                                   |
-| `IntentResponse<T>`              | Mapped entities or aggregate rows, a navigation URI and an execution trace       |
-| `@IntentService`, `@IntentField` | Declare the catalog: services, queryable fields, types, allowed values           |
-| `@IntentRelation`                | Exposes another service's fields to filters                                      |
-| `QueryExecutor`                  | Executes the compiled query and maps rows; provided by an executor module        |
-| `SqlDialect`                     | Renders engine-specific SQL fragments; provided by a dialect module              |
-| `LlmClient`                      | Translates a request into the DSL; replaceable to integrate another API          |
+## Declaring entities
 
-All auto-configured beans are `@ConditionalOnMissingBean`: a user-defined bean of the same type takes precedence
+`@IntentService` makes a class queryable. `@IntentField` shows a field to the LLM. Fields without it are left out
+of the prompt and rejected in queries, but are still loaded into the returned entities, so keep sensitive data out
+of your API responses yourself.
 
-## Entity declaration
-
-`@IntentService` registers a class as a queryable service. `@IntentField` exposes a field to the LLM
-for filtering and sorting; fields without it are excluded from the prompt and rejected by validation,
-but are still mapped by the executor. IntentFlow annotations combine with the persistence mapper's
-own, for example OpenMapper:
-
-```java
-@Model(primaryKey = "id")
-@IntentService(
-        value = "products",
-        table = "product",
-        uri = "/products/{{id}}",
-        defaultSort = "id",
-        description = "Items sold in the shop")
-public class Product {
-
-    @Field
-    @IntentField
-    private Long id;
-
-    @Field
-    @IntentField(description = "USD")
-    private BigDecimal price;
-
-    @Field
-    @IntentField
-    private Category category;
-
-    @Field(name = "created_at")
-    @IntentField
-    private OffsetDateTime createdAt;
-
-    @Field(name = "supplier_cost")
-    private BigDecimal supplierCost;
-}
-```
-
-- **Field types** are inferred from the Java type: text, number, boolean, timestamp. Enum constants
-  become the field's allowed values. Types are included in the prompt and enforced during validation
-- **Column names** are resolved from the mapper's annotations (`@Field`, `@Column`) and default to
-  the snake_case form of the Java field name
-- **`caseSensitive = true`** disables case folding for `==`, `!=` and `in`, so comparisons on codes
-  and keys can use plain column indexes
-- **`uri`** is a template for the navigation URI returned with each response, see [Usage](#usage)
-
-Interface-based entities, such as Jimmer's, declare `@IntentField` on their property methods:
+IntentFlow annotations sit next to your mapper's own:
 
 ```java
 @Entity
-@IntentService(value = "books", uri = "/books/{{id}}", defaultSort = "id")
-public interface Book {
-
-    @Id
-    @IntentField
-    long id();
-
-    @IntentField
-    String title();
-
-    @Column(name = "published_at")
-    @IntentField
-    @Nullable LocalDateTime publishedAt();
+@Table(name = "product")
+@IntentService(value = "products", uri = "/products/{{id}}", defaultSort = "id",
+        description = "Items sold in the shop")
+public class Product {
+    @Id 
+    @IntentField 
+    Long id;
+    @IntentField(description = "retail price in USD") 
+    BigDecimal price;
+    @IntentField Category category;
+    @Column(name = "created_at") 
+    @IntentField 
+    OffsetDateTime createdAt;
+    @Column(name = "supplier_cost") 
+    BigDecimal supplierCost;
 }
 ```
 
-The catalog can also be built programmatically with `ServiceDescriptors.of(...)` and `ServiceCatalogs.of(...)`
+- **Types** come from the Java type: text, number, boolean or timestamp. Enum constants become the allowed values
+- **Column names** come from your mapper's annotations (`@Column`, `@Field`) or default to snake_case
+- **`description`** tells the LLM what a service or field means; good descriptions are the main lever for
+  answer quality
+- **`caseSensitive = true`** compares `==`, `!=` and `in` exactly, which suits codes and keys
+- **`uri`** is the link returned with each answer, filled from the first result
+- **`defaultSort`** is appended to every sort as a tie-breaker; end it with a unique field so paging is stable
 
-## Usage
+Interface entities, such as Jimmer's, put `@IntentField` on their property methods. The catalog can also be built
+in code with `ServiceDescriptors` and `ServiceCatalogs`.
 
-`IntentPipeline` offers a scoped and an unscoped variant of `resolve`.
-
-**Scoped resolution** targets a known entity type:
+## Querying
 
 ```java
 IntentResponse<Product> response = pipeline.resolve(IntentRequests.of("out of stock monitors"), Product.class);
-List<Product> products = response.items();
 ```
 
-The prompt contains only the service mapped to `Product` and the services reachable through its
-`@IntentRelation`s. A DSL query addressing any other service fails with `ServiceNotFoundException`
-
-**Unscoped resolution** lets the LLM select the service from the whole catalog:
+The scoped form above shows the LLM only `Product`'s service and the services it relates to. The unscoped form lets
+the LLM pick the service; `response.type()` tells which entity came back:
 
 ```java
 IntentResponse<?> response = pipeline.resolve(IntentRequests.of("vip customers who joined this year"));
-
-if (response.type() == Customer.class) {
-    List<Customer> customers = response.items().stream().map(Customer.class::cast).toList();
-}
 ```
 
-`service()` returns the selected service name and `type()` its entity class
+| Method          | Contents                                                                       |
+| --------------- | ------------------------------------------------------------------------------ |
+| `items()`       | The entities, in query order; empty for an aggregation                          |
+| `aggregation()` | Rows of an aggregate query, otherwise `null`                                    |
+| `uri()`         | The `uri` template filled from the first item, e.g. `/products/12`, or `/products` |
+| `trace()`       | The DSL, whether it was cached, the SQL and its parameters                      |
 
-**Response contents**
+Only the question → DSL translation is cached; every call runs the query. Failures are unchecked exceptions:
 
-| Method          | Contents                                                                                       |
-| --------------- | ---------------------------------------------------------------------------------------------- |
-| `items()`       | Mapped entities in query order; empty when nothing matched or the query is an aggregation      |
-| `aggregation()` | Result rows of an aggregate query, `null` otherwise, see [Aggregations](#aggregations)         |
-| `uri()`         | The service's `uri` template resolved against the first item (`/products/12`), or the collection path (`/products`) when there are no items |
-| `trace()`       | Generated DSL (`dsl()`), cache hit flag (`cached()`), compiled statement (`query()`) and bind parameters (`parameters()`) |
-
-**Caching.** Only the request → DSL translation is cached, keyed by the normalized request and the
-scope (`intentflow.cache.*`). Every call executes the query, so results always reflect current data
-
-**Error handling.** All failures are unchecked exceptions, see [Exceptions](#exceptions). Typically
-`UnsupportedRequestException`, `ValidationException`, `DslParseException` and `ServiceNotFoundException`
-map to HTTP 422, and `LlmException` to HTTP 503
+| Exception                     | Raised when                                                  | Typical HTTP status |
+| ----------------------------- | ------------------------------------------------------------ | ------------------- |
+| `UnsupportedRequestException` | the LLM declined the question; `reason()` says why           | 422                 |
+| `ValidationException`         | the DSL uses an unknown field or the wrong type              | 422                 |
+| `DslParseException`           | the LLM's answer is not valid DSL                            | 422                 |
+| `ServiceNotFoundException`    | the DSL addresses an unknown or out-of-scope service         | 422                 |
+| `ScanLimitExceededException`  | a Cassandra query read too many rows                         | 422                 |
+| `LlmException`                | the LLM failed, timed out or returned nothing                | 503                 |
 
 ## Query DSL
 
-Each DSL query addresses exactly one service:
+Each query addresses one service:
 
 ```
 products | filter category in ("laptop", "phone") and price < 1000 | sort rating desc | take 5
 customers | filter vip == true and not (created_at < "2026-01-01")
-orders | filter created_at >= "2026-07-01" | sort created_at desc
 ```
 
 | Stage    | Syntax                                                                            |
@@ -266,166 +178,227 @@ orders | filter created_at >= "2026-07-01" | sort created_at desc
 | `filter` | `==` `!=` `<` `<=` `>` `>=`, `~` (contains), `in (...)`, `== null`, `and/or/not`  |
 | `sort`   | `sort field [asc\|desc], ...`                                                     |
 | `skip`   | `skip 20`                                                                         |
-| `take`   | `take 10`, bounded by `maxTake`                                                   |
-| `group`  | `group status, category`, followed by `count`, `sum f`, `avg f`, `min f`, `max f` |
+| `take`   | `take 10`, at most the service's `maxTake`                                        |
+| `group`  | `group status, category`, then `count`, `sum f`, `avg f`, `min f` or `max f`      |
+| `top`    | `top 3 per category by rating desc`                                               |
 
-Semantics:
-
-- Text comparisons are case-insensitive unless the field is declared `caseSensitive`
+- Text comparisons ignore case unless the field is `caseSensitive`
 - NULLs sort last in both directions
-- A date without a time denotes the whole day: `created_at == "2026-10-10"` matches any time on that
-  day, `> "2026-10-10"` starts at the next day and `<= "2026-10-10"` includes it
-- The service's `defaultSort` is appended to every sort as a tie-breaker, which keeps pagination
-  deterministic; it should end with a unique field
-- When a request, or any condition in it, cannot be expressed with the declared catalog, the LLM
-  returns `unsupported "reason"` instead of answering a narrower question; IntentFlow raises it as
-  `UnsupportedRequestException`
+- A date without a time means the whole day: `created_at == "2026-10-10"` matches any time that day
+- If a question, or any part of it, can't be expressed with the catalog, the LLM declines instead of answering a
+  narrower question
+
+**Expressions** work wherever a field does:
+
+```
+orders | filter coalesce(discount, 0) > 10 and total / items_count > 1000
+orders | filter year(created_at) == 2025 and code::bigint > 1000
+orders | group date_trunc("month", created_at) | sum total * 1.2
+```
+
+| Kind        | Syntax                                                                 |
+| ----------- | ---------------------------------------------------------------------- |
+| Arithmetic  | `+` `-` `*` `/`, parentheses; division by zero gives NULL              |
+| Casts       | `cast(x as number\|integer\|text\|timestamp\|date)`, `x::bigint`, `x::date` |
+| Null        | `coalesce(a, b, ...)`, `expr == null`                                  |
+| Date & time | `year`, `month`, `day`, `hour`, `date_trunc("month", t)`               |
+| Text        | `length`, `lower`, `upper`                                             |
+| Numbers     | `round(n)`, `round(n, digits)`, `abs(n)`                               |
+
+Expressions are type-checked before any SQL is generated, and values are always bound as parameters.
 
 ## Relations
 
+Relations come from your ORM model, so ORM entities need no extra annotations:
+
+| ORM        | Read from                                                      |
+| ---------- | -------------------------------------------------------------- |
+| JPA        | `@ManyToOne`, `@OneToOne`, `@OneToMany(mappedBy)`, `@JoinColumn` |
+| Jimmer     | `@ManyToOne`, `@OneToOne`, `@OneToMany(mappedBy)`, `@JoinColumn` |
+| OpenMapper | `@Joined(joinBy, to)`                                          |
+
+A relation is named after its property, and its target must be an `@IntentService` too. Plain records declare the
+link themselves:
+
 ```java
-@IntentService(value = "orders", uri = "/orders/{{id}}", defaultSort = "id")
 @IntentRelation(name = "customer", service = "customers", from = "customer_id", to = "id")
-public record Order(
-        @IntentField long id,
-        @IntentField long customerId,
-        @IntentField String status) {
+public record Order(@IntentField long id, @IntentField long customerId, @IntentField String status) {
 }
 ```
 
-Filters may reference the target service's fields as `<relation>.<field>`; the result type is unchanged:
+Queries use the related fields as `<relation>.<field>`, and still return the same entities:
 
 ```
 orders | filter customer.vip == true and status == "delivered"
 customers | filter orders.total > 100 and orders.status == "PAID"
 customers | filter not (orders.status == "CANCELLED")
+orders | sort customer.name
 ```
 
-Each relation compiles to a correlated `EXISTS` subquery, so the result is never multiplied by the
-join. Conditions on the same relation within one conjunction are evaluated against the same related
-row, and a negated relation condition compiles to `NOT EXISTS`. Relations are supported in filters
-only, and not on Cassandra
+A relation condition means "some related row matches" and becomes an `EXISTS` subquery, so rows are never
+duplicated; `not (...)` means "no related row matches". Conditions on one relation within an `and` apply to the same
+related row.
 
-## Aggregations
+Your ORM still loads the entities, so associations behave as usual:
+
+- **JPA (Hibernate)** loads the matching ids with JPQL. A named entity graph `<Entity>.intentflow` decides which
+  associations arrive initialized:
+  `@NamedEntityGraph(name = "Order.intentflow", attributeNodes = @NamedAttributeNode("customer"))`
+- **Jimmer** uses a `Fetcher` bean per entity type, e.g.
+  `OrderFetcher.$.allScalarFields().customer(CustomerFetcher.$.allScalarFields())`
+- **OpenMapper** filters and sorts by `@Joined` fields but does not fill them
+
+## Aggregations and top rows
 
 ```
 orders | group status | count
-orders | filter customer.vip == true | sum total
 products | group category | avg price | sort avg desc | take 3
 ```
 
-```java
-Aggregation aggregation = pipeline.resolve(IntentRequests.of("orders per status"), Order.class).aggregation();
+`response.aggregation().rows()` holds one row per group: the group values and the result, numbers as `BigDecimal`.
+Rows are ordered by the result, largest first, unless the query sorts them.
 
-for (AggregateRow row : aggregation.rows()) {
-    Object status = row.group().getFirst();
-    Object count = row.value();
-}
+`top` keeps the first rows of every group and still returns entities, for questions like "the latest order of every
+customer":
+
+```
+products | top 3 per category by rating desc
+orders | filter status == "PAID" | top 1 per customer_id by created_at desc
 ```
 
-Each row contains the group values in `groupBy()` order and the aggregated value; numeric values
-are returned as `BigDecimal`. Grouped rows are ordered by the aggregated value descending, then by
-the group fields, unless the query specifies a sort
+## Limitations
 
-## Executors
+IntentFlow answers questions about the records of one service. Anything else is declined or rejected, never turned
+into ad-hoc SQL. Not supported:
 
-An executor runs the compiled query and maps result rows onto the entity class. Executor modules
-are located in `intentflow-executors/`:
+- Results other than entities of one service or one aggregate: no columns from several tables, no `UNION`; the SQL
+  is always a read-only `SELECT`
+- Relations more than one hop away (`customer.address.city`), "every related row" conditions, and counts or sums
+  over related rows ("customers with more than 3 orders")
+- Grouping by related fields, or using them in expressions
+- More than one aggregate function per query, `COUNT(DISTINCT ...)`, percentiles, and conditions on the aggregate
+  (`HAVING`)
+- Window functions other than `top`: `RANK`, `LAG`/`LEAD` and running totals produce new columns, not entities
+- `CASE`, string concatenation, regular expressions, "starts with"/"ends with". Relative dates ("last 3 months")
+  are turned into dates by the LLM
+- Questions about the person asking ("my orders", "near me"); there is no request context yet
+- Relations on Cassandra
 
-| Module                             | Mapping                                           | Column names from      |
-| ---------------------------------- | ------------------------------------------------- | ---------------------- |
-| `intentflow-jdbc`                  | Spring `JdbcClient`: records, `@Value`, JavaBeans | snake_case field names |
-| `intentflow-spring-data-jdbc`      | Spring Data JDBC entity mapping                   | `@Table`, `@Column`    |
-| `intentflow-openmapper`            | OpenMapper `Procedures` (`@Model`, `@Field`)      | `@Field`               |
-| `intentflow-jpa`                   | JPA native query mapped onto the `@Entity`        | `@Table`, `@Column`    |
-| `intentflow-jimmer`                | Jimmer `JSqlClient`: matching ids, then `findMapByIds` | Jimmer `@Table`, `@Column` |
-| `intentflow-spring-data-cassandra` | Spring Data Cassandra converter                   | `@Table`, `@Column`    |
+## Modules
 
-When several executors are present, the starter selects the first available in the order OpenMapper,
-JPA, Jimmer, Spring Data JDBC, Cassandra, JDBC. `intentflow.executor` selects one explicitly; a user-defined
-`QueryExecutor` bean replaces auto-configuration
+**Executors** run the SQL and map rows onto entities. With several on the classpath, the first one in the table wins;
+`intentflow.executor` picks one explicitly.
 
-## SQL dialects
+| Module                             | Maps rows with                                               |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `intentflow-openmapper`            | OpenMapper `Procedures`                                      |
+| `intentflow-jpa`                   | JPA: ids first, then JPQL with an optional entity graph      |
+| `intentflow-jimmer`                | Jimmer: ids first, then `findMapByIds` with an optional `Fetcher` |
+| `intentflow-spring-data-jdbc`      | Spring Data JDBC entity mapping                              |
+| `intentflow-spring-data-cassandra` | Spring Data Cassandra converter                              |
+| `intentflow-jdbc`                  | Spring `JdbcClient`: records, JavaBeans, Lombok `@Value`     |
 
-Dialect modules are located in `intentflow-dialects/` and are discovered via `ServiceLoader`:
+**Dialects** write engine-specific SQL. The starter detects the database from the JDBC URL; `intentflow.dialect`
+overrides it.
 
-| Module                  | Databases         | Notes                                                      |
-| ----------------------- | ----------------- | ---------------------------------------------------------- |
-| `intentflow-postgresql` | PostgreSQL, H2    | `ILIKE` for contains                                       |
-| `intentflow-mysql`      | MySQL 8+, MariaDB | `LOWER() LIKE`; text equality follows the column collation |
-| `intentflow-cassandra`  | Cassandra 5       | CQL query builder, see [Cassandra](#cassandra)             |
+| Module                  | Databases         |
+| ----------------------- | ----------------- |
+| `intentflow-postgresql` | PostgreSQL, H2    |
+| `intentflow-mysql`      | MySQL 8+, MariaDB |
+| `intentflow-cassandra`  | Cassandra 5       |
 
-The starter resolves the dialect from the JDBC URL, falling back to the database product name from
-connection metadata. `intentflow.dialect` or a user-defined `SqlDialect` bean overrides detection.
-Outside Spring: `SqlBuilders.create(new MySqlDialect())`
+The build is tested against Spring Boot 3.2, 3.5 and 4.0. Spring Boot 3.0 and 3.1 are not supported, because the
+JDBC executors need `JdbcClient` (Spring Framework 6.1).
+
+## How SQL is generated
+
+The validated query becomes a small plan (`Select`, `SqlPredicate`, `SqlExpr` in `core.sql.plan`), which
+`SqlRenderer` writes for the configured dialect. The planners decide what the query means; the dialect only decides
+how it is spelled.
+
+**Schema facts.** At startup IntentFlow learns about your tables from three sources; the first that knows a fact
+wins:
+
+1. The database: primary keys, unique indexes, NOT NULL columns
+2. The ORM: `@Id`, `@Column(nullable = false)`, Jimmer's non-null properties, OpenMapper's primary key
+3. The Java model: primitives are NOT NULL, enums store their constant names
+
+`intentflow.schema.introspect=false` skips the database. Anything unknown is assumed the safe way (nullable, not
+unique), which gives plain, conservative SQL.
+
+**Optimizations** apply only when they can't change the result. `trace().optimizations()` lists the ones used, and
+`intentflow.sql.disabled-optimizations` switches them off:
+
+| Optimization        | Effect                                                                      |
+| ------------------- | --------------------------------------------------------------------------- |
+| `date-ranges`       | `year(t) == 2025` becomes a range on `t`, so an index on `t` applies        |
+| `not-null-ordering` | no `NULLS LAST` on NOT NULL columns, so an index can serve the sort         |
+| `exact-values`      | enums compare as `status = 'PAID'` instead of `LOWER(...)`                  |
+| `to-one-join`       | sorting by a to-one relation uses a `LEFT JOIN` instead of a subquery per row |
+| `key-projection`    | JPA and Jimmer get only the primary keys, then load the entities themselves |
+
+**Restrictions.** A condition every row of a service must meet, such as a soft delete, is added to every query of
+that service, including counts and relation subqueries. It comes from Hibernate's `@SQLRestriction`, Jimmer's
+`@LogicalDeleted`, or `@IntentService(restriction = "deleted_at IS NULL")`.
+
+**Schemas.** Tables may be schema-qualified: `@IntentService(table = "billing.invoice")` or JPA's
+`@Table(schema = "billing")`.
+
+Not handled yet: JPA enums stored as ordinals (the default), Hibernate `@Filter`s enabled per session, and the
+discriminator of single-table inheritance.
+
+## Debugging
+
+- `response.trace()` gives the DSL, the SQL and its parameters; the SQL runs as-is in `psql` or `mysql`
+- `pipeline.explain(request)` returns the same trace without running the query
+- `logging.level.io.github.serfom256.intentflow=DEBUG` logs every step: cache hit or LLM call, the DSL, declined or
+  rejected answers with the reason, the SQL and the result count
 
 ## Cassandra
 
-CQL lacks most DSL operators (`or`, `not`, `!=`, contains, case-insensitive comparison, sorting and
-offsets on arbitrary columns). The `intentflow-cassandra` dialect therefore splits each query into
-two phases, executed by `intentflow-spring-data-cassandra`:
+CQL can't express most of the DSL (`or`, `not`, `!=`, contains, sorting on arbitrary columns), so a Cassandra query
+runs in two steps. Conditions CQL can evaluate exactly are sent with `ALLOW FILTERING` to narrow the scan; the full
+filter, `top`, sorting, paging and aggregation then run in memory, so results match SQL. A query reading more than
+`intentflow.cassandra.max-scanned-rows` rows fails with `ScanLimitExceededException`. Timestamps are read as UTC.
 
-- **CQL pushdown:** predicates CQL evaluates exactly, sent with `ALLOW FILTERING`: number, boolean
-  and timestamp comparisons on regular columns, `==` on case-sensitive text columns, and `==` on a
-  single-column partition key
-- **In-memory evaluation:** the complete filter, sort, paging and aggregation over the fetched rows
+## Admin UI
 
-The pushdown only narrows the scan; the in-memory phase always re-applies the full filter, so results
-match the SQL semantics. A query that reads more than `intentflow.cassandra.max-scanned-rows` rows
-fails with `ScanLimitExceededException`. Unsorted queries stop reading as soon as the requested page
-is filled. Timestamp literals are interpreted as UTC
+`intentflow-admin-spring-boot-starter` adds a web UI for editing descriptions and paths at runtime, without a
+redeploy, and for trying questions against the live catalog. See the [admin README](intentflow-admin-spring-boot-starter/README.md).
 
-```java
-@Table("reading")
-@IntentService(value = "readings", uri = "/readings/{{sensor}}")
-public class Reading {
+## Adding a database
 
-    @PrimaryKeyColumn(type = PrimaryKeyType.PARTITIONED)
-    @IntentField(caseSensitive = true)
-    private String sensor;
+A SQL dialect is a module with three parts:
 
-    @Column("taken_at")
-    @IntentField
-    private Instant takenAt;
+1. A `SqlDialect`: quoting, contains, timestamps, null ordering, casts, date functions and paging.
+   `PostgresDialect` and `MySqlDialect` are complete examples of about 100 lines
+2. A `META-INF/services/io.github.serfom256.intentflow.core.pipeline.SqlDialect` entry
+3. A test extending `DialectConformanceTest` that returns your `TestDatabase` (a Testcontainers container)
 
-    @IntentField
-    private BigDecimal value;
-}
-```
+The conformance test runs thousands of random queries against the real database and compares every result with an
+independent in-memory evaluation. `ExpectedSqlTest` pins the SQL of about 60 queries per dialect in `src/test/resources/expected-sql`, so any change to the
+generated SQL shows up as a readable diff.
 
-Outside Spring: `new CassandraQueryBuilder(session)` together with `CassandraQueryExecutor.of(session)`
+## Configuration
 
-## Exceptions
-
-| Exception                     | Raised when                                                    |
-| ----------------------------- | -------------------------------------------------------------- |
-| `UnsupportedRequestException` | the LLM declined the request; `reason()` contains its reason   |
-| `ValidationException`         | the DSL references an unknown field or has a type mismatch     |
-| `DslParseException`           | the LLM output is not valid DSL                                |
-| `ServiceNotFoundException`    | the DSL addresses an unknown or out-of-scope service           |
-| `ScanLimitExceededException`  | a Cassandra query exceeded the scan limit                      |
-| `LlmException`                | the LLM endpoint failed, timed out or returned no content      |
-
-## IntentFlow configuration
-
-| Parameter name                        | Parameter type | Default value                     | Description                                                  |
-| ------------------------------------- | -------------- | --------------------------------- | ------------------------------------------------------------ |
-| intentflow.enabled                    | boolean        | true                              | Enables the auto-configuration                               |
-| intentflow.executor                   | string         | first available                   | `openmapper`, `jpa`, `jimmer`, `spring-data-jdbc`, `cassandra`, `jdbc` |
-| intentflow.dialect                    | string         | detected                          | `postgresql` or `mysql`                                      |
-| intentflow.llm.base-url               | uri            | http://localhost:1234/v1          | Base URL of the OpenAI-compatible API                        |
-| intentflow.llm.model                  | string         | -                                 | Model id; required unless an `LlmClient` bean is defined     |
-| intentflow.llm.api-key                | string         | empty                             | Bearer token; empty for local servers                        |
-| intentflow.llm.timeout                | duration       | 60s                               | Timeout of a single LLM request                              |
-| intentflow.cache.ttl                  | duration       | 10m                               | Time to live of a cached translation                         |
-| intentflow.cache.max-size             | long           | 10000                             | Maximum number of cached translations                        |
-| intentflow.catalog.packages           | list<string>   | auto-configuration packages       | Packages scanned for `@IntentService` classes                |
-| intentflow.cassandra.max-scanned-rows | int            | 10000                             | Maximum rows a single Cassandra query may read               |
-
-`logging.level.io.github.serfom256.intentflow=DEBUG` logs the generated DSL, SQL and bind parameters
+| Property                              | Default                     | Description                                         |
+| ------------------------------------- | --------------------------- | --------------------------------------------------- |
+| intentflow.enabled                    | true                        | Turns the auto-configuration on or off              |
+| intentflow.llm.base-url               | http://localhost:1234/v1    | OpenAI-compatible API                               |
+| intentflow.llm.model                  | -                           | Model id; required unless you define an `LlmClient` |
+| intentflow.llm.api-key                | empty                       | Bearer token; empty for local servers               |
+| intentflow.llm.timeout                | 60s                         | Timeout of one LLM call                             |
+| intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
+| intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
+| intentflow.catalog.packages           | your application's packages | Where `@IntentService` classes are scanned          |
+| intentflow.executor                   | first available             | `openmapper`, `jpa`, `jimmer`, `spring-data-jdbc`, `cassandra` or `jdbc` |
+| intentflow.dialect                    | detected                    | `postgresql` or `mysql`                             |
+| intentflow.max-skip                   | 10000                       | Largest `skip` a query may use                      |
+| intentflow.schema.introspect          | true                        | Read keys and NOT NULL columns from the database    |
+| intentflow.sql.disabled-optimizations | empty                       | Optimizations to switch off                         |
+| intentflow.cassandra.max-scanned-rows | 10000                       | Rows one Cassandra query may read                   |
 
 ## Example application
 
-[`intentflow-examples`](intentflow-examples) contains a reference shop application: a Spring Boot API
-with CRUD endpoints and natural-language search, a React UI on top of it, and a Docker Compose setup for
-running both and the integration tests against PostgreSQL, MySQL and Cassandra
+[`intentflow-examples`](intentflow-examples) is a complete shop: a Spring Boot API with natural-language search, a
+React UI, the admin UI, and a Docker Compose setup for PostgreSQL, MySQL and Cassandra.

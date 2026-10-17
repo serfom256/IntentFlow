@@ -4,8 +4,8 @@ plugins {
 
 dependencies {
     api(projects.intentflowCore)
-    api(platform(libs.spring.boot.dependencies))
-    api(libs.jakarta.persistence.api)
+    compileOnly(libs.jakarta.persistence.api)
+    compileOnly(libs.hibernate.core)
 
     testImplementation(testFixtures(projects.intentflowCore))
     testImplementation(libs.hibernate.core)

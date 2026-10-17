@@ -10,8 +10,6 @@ import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.jdbc.DatabaseDriver;
-import org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.support.JdbcUtils;
@@ -22,6 +20,7 @@ import org.springframework.util.StringUtils;
 import javax.sql.DataSource;
 import java.sql.DatabaseMetaData;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 final class SqlDialectConfigurations {
@@ -50,23 +49,24 @@ final class SqlDialectConfigurations {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass({DatabaseDriver.class, JdbcUtils.class})
+    @ConditionalOnClass(JdbcUtils.class)
     @ConditionalOnBean(DataSource.class)
     static class Jdbc {
 
+        private static final List<String> CONNECTION_DETAILS = List.of(
+                "org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails",
+                "org.springframework.boot.autoconfigure.jdbc.JdbcConnectionDetails");
+
         @Bean
         @ConditionalOnMissingBean
-        SqlDialect intentFlowSqlDialect(IntentFlowProperties properties,
-                                        ObjectProvider<JdbcConnectionDetails> connectionDetails,
-                                        ObjectProvider<DataSource> dataSource,
-                                        BeanFactory beanFactory) {
+        SqlDialect intentFlowSqlDialect(IntentFlowProperties properties, ObjectProvider<DataSource> dataSource,
+                BeanFactory beanFactory) {
             ClassLoader classLoader = classLoader(beanFactory);
             if (StringUtils.hasText(properties.dialect())) {
                 return SqlDialects.named(properties.dialect(), classLoader);
             }
-            JdbcConnectionDetails details = connectionDetails.getIfUnique();
-            SqlDialect dialect = details == null ? null
-                    : dialectOf(DatabaseDriver.fromJdbcUrl(details.getJdbcUrl()), classLoader);
+            String url = jdbcUrl(beanFactory, classLoader);
+            SqlDialect dialect = url == null ? null : dialectOf(url, classLoader);
             if (dialect == null) {
                 DataSource ds = dataSource.getIfUnique();
                 if (ds == null) {
@@ -79,7 +79,7 @@ final class SqlDialectConfigurations {
                     throw new IllegalStateException(
                             "Could not detect the SQL dialect from the DataSource; set intentflow.dialect", e);
                 }
-                dialect = dialectOf(DatabaseDriver.fromProductName(product), classLoader);
+                dialect = dialectOf(product, classLoader);
                 if (dialect == null) {
                     throw new IllegalStateException("IntentFlow has no SQL dialect for " + product
                             + "; supported: PostgreSQL, MySQL, MariaDB, H2. Set intentflow.dialect "
@@ -90,12 +90,35 @@ final class SqlDialectConfigurations {
             return dialect;
         }
 
-        private static @Nullable SqlDialect dialectOf(DatabaseDriver driver, ClassLoader classLoader) {
-            return switch (driver) {
-                case POSTGRESQL, H2 -> SqlDialects.named("postgresql", classLoader);
-                case MYSQL, MARIADB -> SqlDialects.named("mysql", classLoader);
-                default -> null;
-            };
+        private static @Nullable String jdbcUrl(BeanFactory beanFactory, ClassLoader classLoader) {
+            for (String name : CONNECTION_DETAILS) {
+                if (!ClassUtils.isPresent(name, classLoader)) {
+                    continue;
+                }
+                Class<?> type = ClassUtils.resolveClassName(name, classLoader);
+                Object details = beanFactory.getBeanProvider(type).getIfUnique();
+                if (details != null) {
+                    try {
+                        return (String) type.getMethod("getJdbcUrl").invoke(details);
+                    } catch (ReflectiveOperationException e) {
+                        log.debug("Could not read the JDBC URL from {}", name, e);
+                    }
+                }
+            }
+            return null;
+        }
+
+        static @Nullable SqlDialect dialectOf(String urlOrProduct, ClassLoader classLoader) {
+            String value = urlOrProduct.toLowerCase(Locale.ROOT).replace("jdbc:tc:", "jdbc:");
+            if (value.startsWith("jdbc:postgresql:") || value.startsWith("jdbc:h2:")
+                    || value.equals("postgresql") || value.equals("h2")) {
+                return SqlDialects.named("postgresql", classLoader);
+            }
+            if (value.startsWith("jdbc:mysql:") || value.startsWith("jdbc:mariadb:")
+                    || value.equals("mysql") || value.equals("mariadb")) {
+                return SqlDialects.named("mysql", classLoader);
+            }
+            return null;
         }
     }
 }

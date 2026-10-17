@@ -25,7 +25,7 @@ public final class LlmClients {
     }
 
     public static LlmClient openAiCompatible(URI baseUrl, String model, String apiKey, Duration timeout,
-                                             Clock clock) {
+            Clock clock) {
         return new OpenAiCompatibleLlmClient(baseUrl, model, apiKey, timeout, clock);
     }
 }

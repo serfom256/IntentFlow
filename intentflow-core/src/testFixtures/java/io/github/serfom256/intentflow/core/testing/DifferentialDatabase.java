@@ -9,34 +9,31 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.util.function.Supplier;
 
-public enum DifferentialDatabase {
+public enum DifferentialDatabase implements TestDatabase {
 
     POSTGRES(() -> new PostgreSQLContainer("postgres:17.4"), PostgresDialect::new,
             "jdbc:postgresql://localhost:" + ComposeDatabases.port("POSTGRES_PORT", 15432) + "/intentflow", """
-            CREATE TABLE gadget (
-                id BIGINT PRIMARY KEY,
-                name TEXT COLLATE "C",
-                kind TEXT COLLATE "C",
-                price NUMERIC(10,2),
-                stock INTEGER,
-                active BOOLEAN,
-                created_at TIMESTAMP)
-            """),
+                    CREATE TABLE gadget (
+                        id BIGINT PRIMARY KEY,
+                        name TEXT COLLATE "C",
+                        kind TEXT COLLATE "C",
+                        price NUMERIC(10,2),
+                        stock INTEGER,
+                        active BOOLEAN,
+                        created_at TIMESTAMP)
+                    """),
 
     MYSQL(() -> new MySQLContainer("mysql:8.4"), MySqlDialect::new,
             "jdbc:mysql://localhost:" + ComposeDatabases.port("MYSQL_PORT", 13306) + "/intentflow", """
-            CREATE TABLE gadget (
-                id BIGINT PRIMARY KEY,
-                name VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin,
-                kind VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin,
-                price DECIMAL(10,2),
-                stock INT,
-                active BOOLEAN,
-                created_at DATETIME)
-            """);
-
-    public record Endpoint(String url, String user, String password) {
-    }
+                    CREATE TABLE gadget (
+                        id BIGINT PRIMARY KEY,
+                        name VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin,
+                        kind VARCHAR(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin,
+                        price DECIMAL(10,2),
+                        stock INT,
+                        active BOOLEAN,
+                        created_at DATETIME)
+                    """);
 
     private final Supplier<JdbcDatabaseContainer<?>> containerFactory;
     private final Supplier<SqlDialect> dialect;
@@ -45,13 +42,14 @@ public enum DifferentialDatabase {
     private Endpoint endpoint;
 
     DifferentialDatabase(Supplier<JdbcDatabaseContainer<?>> containerFactory, Supplier<SqlDialect> dialect,
-                         String composeUrl, String createGadgetTable) {
+            String composeUrl, String createGadgetTable) {
         this.containerFactory = containerFactory;
         this.dialect = dialect;
         this.composeUrl = composeUrl;
         this.createGadgetTable = createGadgetTable;
     }
 
+    @Override
     public synchronized Endpoint endpoint() {
         if (endpoint == null) {
             if (ComposeDatabases.enabled()) {
@@ -65,11 +63,13 @@ public enum DifferentialDatabase {
         return endpoint;
     }
 
+    @Override
     public SqlDialect dialect() {
         return dialect.get();
     }
 
-    String createGadgetTable() {
+    @Override
+    public String createGadgetTable() {
         return createGadgetTable;
     }
 }

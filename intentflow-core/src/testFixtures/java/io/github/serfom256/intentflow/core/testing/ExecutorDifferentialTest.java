@@ -1,8 +1,12 @@
 package io.github.serfom256.intentflow.core.testing;
 
+import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
+import io.github.serfom256.intentflow.core.schema.JdbcSchemaIntrospector;
+import io.github.serfom256.intentflow.core.schema.SchemaFacts;
+import io.github.serfom256.intentflow.core.schema.TableFacts;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -14,17 +18,21 @@ import java.sql.Types;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 public abstract class ExecutorDifferentialTest extends DifferentialTestBase {
+
+    private SchemaFacts facts = SchemaFacts.none();
 
     protected abstract QueryExecutor createExecutor(String jdbcUrl, String user, String password);
 
-    protected DifferentialDatabase database() {
+    protected TestDatabase database() {
         return DifferentialDatabase.POSTGRES;
     }
 
     @Override
     protected SqlBuilder sqlBuilder() {
-        return SqlBuilders.create(database().dialect());
+        return SqlBuilders.create(database().dialect(), facts);
     }
 
     @Override
@@ -34,7 +42,7 @@ public abstract class ExecutorDifferentialTest extends DifferentialTestBase {
 
     @Override
     protected QueryExecutor prepare(List<Map<String, Object>> rows) throws SQLException {
-        DifferentialDatabase.Endpoint db = database().endpoint();
+        TestDatabase.Endpoint db = database().endpoint();
         try (Connection c = DriverManager.getConnection(db.url(), db.user(), db.password())) {
             try (Statement s = c.createStatement()) {
                 s.execute("DROP TABLE IF EXISTS gadget");
@@ -55,6 +63,12 @@ public abstract class ExecutorDifferentialTest extends DifferentialTestBase {
                 insert.executeBatch();
             }
         }
+        Map<String, TableFacts> introspected = JdbcSchemaIntrospector.introspect(
+                new DriverManagerDataSource(db), List.of("gadget"));
+        TableFacts declared = ServiceDescriptors.factsOf(entityType(), nameResolvers());
+        facts = SchemaFacts
+                .of(Map.of("gadget", introspected.getOrDefault("gadget", TableFacts.UNKNOWN).merge(declared)));
+        assertThat(facts.table("gadget").primaryKey()).as("introspected primary key").containsExactly("id");
         return createExecutor(db.url(), db.user(), db.password());
     }
 }

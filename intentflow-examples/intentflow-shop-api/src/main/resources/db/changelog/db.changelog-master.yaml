@@ -112,3 +112,16 @@ databaseChangeLog:
               CREATE EXTENSION IF NOT EXISTS pg_trgm;
               CREATE INDEX product_name_trgm_idx ON product USING gin (name gin_trgm_ops);
               CREATE INDEX customer_full_name_trgm_idx ON customer USING gin (full_name gin_trgm_ops);
+
+  - changeSet:
+      id: 6-product-discount
+      author: intentflow
+      changes:
+        - addColumn:
+            tableName: product
+            columns:
+              - column: { name: discount, type: "DECIMAL(3, 1)" }
+        - sql:
+            sql: >
+              ALTER TABLE product ADD CONSTRAINT product_discount_chk CHECK (discount BETWEEN 0 AND 90);
+              UPDATE product SET discount = 5 + MOD(id * 7, 6) * 5 WHERE MOD(id, 5) = 0;

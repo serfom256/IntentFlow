@@ -3,8 +3,8 @@ package io.github.serfom256.intentflow.examples.shop.web;
 import io.github.serfom256.intentflow.examples.shop.domain.Product;
 import io.github.serfom256.intentflow.examples.shop.search.SearchResult;
 import io.github.serfom256.intentflow.examples.shop.search.SearchService;
-import io.github.serfom256.intentflow.examples.shop.service.ProductService;
 import io.github.serfom256.intentflow.examples.shop.service.PageResponse;
+import io.github.serfom256.intentflow.examples.shop.service.ProductService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -33,13 +33,13 @@ public class ProductController {
 
     @GetMapping
     public PageResponse<Product> list(@RequestParam(defaultValue = "0") @Min(0) int page,
-                                   @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return productService.list(page, size);
     }
 
     @GetMapping("/search")
-    public SearchResult<Product> search(@RequestParam("q") @NotBlank @Size(max = 500) String query,
-                                            @RequestParam(defaultValue = "false") boolean debug) {
+    public SearchResult<?> search(@RequestParam("q") @NotBlank @Size(max = 500) String query,
+            @RequestParam(defaultValue = "false") boolean debug) {
         return searchService.search(query, Product.class, debug);
     }
 

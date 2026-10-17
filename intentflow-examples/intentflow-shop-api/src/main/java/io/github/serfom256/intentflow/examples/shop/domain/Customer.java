@@ -18,8 +18,7 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Model(primaryKey = "id")
-@IntentService(value = "customers", table = "customer", uri = "/customers/{{id}}", maxTake = 50,
-        defaultSort = "id", description = "Registered shop customers")
+@IntentService(value = "customers", table = "customer", uri = "/customers/{{id}}", maxTake = 50, defaultSort = "id", description = "Registered shop customers")
 @IntentRelation(name = "orders", service = "orders", from = "id", to = "customer_id")
 public class Customer {
 
@@ -35,7 +34,7 @@ public class Customer {
     private String email;
 
     @Field
-    @IntentField
+    @IntentField(description = "city name in English, e.g. Berlin, Tokyo, New York")
     private String city;
 
     @Field

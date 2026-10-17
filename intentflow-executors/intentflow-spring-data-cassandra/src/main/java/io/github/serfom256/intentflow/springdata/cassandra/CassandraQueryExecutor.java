@@ -3,26 +3,23 @@ package io.github.serfom256.intentflow.springdata.cassandra;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.CqlIdentifier;
 import io.github.serfom256.intentflow.cassandra.CassandraAggregate;
 import io.github.serfom256.intentflow.cassandra.CassandraQuery;
-import io.github.serfom256.intentflow.cassandra.CqlValues;
 import io.github.serfom256.intentflow.core.ast.AggregateFunction;
-import io.github.serfom256.intentflow.core.pipeline.ScanLimitExceededException;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
+import io.github.serfom256.intentflow.core.pipeline.ScanLimitExceededException;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.cassandra.core.convert.CassandraConverter;
 import org.springframework.data.cassandra.core.convert.MappingCassandraConverter;
 import org.springframework.data.cassandra.core.mapping.SimpleUserTypeResolver;
-
-import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 public final class CassandraQueryExecutor implements QueryExecutor {
 
@@ -52,7 +49,11 @@ public final class CassandraQueryExecutor implements QueryExecutor {
     @Override
     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
         CassandraQuery q = cassandraQuery(query);
-        List<Row> matches = matching(q, q.order() == null ? q.skip() + q.limit() : Integer.MAX_VALUE);
+        List<Row> matches = matching(q,
+                q.order() == null && q.top() == null ? q.skip() + q.limit() : Integer.MAX_VALUE);
+        if (q.top() != null) {
+            matches = new ArrayList<>(q.top().apply(matches));
+        }
         if (q.order() != null) {
             matches.sort(q.order());
         }
@@ -68,14 +69,14 @@ public final class CassandraQueryExecutor implements QueryExecutor {
         }
         Map<List<@Nullable Object>, Accumulator> groups = new LinkedHashMap<>();
         for (Row row : matching(q, Integer.MAX_VALUE)) {
-            List<@Nullable Object> key = new ArrayList<>(aggregate.groupColumns().size());
-            for (CqlIdentifier column : aggregate.groupColumns()) {
-                key.add(CqlValues.comparable(row.getObject(column)));
+            List<@Nullable Object> key = new ArrayList<>(aggregate.groups().size());
+            for (var group : aggregate.groups()) {
+                key.add(group.apply(row));
             }
-            Object value = aggregate.column() == null ? null : CqlValues.comparable(row.getObject(aggregate.column()));
+            Object value = aggregate.argument() == null ? null : aggregate.argument().apply(row);
             groups.computeIfAbsent(key, k -> new Accumulator(aggregate.function())).add(value);
         }
-        if (groups.isEmpty() && aggregate.groupColumns().isEmpty()) {
+        if (groups.isEmpty() && aggregate.groups().isEmpty()) {
             groups.put(List.of(), new Accumulator(aggregate.function()));
         }
         List<List<@Nullable Object>> rows = new ArrayList<>(groups.size());
@@ -90,8 +91,9 @@ public final class CassandraQueryExecutor implements QueryExecutor {
 
     private static CassandraQuery cassandraQuery(BoundQuery query) {
         if (!(query instanceof CassandraQuery q)) {
-            throw new IllegalArgumentException("CassandraQueryExecutor runs queries built by CassandraQueryBuilder, got "
-                    + query.getClass().getName());
+            throw new IllegalArgumentException(
+                    "CassandraQueryExecutor runs queries built by CassandraQueryBuilder, got "
+                            + query.getClass().getName());
         }
         return q;
     }
@@ -135,13 +137,17 @@ public final class CassandraQueryExecutor implements QueryExecutor {
             present++;
             switch (function) {
                 case SUM, AVG -> sum = sum == null ? (BigDecimal) value : sum.add((BigDecimal) value);
-                case MIN -> extreme = extreme == null || extreme.compareTo(value) > 0 ? (Comparable<Object>) value : extreme;
-                case MAX -> extreme = extreme == null || extreme.compareTo(value) < 0 ? (Comparable<Object>) value : extreme;
-                case COUNT -> { }
+                case MIN ->
+                    extreme = extreme == null || extreme.compareTo(value) > 0 ? (Comparable<Object>) value : extreme;
+                case MAX ->
+                    extreme = extreme == null || extreme.compareTo(value) < 0 ? (Comparable<Object>) value : extreme;
+                case COUNT -> {
+                }
             }
         }
 
-        @Nullable Object result() {
+        @Nullable
+        Object result() {
             return switch (function) {
                 case COUNT -> BigDecimal.valueOf(count);
                 case SUM -> sum;

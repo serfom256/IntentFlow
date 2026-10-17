@@ -4,10 +4,10 @@ plugins {
 
 dependencies {
     api(projects.intentflowCore)
-    api(platform(libs.spring.boot.dependencies))
-    api(libs.spring.data.jdbc)
+    compileOnly(libs.spring.data.jdbc)
 
     testImplementation(testFixtures(projects.intentflowCore))
+    testImplementation(libs.spring.data.jdbc)
     testRuntimeOnly(libs.postgresql)
     testRuntimeOnly(libs.mysql)
 }

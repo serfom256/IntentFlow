@@ -52,7 +52,7 @@ public final class CqlValues {
             case BigDecimal n when literal instanceof NumberLiteral l -> n.compareTo(l.value());
             case Boolean b when literal instanceof BoolLiteral l -> Boolean.compare(b, l.value());
             case LocalDateTime d when literal instanceof TextLiteral t ->
-                    parseTimestamp(t.value()).map(d::compareTo).orElse(null);
+                parseTimestamp(t.value()).map(d::compareTo).orElse(null);
             case null, default -> null;
         };
     }

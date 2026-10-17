@@ -24,8 +24,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
 import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.catalog.impl.DefaultFieldMapping;
-import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
+import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -44,8 +44,10 @@ class MySqlDialectTest {
     private static final ServiceDescriptor SERVICE = ServiceDescriptors.of(
             BOOKS, null, TableNames.of("book`s"),
             List.of(
-                    new DefaultFieldMapping(TITLE, ColumnNames.of("title"), true, FieldType.TEXT, null, List.of(), "title"),
-                    new DefaultFieldMapping(RATING, ColumnNames.of("rating"), true, FieldType.NUMBER, null, List.of(), "rating"),
+                    new DefaultFieldMapping(TITLE, ColumnNames.of("title"), true, FieldType.TEXT, null, List.of(),
+                            "title"),
+                    new DefaultFieldMapping(RATING, ColumnNames.of("rating"), true, FieldType.NUMBER, null, List.of(),
+                            "rating"),
                     new DefaultFieldMapping(PUBLISHED, ColumnNames.of("published_at"), true, FieldType.TIMESTAMP, null,
                             List.of(), "publishedAt")),
             List.of(), MaxTakes.of(50), UriTemplates.of("/books"), Object.class);

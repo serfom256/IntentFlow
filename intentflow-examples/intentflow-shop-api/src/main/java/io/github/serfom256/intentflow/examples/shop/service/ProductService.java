@@ -53,6 +53,7 @@ public class ProductService {
                 .brand(r.brand().strip())
                 .category(r.category())
                 .price(r.price())
+                .discount(r.discount())
                 .rating(r.rating())
                 .stock(r.stock())
                 .active(r.active())

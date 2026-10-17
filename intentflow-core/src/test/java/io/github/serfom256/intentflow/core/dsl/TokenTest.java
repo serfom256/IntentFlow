@@ -1,7 +1,7 @@
 package io.github.serfom256.intentflow.core.dsl;
 
-import io.github.serfom256.intentflow.core.dsl.factories.Positions;
 import io.github.serfom256.intentflow.core.dsl.factories.Lexers;
+import io.github.serfom256.intentflow.core.dsl.factories.Positions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -28,13 +28,13 @@ class TokenTest {
         List<String> labels = new ArrayList<>();
         for (Token t : tokens) {
             String label = switch (t) {
-                case IdentifierToken id  -> "ident:" + id.name();
-                case StringToken str     -> "str:" + str.value();
-                case NumberToken num     -> "num:" + num.value();
-                case KeywordToken kw     -> "kw:" + kw.keyword();
-                case OperatorToken op    -> "op:" + op.operator();
-                case PunctuationToken p  -> "punct:" + p.punctuation();
-                case EofToken eof        -> "eof";
+                case IdentifierToken id -> "ident:" + id.name();
+                case StringToken str -> "str:" + str.value();
+                case NumberToken num -> "num:" + num.value();
+                case KeywordToken kw -> "kw:" + kw.keyword();
+                case OperatorToken op -> "op:" + op.operator();
+                case PunctuationToken p -> "punct:" + p.punctuation();
+                case EofToken eof -> "eof";
             };
             labels.add(label);
         }

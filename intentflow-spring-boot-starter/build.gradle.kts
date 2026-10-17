@@ -4,13 +4,16 @@ plugins {
 
 dependencies {
     api(projects.intentflowCore)
-    api(platform(libs.spring.boot.dependencies))
-    api(libs.spring.boot.starter)
-    annotationProcessor(platform(libs.spring.boot.dependencies))
+    compileOnly(libs.spring.boot.starter)
     annotationProcessor(libs.spring.boot.configuration.processor)
 
-    compileOnly(libs.spring.boot.jdbc)
+    compileOnly(libs.spring.jdbc)
     compileOnly(libs.spring.orm)
+    compileOnly(libs.spring.data.jdbc)
+    compileOnly(libs.spring.data.cassandra)
+    compileOnly(libs.jakarta.persistence.api)
+    compileOnly(libs.jimmer.sql)
+    compileOnly(libs.openmapper)
     compileOnly(projects.intentflowJdbc)
     compileOnly(projects.intentflowSpringDataJdbc)
     compileOnly(projects.intentflowJpa)
@@ -31,6 +34,9 @@ dependencies {
     testImplementation(libs.spring.boot.starter.data.jpa)
     testImplementation(libs.spring.boot.starter.data.cassandra)
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.jimmer.sql)
+    testImplementation(libs.openmapper)
+    testRuntimeOnly(libs.jackson3.databind)
     testImplementation(libs.h2)
     testRuntimeOnly(libs.mysql)
 }

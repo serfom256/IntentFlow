@@ -1,9 +1,14 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
+import com.datastax.oss.driver.api.core.CqlSession;
+import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
+import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.api.factories.UserTexts;
+import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
+import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
@@ -29,48 +34,39 @@ import io.github.serfom256.intentflow.core.pipeline.UriBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.impl.OpenAiCompatibleLlmClient;
-import io.github.serfom256.intentflow.starter.autoconfigure.fixtures.Book;
-import io.github.serfom256.procedures.Procedures;
-import io.github.serfom256.intentflow.core.api.IntentResponse;
-import io.github.serfom256.intentflow.core.ast.BoundQuery;
-import io.github.serfom256.intentflow.core.catalog.NameResolver;
-import com.datastax.oss.driver.api.core.CqlSession;
-import io.github.serfom256.intentflow.springdata.cassandra.CassandraNameResolver;
-import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
-import io.github.serfom256.intentflow.springdata.cassandra.CassandraQueryExecutor;
 import io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor;
 import io.github.serfom256.intentflow.jimmer.JimmerNameResolver;
 import io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor;
-import org.babyfish.jimmer.sql.JSqlClient;
-import org.babyfish.jimmer.sql.runtime.JSqlClientImplementor;
-import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcNameResolver;
-import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcQueryExecutor;
-import org.springframework.data.jdbc.core.convert.JdbcConverter;
-import org.springframework.data.jdbc.core.convert.MappingJdbcConverter;
-import org.springframework.data.jdbc.core.mapping.JdbcMappingContext;
-import org.springframework.context.ApplicationContext;
-import org.springframework.data.cassandra.core.convert.CassandraConverter;
-import org.springframework.data.cassandra.core.convert.MappingCassandraConverter;
 import io.github.serfom256.intentflow.jpa.JpaNameResolver;
 import io.github.serfom256.intentflow.jpa.JpaQueryExecutor;
 import io.github.serfom256.intentflow.openmapper.OpenMapperNameResolver;
 import io.github.serfom256.intentflow.openmapper.OpenMapperQueryExecutor;
-import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
-import org.springframework.boot.test.context.FilteredClassLoader;
-import java.math.BigDecimal;
+import io.github.serfom256.intentflow.springdata.cassandra.CassandraNameResolver;
+import io.github.serfom256.intentflow.springdata.cassandra.CassandraQueryExecutor;
+import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcNameResolver;
+import io.github.serfom256.intentflow.springdata.jdbc.SpringDataJdbcQueryExecutor;
+import io.github.serfom256.intentflow.starter.autoconfigure.fixtures.Book;
+import io.github.serfom256.procedures.Procedures;
+import org.babyfish.jimmer.sql.JSqlClient;
+import org.babyfish.jimmer.sql.runtime.JSqlClientImplementor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
-import org.springframework.boot.jdbc.autoconfigure.JdbcClientAutoConfiguration;
-import org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration;
+import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.cassandra.core.convert.CassandraConverter;
+import org.springframework.data.cassandra.core.convert.MappingCassandraConverter;
+import org.springframework.data.jdbc.core.convert.JdbcConverter;
+import org.springframework.data.jdbc.core.convert.MappingJdbcConverter;
+import org.springframework.data.jdbc.core.mapping.JdbcMappingContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.sql.DataSource;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 
@@ -84,9 +80,9 @@ class IntentFlowAutoConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(
-                    DataSourceAutoConfiguration.class,
-                    JdbcTemplateAutoConfiguration.class,
-                    JdbcClientAutoConfiguration.class,
+                    BootAutoConfigurations.DATA_SOURCE,
+                    BootAutoConfigurations.JDBC_TEMPLATE,
+                    BootAutoConfigurations.JDBC_CLIENT,
                     IntentFlowAutoConfiguration.class))
             .withPropertyValues(
                     "spring.datasource.url=jdbc:h2:mem:af;DB_CLOSE_DELAY=-1",
@@ -127,7 +123,7 @@ class IntentFlowAutoConfigurationTest {
     @Test
     void scansMultipleConfiguredPackages() {
         runner.withPropertyValues("intentflow.catalog.packages=" + FIXTURES
-                        + ",io.github.serfom256.intentflow.starter.autoconfigure.other")
+                + ",io.github.serfom256.intentflow.starter.autoconfigure.other")
                 .run(ctx -> assertThat(serviceNames(ctx.getBean(ServiceCatalog.class)))
                         .containsExactly("authors", "books", "magazines"));
     }
@@ -220,11 +216,11 @@ class IntentFlowAutoConfigurationTest {
     @Test
     void bindsProperties() {
         runner.withPropertyValues(
-                        "intentflow.llm.base-url=http://ollama:11434/v1",
-                        "intentflow.llm.api-key=secret",
-                        "intentflow.llm.timeout=5s",
-                        "intentflow.cache.ttl=1h",
-                        "intentflow.cache.max-size=42")
+                "intentflow.llm.base-url=http://ollama:11434/v1",
+                "intentflow.llm.api-key=secret",
+                "intentflow.llm.timeout=5s",
+                "intentflow.cache.ttl=1h",
+                "intentflow.cache.max-size=42")
                 .run(ctx -> {
                     IntentFlowProperties p = ctx.getBean(IntentFlowProperties.class);
                     assertThat(p.llm().baseUrl()).hasToString("http://ollama:11434/v1");
@@ -262,7 +258,8 @@ class IntentFlowAutoConfigurationTest {
         runner.withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books | filter title == \"DUNE\""))
                 .run(ctx -> {
                     JdbcClient jdbc = ctx.getBean(JdbcClient.class);
-                    jdbc.sql("CREATE TABLE \"book\" (\"id\" BIGINT, \"title\" VARCHAR(100), \"price\" DECIMAL(6,2))").update();
+                    jdbc.sql("CREATE TABLE \"book\" (\"id\" BIGINT, \"title\" VARCHAR(100), \"price\" DECIMAL(6,2))")
+                            .update();
                     jdbc.sql("INSERT INTO \"book\" VALUES (7, 'Dune', 9.99), (8, 'Emma', 5.00)").update();
 
                     IntentResponse<Book> response = ctx.getBean(IntentPipeline.class)
@@ -279,7 +276,7 @@ class IntentFlowAutoConfigurationTest {
         runner.withPropertyValues("spring.datasource.url=jdbc:mysql://localhost:3306/shop")
                 .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("mysql"));
         runner.withPropertyValues("spring.datasource.url=jdbc:mariadb://localhost:3306/shop",
-                        "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver")
+                "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver")
                 .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("mysql"));
     }
 
@@ -353,7 +350,7 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void jpaWinsWhenAnEntityManagerFactoryIsPresent() {
-        runner.withConfiguration(AutoConfigurations.of(HibernateJpaAutoConfiguration.class))
+        runner.withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JpaQueryExecutor.class);
@@ -364,7 +361,7 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void executorPropertyForcesTheChoice() {
-        runner.withConfiguration(AutoConfigurations.of(HibernateJpaAutoConfiguration.class))
+        runner.withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
                 .withBean(Procedures.class, () -> mock(Procedures.class))
                 .withPropertyValues("intentflow.executor=jdbc")
                 .run(ctx -> assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class));
@@ -393,7 +390,7 @@ class IntentFlowAutoConfigurationTest {
         runner.withBean(CqlSession.class, () -> mock(CqlSession.class))
                 .withBean(CassandraConverter.class, MappingCassandraConverter::new)
                 .run(ctx -> assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(CassandraQueryExecutor.class));
-        runner.withConfiguration(AutoConfigurations.of(HibernateJpaAutoConfiguration.class))
+        runner.withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
                 .withBean(CqlSession.class, () -> mock(CqlSession.class))
                 .withBean(CassandraConverter.class, MappingCassandraConverter::new)
                 .run(ctx -> {
@@ -430,7 +427,7 @@ class IntentFlowAutoConfigurationTest {
     @Test
     void springDataJdbcWinsOverPlainJdbcWhenItsConverterIsPresent() {
         runner.withBean(JdbcConverter.class, () -> new MappingJdbcConverter(new JdbcMappingContext(),
-                        (identifier, path) -> List.of()))
+                (identifier, path) -> List.of()))
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(SpringDataJdbcQueryExecutor.class);
@@ -457,19 +454,21 @@ class IntentFlowAutoConfigurationTest {
     @Test
     void missingAdapterJarsFallBackToJdbc() {
         runner.withClassLoader(new FilteredClassLoader(OpenMapperQueryExecutor.class, JpaQueryExecutor.class))
-                .withConfiguration(AutoConfigurations.of(HibernateJpaAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
                 .withBean(Procedures.class, () -> mock(Procedures.class))
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class);
-                    assertThat(ctx).doesNotHaveBean(OpenMapperNameResolver.class).doesNotHaveBean(JpaNameResolver.class);
+                    assertThat(ctx).doesNotHaveBean(OpenMapperNameResolver.class)
+                            .doesNotHaveBean(JpaNameResolver.class);
                 });
     }
 
     @Test
     void nameResolversFeedTheCatalogScan() {
-        runner.withPropertyValues("intentflow.catalog.packages=io.github.serfom256.intentflow.starter.autoconfigure.jpa")
-                .withConfiguration(AutoConfigurations.of(HibernateJpaAutoConfiguration.class))
+        runner.withPropertyValues(
+                "intentflow.catalog.packages=io.github.serfom256.intentflow.starter.autoconfigure.jpa")
+                .withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
                 .run(ctx -> {
                     var service = ctx.getBean(ServiceCatalog.class).get(ServiceNames.of("shelves"));
                     assertThat(service.table().value()).isEqualTo("library_shelf");

@@ -124,3 +124,29 @@ GET {{base}}/api/products/search?q=average price of phones
 
 ###
 GET {{base}}/api/search?q=vip customers with a cancelled order&debug=true
+
+### --- Expressions, related sorting and top rows per group ---------------------
+
+### coalesce over the nullable discount: price * (1 - coalesce(discount, 0) / 100) < 500
+GET {{base}}/api/products/search?q=phones under 500 after discount&debug=true
+
+### top 1 per category by rating desc
+GET {{base}}/api/products/search?q=the best rated product in each category&debug=true
+
+### top 2 per brand by an expression
+GET {{base}}/api/products/search?q=the 2 cheapest phones of each brand after discount&debug=true
+
+### relation filter combined with top 1 per customer_id
+GET {{base}}/api/orders/search?q=the latest order of every vip customer&debug=true
+
+### sort by a related field: sort customer.name
+GET {{base}}/api/orders/search?q=paid orders sorted by customer name&debug=true
+
+### one-to-many sort: the largest related total comes first
+GET {{base}}/api/customers/search?q=customers with an order over 5000, biggest order first&debug=true
+
+### group by an expression: group date_trunc("month", created_at) | sum total
+GET {{base}}/api/orders/search?q=revenue per month in 2026&debug=true
+
+### cast: total::bigint
+GET {{base}}/api/orders/search?q=orders whose total in whole dollars is exactly 1000&debug=true

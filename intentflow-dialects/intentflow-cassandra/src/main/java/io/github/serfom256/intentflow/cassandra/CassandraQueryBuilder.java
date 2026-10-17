@@ -2,6 +2,7 @@ package io.github.serfom256.intentflow.cassandra;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
@@ -13,20 +14,28 @@ import io.github.serfom256.intentflow.core.ast.ComparisonOp;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
+import io.github.serfom256.intentflow.core.ast.TopN;
+import io.github.serfom256.intentflow.core.ast.ValueExpr;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
+import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 @RequiredArgsConstructor
 public final class CassandraQueryBuilder implements SqlBuilder {
@@ -45,8 +54,10 @@ public final class CassandraQueryBuilder implements SqlBuilder {
         }
         Map<String, CqlIdentifier> columns = new HashMap<>();
         Set<String> caseSensitive = new HashSet<>();
+        Map<String, FieldType> types = new HashMap<>();
         for (FieldMapping fm : service.fields()) {
             columns.put(fm.logical().value(), CqlIdentifier.fromInternal(fm.column().value()));
+            types.put(fm.logical().value(), fm.type());
             if (fm.caseSensitive()) {
                 caseSensitive.add(fm.logical().value());
             }
@@ -95,20 +106,52 @@ public final class CassandraQueryBuilder implements SqlBuilder {
 
         int limit = ast.take() != null ? ast.take().value() : service.maxTake().value();
         int skip = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
-        RowFilter filter = new RowFilter(ast.filter(), columns, caseSensitive);
+        CqlExpressions expressions = new CqlExpressions(columns, types);
+        RowFilter filter = new RowFilter(ast.filter(), columns, caseSensitive, expressions);
         Aggregate aggregate = ast.aggregate();
         if (aggregate == null) {
             return new CassandraQuery(segments, parameters, bindValues, filter,
-                    RowOrder.of(query.effectiveSort(), columns), skip, limit);
+                    RowOrder.of(query.effectiveSort(), columns, expressions), skip, limit, null,
+                    top(query, columns, expressions));
         }
-        List<String> rowColumns = new ArrayList<>(aggregate.groupBy().stream().map(LogicalFieldName::value).toList());
+        List<String> rowColumns = new ArrayList<>(aggregate.groupNames());
         rowColumns.add(ValidatedQuery.valueField(aggregate).value());
         CassandraAggregate spec = new CassandraAggregate(
                 aggregate.function(),
-                aggregate.groupBy().stream().map(f -> columns.get(f.value())).toList(),
-                aggregate.field() == null ? null : columns.get(aggregate.field().value()),
+                aggregate.groupBy().stream()
+                        .<Function<Row, @Nullable Object>>map(
+                                g -> row -> expressions.eval(g, row))
+                        .toList(),
+                aggregate.argument() == null ? null : row -> expressions.eval(aggregate.argument(), row),
                 RowOrder.ofValues(query.effectiveSort(), rowColumns));
-        return new CassandraQuery(segments, parameters, bindValues, filter, null, skip, limit, spec);
+        return new CassandraQuery(segments, parameters, bindValues, filter, null, skip, limit, spec, null);
+    }
+
+    private static @Nullable UnaryOperator<List<Row>> top(ValidatedQuery query, Map<String, CqlIdentifier> columns,
+            CqlExpressions expressions) {
+        TopN top = query.ast().top();
+        if (top == null) {
+            return null;
+        }
+        Comparator<Row> order = RowOrder.of(query.topOrder(), columns, expressions);
+        return rows -> {
+            Map<List<Object>, List<Row>> partitions = new LinkedHashMap<>();
+            for (Row row : rows) {
+                List<Object> key = new ArrayList<>(top.partition().size());
+                for (ValueExpr part : top.partition()) {
+                    key.add(expressions.eval(part, row));
+                }
+                partitions.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+            }
+            List<Row> kept = new ArrayList<>();
+            for (List<Row> partition : partitions.values()) {
+                if (order != null) {
+                    partition.sort(order);
+                }
+                kept.addAll(partition.subList(0, Math.min(top.count(), partition.size())));
+            }
+            return kept;
+        };
     }
 
     private TableMetadata table(String name) {

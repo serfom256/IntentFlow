@@ -4,8 +4,10 @@ import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.AggregateFunction;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
+import io.github.serfom256.intentflow.core.ast.Expressions;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
+import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentRelation;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
@@ -39,7 +41,7 @@ class RelationsAndAggregatesTest {
     @IntentService(value = "orders", table = "orders", uri = "/orders/{{id}}", defaultSort = "id")
     @IntentRelation(name = "customer", service = "customers", from = "customer_id", to = "id")
     record Order(@IntentField long id, @IntentField long customerId, @IntentField String status,
-                 @IntentField BigDecimal total) {
+            @IntentField BigDecimal total) {
     }
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
@@ -59,8 +61,8 @@ class RelationsAndAggregatesTest {
         AstQuery q = parse("orders | filter customer.country == \"DE\" | group status | sum total | sort sum desc");
 
         assertThat(q.aggregate().function()).isEqualTo(AggregateFunction.SUM);
-        assertThat(q.aggregate().field().value()).isEqualTo("total");
-        assertThat(q.aggregate().groupBy()).extracting(f -> f.value()).containsExactly("status");
+        assertThat(Expressions.print(q.aggregate().argument())).isEqualTo("total");
+        assertThat(q.aggregate().groupNames()).containsExactly("status");
         assertThat(q.sort().getFirst().field().value()).isEqualTo("sum");
     }
 
@@ -102,7 +104,8 @@ class RelationsAndAggregatesTest {
 
     @Test
     void sortsGetTheDefaultSortAsTieBreaker() {
-        assertThat(sql("orders | sort status desc").sql()).endsWith("ORDER BY \"status\" DESC NULLS LAST, \"id\" ASC LIMIT 50");
+        assertThat(sql("orders | sort status desc").sql())
+                .endsWith("ORDER BY \"status\" DESC NULLS LAST, \"id\" ASC LIMIT 50");
         assertThat(sql("orders | sort id desc").sql()).endsWith("ORDER BY \"id\" DESC NULLS LAST LIMIT 50");
     }
 
@@ -121,7 +124,8 @@ class RelationsAndAggregatesTest {
     void validatorRejectsWrongAggregatesAndRelations() {
         assertThatThrownBy(() -> sql("orders | sum status")).isInstanceOf(ValidationException.class)
                 .hasMessageContaining("sum needs a number field");
-        assertThatThrownBy(() -> sql("orders | group status | count | sort total")).isInstanceOf(ValidationException.class)
+        assertThatThrownBy(() -> sql("orders | group status | count | sort total"))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("sort by 'count' or a group field");
         assertThatThrownBy(() -> sql("orders | group customer.country | count")).isInstanceOf(ValidationException.class)
                 .hasMessageContaining("related field");
@@ -161,6 +165,6 @@ class RelationsAndAggregatesTest {
         assertThat(pipeline.resolve(IntentRequests.of("count"), Order.class).trace().cached()).isTrue();
 
         assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("other"), Order.class))
-                .isInstanceOf(io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException.class);
+                .isInstanceOf(ServiceNotFoundException.class);
     }
 }

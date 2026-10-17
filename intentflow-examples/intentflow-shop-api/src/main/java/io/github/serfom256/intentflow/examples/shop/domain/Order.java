@@ -19,8 +19,8 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Model(primaryKey = "id")
-@IntentService(value = "orders", table = "orders", uri = "/orders/{{id}}", maxTake = 50,
-        defaultSort = {"created_at desc", "id desc"}, description = "Customer orders")
+@IntentService(value = "orders", table = "orders", uri = "/orders/{{id}}", maxTake = 50, defaultSort = {
+        "created_at desc", "id desc" }, description = "Customer orders")
 @IntentRelation(name = "customer", service = "customers", from = "customer_id", to = "id")
 public class Order {
 

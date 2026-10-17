@@ -4,6 +4,7 @@ import io.github.serfom256.intentflow.core.api.AggregateRow;
 import io.github.serfom256.intentflow.core.api.Aggregation;
 import io.github.serfom256.intentflow.core.api.IntentRequest;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
+import io.github.serfom256.intentflow.core.api.IntentTrace;
 import io.github.serfom256.intentflow.core.api.MicroFrontendUri;
 import io.github.serfom256.intentflow.core.api.UserText;
 import io.github.serfom256.intentflow.core.api.factories.IntentResponses;
@@ -11,6 +12,7 @@ import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.DslSource;
+import io.github.serfom256.intentflow.core.ast.Expressions;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
@@ -25,6 +27,7 @@ import io.github.serfom256.intentflow.core.pipeline.LlmClient;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
+import io.github.serfom256.intentflow.core.pipeline.UnsupportedRequestException;
 import io.github.serfom256.intentflow.core.pipeline.UriBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import lombok.RequiredArgsConstructor;
@@ -50,27 +53,53 @@ public final class DefaultIntentPipeline implements IntentPipeline {
 
     @Override
     public IntentResponse<?> resolve(IntentRequest request) {
-        return run(request, catalog, null);
+        return execute(compile(request, catalog, null));
     }
-
 
     @Override
     public <T> IntentResponse<T> resolve(IntentRequest request, Class<T> resultType) {
-        ServiceDescriptor service = catalog.findByType(resultType).orElseThrow(() -> new IllegalArgumentException(
+        ServiceDescriptor service = serviceFor(resultType);
+        return execute(compile(request, scopeOf(service), service));
+    }
+
+    @Override
+    public IntentTrace explain(IntentRequest request) {
+        return compile(request, catalog, null).trace();
+    }
+
+    @Override
+    public IntentTrace explain(IntentRequest request, Class<?> resultType) {
+        ServiceDescriptor service = serviceFor(resultType);
+        return compile(request, scopeOf(service), service).trace();
+    }
+
+    private record Compiled(UserText question, DslSource dsl, boolean cached, ValidatedQuery validated,
+            BoundQuery query, long startNanos) {
+
+        IntentTrace trace() {
+            return IntentResponses.trace(dsl.value(), cached, query.sql(), new ArrayList<>(query.values()),
+                    query.optimizations());
+        }
+    }
+
+    private ServiceDescriptor serviceFor(Class<?> resultType) {
+        return catalog.findByType(resultType).orElseThrow(() -> new IllegalArgumentException(
                 "No IntentFlow service maps to " + resultType.getName()));
+    }
+
+    private ServiceCatalog scopeOf(ServiceDescriptor service) {
         List<ServiceDescriptor> scope = new ArrayList<>();
         scope.add(service);
         for (ServiceRelation relation : service.relations()) {
             catalog.find(relation.target()).filter(t -> !scope.contains(t)).ifPresent(scope::add);
         }
-        return run(request, ServiceCatalogs.of(scope), service);
+        return ServiceCatalogs.of(scope);
     }
 
-    private <T> IntentResponse<T> run(IntentRequest request, ServiceCatalog scope,
-                                      @Nullable ServiceDescriptor expected) {
+    private Compiled compile(IntentRequest request, ServiceCatalog scope, @Nullable ServiceDescriptor expected) {
         long start = System.nanoTime();
         UserText normalized = normalizer.normalize(request.text());
-        DslCacheKey key = new DslCacheKey(normalized, expected == null ? null : expected.name());
+        DslCacheKey key = new DslCacheKey(normalized, expected == null ? null : expected.name(), catalog.version());
 
         DslSource dsl = cache.get(key).orElse(null);
         boolean cached = dsl != null;
@@ -80,29 +109,46 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             long llmStart = System.nanoTime();
             dsl = llm.generateDsl(normalized, scope);
             log.debug("LLM translated '{}' in {} ms: {}", normalized.value(), millisSince(llmStart), dsl.value());
+        }
+
+        ValidatedQuery validated;
+        try {
+            AstQuery ast = parser.parse(dsl);
+            if (expected != null && !ast.service().equals(expected.name())) {
+                throw new ServiceNotFoundException(ast.service());
+            }
+            validated = validator.validate(ast, catalog);
+        } catch (UnsupportedRequestException declined) {
+            log.debug("Declined '{}': {}", normalized.value(), declined.getMessage());
+            if (!cached) {
+                cache.put(key, dsl);
+            }
+            throw declined;
+        } catch (RuntimeException rejected) {
+            log.debug("Rejected DSL for '{}': {} ({})", normalized.value(), dsl.value(), rejected.getMessage());
+            throw rejected;
+        }
+        if (!cached) {
             cache.put(key, dsl);
         }
-
-        AstQuery ast = parser.parse(dsl);
-        if (expected != null && !ast.service().equals(expected.name())) {
-            throw new ServiceNotFoundException(ast.service());
-        }
-        ValidatedQuery validated = validator.validate(ast, catalog);
-        BoundQuery query = sqlBuilder.build(validated);
+        BoundQuery query = sqlBuilder.build(validated, executor.shape(validated.service().resultType()));
         log.debug("Query: {} binds={}", query.sql(), query.values());
+        return new Compiled(normalized, dsl, cached, validated, query, start);
+    }
 
+    private <T> IntentResponse<T> execute(Compiled compiled) {
+        ValidatedQuery validated = compiled.validated();
+        BoundQuery query = compiled.query();
         @SuppressWarnings("unchecked")
         Class<T> type = (Class<T>) validated.service().resultType();
-        Aggregate aggregate = ast.aggregate();
+        Aggregate aggregate = validated.ast().aggregate();
         List<T> items = aggregate == null ? executor.execute(query, type) : List.of();
         Aggregation aggregation = aggregate == null ? null : aggregation(aggregate, executor.rows(query));
         MicroFrontendUri uri = uriBuilder.build(validated, items);
-        log.debug("Resolved '{}' to {} with {} {} in {} ms", normalized.value(), uri.value(),
+        log.debug("Resolved '{}' to {} with {} {} in {} ms", compiled.question().value(), uri.value(),
                 aggregation == null ? items.size() : aggregation.rows().size(),
-                aggregation == null ? type.getSimpleName() : "groups", millisSince(start));
-        List<Object> parameters = new ArrayList<>(query.values());
-        return IntentResponses.of(validated.service().name(), type, items, uri, aggregation,
-                IntentResponses.trace(dsl.value(), cached, query.sql(), parameters));
+                aggregation == null ? type.getSimpleName() : "groups", millisSince(compiled.startNanos()));
+        return IntentResponses.of(validated.service().name(), type, items, uri, aggregation, compiled.trace());
     }
 
     private static Aggregation aggregation(Aggregate aggregate, List<List<@Nullable Object>> rows) {
@@ -120,8 +166,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             out.add(new AggregateRow(group, AggregateValues.normalize(row.get(groups))));
         }
         return new Aggregation(aggregate.function().keyword(),
-                aggregate.field() == null ? null : aggregate.field().value(),
-                aggregate.groupBy().stream().map(f -> f.value()).toList(), out);
+                aggregate.argument() == null ? null : Expressions.print(aggregate.argument()),
+                aggregate.groupNames(), out);
     }
 
     private static long millisSince(long nanoStart) {

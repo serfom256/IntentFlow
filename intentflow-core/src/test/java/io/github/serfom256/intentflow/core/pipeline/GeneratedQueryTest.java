@@ -1,14 +1,12 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
-import io.github.serfom256.intentflow.dialect.mysql.MySqlDialect;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoolLiteral;
+import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
-import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -31,6 +29,8 @@ import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.testing.RandomQueries;
+import io.github.serfom256.intentflow.dialect.mysql.MySqlDialect;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -58,9 +58,12 @@ class GeneratedQueryTest {
                     FieldMappings.of(LogicalFieldNames.of("name"), ColumnNames.of("item_name"), true, FieldType.TEXT),
                     FieldMappings.of(LogicalFieldNames.of("category"), ColumnNames.of("cat"), true, FieldType.TEXT,
                             null, List.of("LAPTOP", "PHONE", "SMART_WATCH")),
-                    FieldMappings.of(LogicalFieldNames.of("price"), ColumnNames.of("price_usd"), true, FieldType.NUMBER),
-                    FieldMappings.of(LogicalFieldNames.of("active"), ColumnNames.of("is_active"), true, FieldType.BOOLEAN),
-                    FieldMappings.of(LogicalFieldNames.of("created"), ColumnNames.of("created_at"), true, FieldType.TIMESTAMP),
+                    FieldMappings.of(LogicalFieldNames.of("price"), ColumnNames.of("price_usd"), true,
+                            FieldType.NUMBER),
+                    FieldMappings.of(LogicalFieldNames.of("active"), ColumnNames.of("is_active"), true,
+                            FieldType.BOOLEAN),
+                    FieldMappings.of(LogicalFieldNames.of("created"), ColumnNames.of("created_at"), true,
+                            FieldType.TIMESTAMP),
                     FieldMappings.of(LogicalFieldNames.of("notes"), ColumnNames.of("notes"), true),
                     FieldMappings.of(LogicalFieldNames.of("secret"), ColumnNames.of("secret"), false, FieldType.TEXT)),
             List.of(SortKeys.of(LogicalFieldNames.of("id"), SortKey.Direction.ASC)),
@@ -70,12 +73,16 @@ class GeneratedQueryTest {
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(ITEMS);
     private static final Set<String> IDENTIFIERS = Set.of(
-            "item_table", "item_id", "item_name", "cat", "price_usd", "is_active", "created_at", "notes", "secret");
+            "item_table", "item_id", "item_name", "cat", "price_usd", "is_active", "created_at", "notes", "secret",
+            "intentflow_rank");
 
     private static final Pattern SQL_TOKEN = Pattern.compile(
-            "\\s+|\"(?:[^\"]|\"\")+\"|`(?:[^`]|``)+`|\\?|\\*|,|\\(|\\)|<>|<=|>=|=|<|>|'\\\\'|'!'|\\d+"
-                    + "|(?:SELECT|FROM|WHERE|AND|OR|NOT|IN|IS|NULL|LOWER|CAST|AS|TIMESTAMP|DATETIME|ILIKE|LIKE"
-                    + "|ESCAPE|ORDER|BY|ASC|DESC|NULLS|LAST|LIMIT|OFFSET)\\b");
+            "\\s+|\"(?:[^\"]|\"\")+\"|`(?:[^`]|``)+`|\\?|\\.|\\*|\\+|-|/|,|\\(|\\)|<>|<=|>=|=|<|>|'\\\\'|'!'"
+                    + "|'(?:year|month|day|hour)'|'%[A-Za-z0-9%: -]+'|\\d+"
+                    + "|(?:SELECT|FROM|WHERE|AND|OR|NOT|IN|IS|NULL|LOWER|UPPER|CAST|AS|TIMESTAMP|DATETIME|ILIKE|LIKE"
+                    + "|ESCAPE|ORDER|BY|ASC|DESC|NULLS|LAST|LIMIT|OFFSET|COALESCE|EXTRACT|YEAR|MONTH|DAY|HOUR"
+                    + "|DATE_TRUNC|DATE_FORMAT|DATE|CHAR_LENGTH|ROUND|ABS|NUMERIC|BIGINT|TEXT|DECIMAL|SIGNED|CHAR"
+                    + "|NULLIF|ROW_NUMBER|OVER|PARTITION|BINARY)\\b");
 
     private final DslParser parser = DslParsers.create();
     private final AstValidator validator = AstValidators.create();
@@ -115,7 +122,10 @@ class GeneratedQueryTest {
 
             assertThat(count(text, '?')).as("placeholders vs binds: %s", dsl).isEqualTo(sql.parameters().size());
             assertOnlyKnownTokens(text, dsl);
-            assertThat(text).as(dsl).startsWith("SELECT * FROM \"item_table\"").contains(" LIMIT ");
+            assertThat(text).as(dsl)
+                    .startsWith(
+                            q.top() == null ? "SELECT * FROM \"item_table\"" : "SELECT * FROM (SELECT \"item_table\".*")
+                    .contains(" LIMIT ");
             for (DslLiteral p : sql.parameters()) {
                 assertThat(p).as(dsl).isNotNull();
             }
@@ -124,7 +134,9 @@ class GeneratedQueryTest {
             assertThat(count(mysql.sql(), '?')).as("MySQL placeholders vs binds: %s", dsl)
                     .isEqualTo(mysql.parameters().size());
             assertOnlyKnownTokens(mysql.sql(), dsl);
-            assertThat(mysql.sql()).as(dsl).startsWith("SELECT * FROM `item_table`").doesNotContain("\"");
+            assertThat(mysql.sql()).as(dsl)
+                    .startsWith(q.top() == null ? "SELECT * FROM `item_table`" : "SELECT * FROM (SELECT `item_table`.*")
+                    .doesNotContain("\"");
         }
     }
 
@@ -175,7 +187,8 @@ class GeneratedQueryTest {
     @Test
     void containsBindsAreWrappedAndEscaped() {
         AstQuery q = AstQueries.of(ITEMS.name(),
-                new Compare(LogicalFieldNames.of("name"), ComparisonOp.CONTAINS, new TextLiteral("50%_off\\")), List.of(), null, null);
+                new Compare(LogicalFieldNames.of("name"), ComparisonOp.CONTAINS, new TextLiteral("50%_off\\")),
+                List.of(), null, null);
 
         BoundQuery sql = sqlBuilder.build(validator.validate(q, CATALOG));
 

@@ -24,13 +24,15 @@ class BoundQueryTest {
 
     @Test
     void customPlaceholderStylesAreOneBased() {
-        assertThat(QUERY.render(i -> "?" + i)).isEqualTo("select * from book where year >= ?1 and title = ?2 and flag = ?3");
+        assertThat(QUERY.render(i -> "?" + i))
+                .isEqualTo("select * from book where year >= ?1 and title = ?2 and flag = ?3");
         assertThat(QUERY.render(i -> "[p" + i + "]")).endsWith("title = [p2] and flag = [p3]");
     }
 
     @Test
     void valuesArePlainJavaObjects() {
-        BoundQuery withNull = BoundQueries.of(List.of("a ", " b ", ""), List.of(new NullLiteral(), new TextLiteral("x")));
+        BoundQuery withNull = BoundQueries.of(List.of("a ", " b ", ""),
+                List.of(new NullLiteral(), new TextLiteral("x")));
 
         assertThat(QUERY.values()).containsExactly(new BigDecimal("2000"), "Dune", true);
         assertThat(withNull.values()).isEqualTo(Arrays.asList(null, "x"));

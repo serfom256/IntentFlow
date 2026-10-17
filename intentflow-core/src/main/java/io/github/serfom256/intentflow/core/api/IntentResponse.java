@@ -1,7 +1,6 @@
 package io.github.serfom256.intentflow.core.api;
 
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
-
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -20,16 +19,25 @@ public interface IntentResponse<T> {
     /** Entity class of {@link #items()}. */
     Class<T> type();
 
-    /** Matching entities, in query order. Empty when nothing matched or the query aggregated. */
+    /**
+     * Matching entities, in query order. Empty when nothing matched or the query
+     * aggregated.
+     */
     List<T> items();
 
-    /** Grouped or aggregated values when the query used {@code count}, {@code sum} and so on. */
+    /**
+     * Grouped or aggregated values when the query used {@code count}, {@code sum}
+     * and so on.
+     */
     @Nullable
     Aggregation aggregation();
 
     /** The DSL and statement behind this response. */
     IntentTrace trace();
 
-    /** The first match ({@code /products/12}), or the collection ({@code /products}) when nothing matched. */
+    /**
+     * The first match ({@code /products/12}), or the collection ({@code /products})
+     * when nothing matched.
+     */
     MicroFrontendUri uri();
 }

@@ -1,10 +1,10 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.api.UserText;
-import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.api.factories.UserTexts;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
+import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
 import org.junit.jupiter.api.Test;
 
@@ -146,8 +146,10 @@ class DslCacheTest {
                             case 1 -> c.get(k);
                             case 2 -> c.invalidate(k);
                             case 3 -> {
-                                if (i % 100 == 0) c.invalidateAll();
-                                else c.get(k);
+                                if (i % 100 == 0)
+                                    c.invalidateAll();
+                                else
+                                    c.get(k);
                             }
                         }
                     }

@@ -1,7 +1,10 @@
 package io.github.serfom256.intentflow.core.catalog;
 
+import io.github.serfom256.intentflow.core.schema.TableFacts;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,8 +24,38 @@ public interface NameResolver {
         return Optional.empty();
     }
 
-    /** Column of a property declared as a method, as on interface-based entities. */
+    /**
+     * Column of a property declared as a method, as on interface-based entities.
+     */
     default Optional<String> columnName(Method method) {
+        return Optional.empty();
+    }
+
+    /**
+     * Associations the mapper declares on {@code type}, such as JPA
+     * {@code @ManyToOne} or OpenMapper
+     * {@code @Joined}. They become relations unless an {@code @IntentRelation} with
+     * the same name exists.
+     */
+    default List<DiscoveredRelation> relations(Class<?> type) {
+        return List.of();
+    }
+
+    /**
+     * Physical facts the ORM knows about the entity's table, such as its primary
+     * key and NOT NULL columns. They
+     * complement facts read from the database.
+     */
+    default TableFacts facts(Class<?> type) {
+        return TableFacts.UNKNOWN;
+    }
+
+    /**
+     * SQL condition the ORM applies to every query of the entity, such as a
+     * soft-delete condition; IntentFlow ANDs
+     * it into the SQL it generates.
+     */
+    default Optional<String> restriction(Class<?> type) {
         return Optional.empty();
     }
 }

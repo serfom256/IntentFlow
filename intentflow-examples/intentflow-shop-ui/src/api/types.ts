@@ -10,6 +10,7 @@ export interface Product {
   brand: string;
   category: Category;
   price: number;
+  discount: number | null;
   rating: number;
   stock: number;
   active: boolean;
@@ -41,6 +42,7 @@ export interface ProductRequest {
   brand: string;
   category: Category;
   price: number;
+  discount: number | null;
   rating: number;
   stock: number;
   active: boolean;

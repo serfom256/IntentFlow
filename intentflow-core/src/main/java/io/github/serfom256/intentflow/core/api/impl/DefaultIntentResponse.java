@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 
 public record DefaultIntentResponse<T>(ServiceName service, Class<T> type, List<T> items, MicroFrontendUri uri,
-                                       @Nullable Aggregation aggregation, IntentTrace trace)
+        @Nullable Aggregation aggregation, IntentTrace trace)
         implements IntentResponse<T> {
 
     public DefaultIntentResponse {

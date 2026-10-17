@@ -1,5 +1,7 @@
 package io.github.serfom256.intentflow.jdbc;
 
+import io.github.serfom256.intentflow.core.ast.NumberLiteral;
+import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -21,7 +23,9 @@ class JdbcMappingStylesIT {
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.4");
 
-    enum Status { ACTIVE, RETIRED }
+    enum Status {
+        ACTIVE, RETIRED
+    }
 
     record AsRecord(long id, String fullName, Status status, BigDecimal price, Integer stock, Instant createdAt) {
     }
@@ -105,8 +109,8 @@ class JdbcMappingStylesIT {
     @Test
     void parametersAreBoundPositionally() {
         var query = BoundQueries.of(List.of("SELECT * FROM item WHERE LOWER(full_name) = LOWER(", ") AND id < ", ""),
-                List.of(new io.github.serfom256.intentflow.core.ast.TextLiteral("GADGET"),
-                        new io.github.serfom256.intentflow.core.ast.NumberLiteral(BigDecimal.TEN)));
+                List.of(new TextLiteral("GADGET"),
+                        new NumberLiteral(BigDecimal.TEN)));
         assertThat(executor.execute(query, AsRecord.class)).extracting(AsRecord::id).containsExactly(2L);
     }
 }

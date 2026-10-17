@@ -61,6 +61,10 @@ const examples: { service: ServiceName; question: string }[] = [
   { service: "orders", question: "how many orders are there per status?" },
   { service: "customers", question: "customers who have a cancelled order" },
   { service: "products", question: "products with ultra in the name" },
+  { service: "products", question: "the 2 cheapest phones of each brand after discount" },
+  { service: "orders", question: "the latest order of every vip customer" },
+  { service: "orders", question: "revenue per month in 2026" },
+  { service: "customers", question: "customers with an order over 5000, biggest order first" },
 ];
 
 export function SearchPage() {
@@ -245,13 +249,15 @@ function Results({ result }: { result: SearchResult }) {
           {result.trace ? <TracePanel trace={result.trace} tookMs={result.tookMs} /> : null}
         </Tabs.Panel>
       </Tabs>
-      {count === 50 && !result.aggregation && (
+      {count === 50 && (
         <Group mt="md" gap={6}>
           <ActionIcon variant="transparent" color="gray" size="xs">
             <IconTable size={14} />
           </ActionIcon>
           <Text size="xs" c="dimmed">
-            Showing the first 50 matches; refine the question to narrow them down
+            {result.aggregation
+              ? "Showing the first 50 groups; refine the question to narrow them down"
+              : "Showing the first 50 matches; refine the question to narrow them down"}
           </Text>
         </Group>
       )}

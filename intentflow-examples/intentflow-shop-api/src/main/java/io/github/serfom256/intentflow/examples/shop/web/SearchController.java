@@ -19,7 +19,7 @@ public class SearchController {
 
     @GetMapping
     public SearchResult<?> search(@RequestParam("q") @NotBlank @Size(max = 500) String query,
-                                  @RequestParam(defaultValue = "false") boolean debug) {
+            @RequestParam(defaultValue = "false") boolean debug) {
         return searchService.search(query, debug);
     }
 }

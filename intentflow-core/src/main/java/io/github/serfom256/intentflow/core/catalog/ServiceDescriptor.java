@@ -21,10 +21,15 @@ public interface ServiceDescriptor {
 
     UriTemplate uriTemplate();
 
-    /** Entity class the {@code QueryExecutor} maps rows of {@link #table()} into. */
+    /**
+     * Entity class the {@code QueryExecutor} maps rows of {@link #table()} into.
+     */
     Class<?> resultType();
 
-    /** Links to other services whose fields can be filtered on as {@code relation.field}. */
+    /**
+     * Links to other services whose fields can be filtered on as
+     * {@code relation.field}.
+     */
     default List<ServiceRelation> relations() {
         return List.of();
     }

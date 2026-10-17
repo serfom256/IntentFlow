@@ -18,8 +18,7 @@ import java.time.OffsetDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Model(primaryKey = "id")
-@IntentService(value = "products", table = "product", uri = "/products/{{id}}", maxTake = 50,
-        defaultSort = "id", description = "Items sold in the shop")
+@IntentService(value = "products", table = "product", uri = "/products/{{id}}", maxTake = 50, defaultSort = "id", description = "Items sold in the shop")
 public class Product {
 
     @Field
@@ -37,12 +36,16 @@ public class Product {
     private String brand;
 
     @Field
-    @IntentField
+    @IntentField(description = "kind of product; words such as laptops, phones, tablets or headphones mean this field")
     private Category category;
 
     @Field
     @IntentField(description = "retail price in USD")
     private BigDecimal price;
+
+    @Field
+    @IntentField(description = "discount in percent of price; null when the product is not discounted")
+    private @Nullable BigDecimal discount;
 
     @Field
     @IntentField(description = "average customer rating from 0 to 5")

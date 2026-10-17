@@ -83,7 +83,8 @@ public final class DefaultLexer implements Lexer {
                 continue;
             }
 
-            boolean negative = c == '-' && i + 1 < n && Character.isDigit(s.charAt(i + 1));
+            boolean negative = c == '-' && i + 1 < n && Character.isDigit(s.charAt(i + 1))
+                    && !endsValue(tokens);
             if (Character.isDigit(c) || negative) {
                 if (negative) {
                     i++;
@@ -154,6 +155,13 @@ public final class DefaultLexer implements Lexer {
                 continue;
             }
 
+            if (c == ':' && i + 1 < n && s.charAt(i + 1) == ':') {
+                tokens.add(new PunctuationToken(Punctuation.DOUBLE_COLON, pos));
+                i += 2;
+                column += 2;
+                continue;
+            }
+
             if (i + 1 < n) {
                 char c2 = s.charAt(i + 1);
                 Operator twoChar = switch ("" + c + c2) {
@@ -190,6 +198,10 @@ public final class DefaultLexer implements Lexer {
                 case ')' -> Punctuation.RPAREN;
                 case ',' -> Punctuation.COMMA;
                 case '.' -> Punctuation.DOT;
+                case '+' -> Punctuation.PLUS;
+                case '-' -> Punctuation.MINUS;
+                case '*' -> Punctuation.STAR;
+                case '/' -> Punctuation.SLASH;
                 default -> null;
             };
             if (p != null) {
@@ -205,6 +217,18 @@ public final class DefaultLexer implements Lexer {
 
         tokens.add(new EofToken(Positions.of(i, line, column)));
         return List.copyOf(tokens);
+    }
+
+    private static boolean endsValue(List<Token> tokens) {
+        if (tokens.isEmpty()) {
+            return false;
+        }
+        Token last = tokens.getLast();
+        return last instanceof IdentifierToken || last instanceof NumberToken || last instanceof StringToken
+                || (last instanceof PunctuationToken p && p.punctuation() == Punctuation.RPAREN)
+                || (last instanceof KeywordToken k
+                        && (k.keyword() == Keyword.TRUE || k.keyword() == Keyword.FALSE
+                                || k.keyword() == Keyword.NULL));
     }
 
     private static boolean isIdentStart(char c) {

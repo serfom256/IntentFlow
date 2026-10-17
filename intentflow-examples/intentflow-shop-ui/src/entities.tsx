@@ -30,7 +30,16 @@ export type FormField =
       pattern?: RegExp;
       patternMessage?: string;
     }
-  | { name: string; label: string; kind: "number"; min?: number; max?: number; step?: number; decimals?: number }
+  | {
+      name: string;
+      label: string;
+      kind: "number";
+      min?: number;
+      max?: number;
+      step?: number;
+      decimals?: number;
+      optional?: boolean;
+    }
   | { name: string; label: string; kind: "select"; options: readonly string[] }
   | { name: string; label: string; kind: "switch" };
 
@@ -79,7 +88,23 @@ export const productEntity: EntityDefinition<Product, ProductRequest> = {
       ),
     },
     { key: "category", label: "Category", render: (p) => <Badge variant="light">{p.category}</Badge> },
-    { key: "price", label: "Price", align: "right", render: (p) => formatMoney(p.price) },
+    {
+      key: "price",
+      label: "Price",
+      align: "right",
+      render: (p) =>
+        p.discount === null ? (
+          formatMoney(p.price)
+        ) : (
+          <div>
+            <Text size="sm">{formatMoney(p.price * (1 - p.discount / 100))}</Text>
+            <Group gap={4} justify="flex-end" wrap="nowrap">
+              <Text size="xs" c="dimmed" td="line-through">{formatMoney(p.price)}</Text>
+              <Badge size="xs" color="orange" variant="light">-{p.discount}%</Badge>
+            </Group>
+          </div>
+        ),
+    },
     {
       key: "rating",
       label: "Rating",
@@ -109,17 +134,19 @@ export const productEntity: EntityDefinition<Product, ProductRequest> = {
     { name: "brand", label: "Brand", kind: "text", maxLength: 60 },
     { name: "category", label: "Category", kind: "select", options: categories },
     { name: "price", label: "Price, USD", kind: "number", min: 0, step: 1, decimals: 2 },
+    { name: "discount", label: "Discount, %", kind: "number", min: 0, max: 90, step: 5, decimals: 1, optional: true },
     { name: "rating", label: "Rating", kind: "number", min: 0, max: 5, step: 0.1, decimals: 1 },
     { name: "stock", label: "Stock", kind: "number", min: 0, step: 1, decimals: 0 },
     { name: "supplierCost", label: "Supplier cost, USD", kind: "number", min: 0, step: 1, decimals: 2 },
     { name: "active", label: "Active", kind: "switch" },
   ],
-  empty: { name: "", brand: "", category: "LAPTOP", price: 0, rating: 0, stock: 0, supplierCost: 0, active: true },
+  empty: { name: "", brand: "", category: "LAPTOP", price: 0, discount: "", rating: 0, stock: 0, supplierCost: 0, active: true },
   toValues: (p) => ({
     name: p.name,
     brand: p.brand,
     category: p.category,
     price: p.price,
+    discount: p.discount ?? "",
     rating: p.rating,
     stock: p.stock,
     supplierCost: p.supplierCost,
@@ -130,6 +157,7 @@ export const productEntity: EntityDefinition<Product, ProductRequest> = {
     brand: String(v.brand),
     category: v.category as ProductRequest["category"],
     price: Number(v.price),
+    discount: v.discount === "" ? null : Number(v.discount),
     rating: Number(v.rating),
     stock: Number(v.stock),
     supplierCost: Number(v.supplierCost),
@@ -140,6 +168,8 @@ export const productEntity: EntityDefinition<Product, ProductRequest> = {
     "the 3 most expensive monitors",
     "headphones rated 4.5 or higher",
     "average price per category",
+    "phones under 500 after discount",
+    "the best rated product in each category",
   ],
 };
 
@@ -190,6 +220,8 @@ export const customerEntity: EntityDefinition<Customer, CustomerRequest> = {
     "vip customers who joined this year",
     "customers who have a cancelled order",
     "how many customers are vip",
+    "customers with an order over 5000, biggest order first",
+    "the newest customer in each country",
   ],
 };
 
@@ -227,6 +259,9 @@ export const orderEntity: EntityDefinition<Order, OrderRequest> = {
     "delivered orders from vip customers",
     "how many orders are there per status?",
     "orders placed in the last 3 months",
+    "the latest order of every vip customer",
+    "revenue per month in 2026",
+    "paid orders sorted by customer name",
   ],
 };
 

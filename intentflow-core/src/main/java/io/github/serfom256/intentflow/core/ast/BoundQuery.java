@@ -19,7 +19,10 @@ public interface BoundQuery {
 
     List<DslLiteral> parameters();
 
-    /** Joins the segments, asking {@code placeholder} for the text of each parameter (1-based). */
+    /**
+     * Joins the segments, asking {@code placeholder} for the text of each parameter
+     * (1-based).
+     */
     default String render(IntFunction<String> placeholder) {
         StringBuilder sb = new StringBuilder(segments().getFirst());
         for (int i = 1; i < segments().size(); i++) {
@@ -29,11 +32,22 @@ public interface BoundQuery {
     }
 
     /** JDBC form with {@code ?} placeholders. */
+    /**
+     * Names of the optimizations applied while building the statement, for traces
+     * and debugging.
+     */
+    default List<String> optimizations() {
+        return List.of();
+    }
+
     default String sql() {
         return render(i -> "?");
     }
 
-    /** Parameter values as plain Java objects: {@code String}, {@code BigDecimal}, {@code Boolean} or {@code null}. */
+    /**
+     * Parameter values as plain Java objects: {@code String}, {@code BigDecimal},
+     * {@code Boolean} or {@code null}.
+     */
     default List<@Nullable Object> values() {
         List<@Nullable Object> values = new ArrayList<>(parameters().size());
         for (DslLiteral p : parameters()) {

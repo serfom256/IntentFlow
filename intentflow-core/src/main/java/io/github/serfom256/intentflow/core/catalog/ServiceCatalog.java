@@ -18,9 +18,11 @@ public interface ServiceCatalog {
     int version();
 
     /**
-     * The service whose {@link ServiceDescriptor#resultType()} is exactly {@code type}.
+     * The service whose {@link ServiceDescriptor#resultType()} is exactly
+     * {@code type}.
      *
-     * @throws IllegalStateException when several services share that type (resolve by name instead)
+     * @throws IllegalStateException when several services share that type (resolve
+     *                               by name instead)
      */
     default Optional<ServiceDescriptor> findByType(Class<?> type) {
         List<ServiceDescriptor> matches = names().stream().map(this::get)
