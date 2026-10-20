@@ -34,7 +34,7 @@ intentflow_dep() {
 echo "== Probe A: the starter alone must not pull in any executor, dialect or database driver =="
 emit_pom "$PROBE/a" "" ""
 mvn -B -q -f "$PROBE/a/pom.xml" dependency:tree -DoutputFile="$PROBE/a/tree.txt"
-leaked="$(grep -E "intentflow-(jdbc|jpa|openmapper|spring-data|postgresql|mysql|cassandra)|spring-jdbc|HikariCP|hibernate|java-driver-core|postgresql:|mysql-connector" "$PROBE/a/tree.txt" || true)"
+leaked="$(grep -E "intentflow-(jdbc|jpa|jimmer|openmapper|spring-data|postgresql|mysql|h2|cassandra)|spring-jdbc|HikariCP|hibernate|java-driver-core|postgresql:|mysql-connector" "$PROBE/a/tree.txt" || true)"
 if [ -n "$leaked" ]; then
   echo "FAIL: the starter pulled in optional modules:"
   echo "$leaked"
@@ -47,7 +47,7 @@ echo
 echo "== Probe B: inside a Boot ${BOOT_VERSION} application, all Boot artifacts must be ${BOOT_VERSION} =="
 emit_pom "$PROBE/b" \
   "<parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>${BOOT_VERSION}</version><relativePath/></parent>" \
-  "$(intentflow_dep intentflow-jdbc)$(intentflow_dep intentflow-postgresql)<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency><dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>"
+  "$(intentflow_dep intentflow-jdbc)$(intentflow_dep intentflow-h2)<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency><dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>"
 mvn -B -f "$PROBE/b/pom.xml" dependency:tree > "$PROBE/b/tree.txt"
 offending="$(grep -oE "org\.springframework\.boot:[A-Za-z0-9._-]+:jar:[^:]+" "$PROBE/b/tree.txt" \
              | grep -v ":jar:${BOOT_VERSION}\$" || true)"
@@ -107,10 +107,11 @@ public class ProbeApp {
 JAVA
 if mvn -B -f "$PROBE/b/pom.xml" -q compile exec:java \
       -Dexec.mainClass=probe.ProbeApp > "$PROBE/b/run.txt" 2>&1 \
-   && grep -q PROBE_CONTEXT_STARTED "$PROBE/b/run.txt"; then
+   && grep -q PROBE_CONTEXT_STARTED "$PROBE/b/run.txt" && grep -q PROBE_DIALECT=h2 "$PROBE/b/run.txt"; then
   echo "OK: context started against an embedded DataSource ($(grep -o 'PROBE_DIALECT=.*' "$PROBE/b/run.txt"))."
 else
-  echo "FAIL: context did not start:"
+  echo "FAIL: context did not start with the h2 dialect:"
+  grep -o 'PROBE_DIALECT=.*' "$PROBE/b/run.txt" || true
   grep -E "NoClassDefFoundError|ClassNotFoundException|Caused by|APPLICATION FAILED|Description:" -A2 \
        "$PROBE/b/run.txt" | head -12
   status=1
