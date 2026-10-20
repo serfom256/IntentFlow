@@ -1,11 +1,14 @@
 package io.github.serfom256.intentflow.core.pipeline.factories;
 
+import io.github.serfom256.intentflow.core.api.IntentContext;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
+import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
 import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
+import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
@@ -13,6 +16,8 @@ import io.github.serfom256.intentflow.core.pipeline.UriBuilder;
 import io.github.serfom256.intentflow.core.pipeline.impl.DefaultIntentPipeline;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+
+import java.util.function.Supplier;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class IntentPipelines {
@@ -41,5 +46,22 @@ public final class IntentPipelines {
             int maxRepairs) {
         return new DefaultIntentPipeline(normalizer, cache, llm, parser, validator, sqlBuilder, executor, uriBuilder,
                 catalog, maxRepairs);
+    }
+
+    public static IntentPipeline create(TextNormalizer normalizer,
+            DslCache cache,
+            LlmClient llm,
+            DslParser parser,
+            AstValidator validator,
+            SqlBuilder sqlBuilder,
+            QueryExecutor executor,
+            UriBuilder uriBuilder,
+            ServiceCatalog catalog,
+            int maxRepairs,
+            AccessPolicy policy,
+            Supplier<IntentContext> defaultCaller,
+            PipelineListener listener) {
+        return new DefaultIntentPipeline(normalizer, cache, llm, parser, validator, sqlBuilder, executor, uriBuilder,
+                catalog, maxRepairs, policy, defaultCaller, listener);
     }
 }

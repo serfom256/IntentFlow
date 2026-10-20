@@ -16,6 +16,7 @@ import org.springframework.data.cassandra.core.mapping.SimpleUserTypeResolver;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,14 +30,21 @@ public final class CassandraQueryExecutor implements QueryExecutor {
     private final CqlSession session;
     private final CassandraConverter converter;
     private final int maxScannedRows;
+    private final Duration statementTimeout;
 
     public CassandraQueryExecutor(CqlSession session, CassandraConverter converter, int maxScannedRows) {
+        this(session, converter, maxScannedRows, Duration.ZERO);
+    }
+
+    public CassandraQueryExecutor(CqlSession session, CassandraConverter converter, int maxScannedRows,
+            Duration statementTimeout) {
         if (maxScannedRows < 1) {
             throw new IllegalArgumentException("maxScannedRows must be positive: " + maxScannedRows);
         }
         this.session = session;
         this.converter = converter;
         this.maxScannedRows = maxScannedRows;
+        this.statementTimeout = statementTimeout;
     }
 
     public static CassandraQueryExecutor of(CqlSession session) {
@@ -103,7 +111,11 @@ public final class CassandraQueryExecutor implements QueryExecutor {
         String cql = q.cql();
         List<Row> matches = new ArrayList<>();
         int scanned = 0;
-        for (Row row : session.execute(SimpleStatement.newInstance(cql, q.bindValues().toArray()))) {
+        SimpleStatement statement = SimpleStatement.newInstance(cql, q.bindValues().toArray());
+        if (statementTimeout.isPositive()) {
+            statement = statement.setTimeout(statementTimeout);
+        }
+        for (Row row : session.execute(statement)) {
             if (++scanned > maxScannedRows) {
                 throw new ScanLimitExceededException(cql, maxScannedRows);
             }

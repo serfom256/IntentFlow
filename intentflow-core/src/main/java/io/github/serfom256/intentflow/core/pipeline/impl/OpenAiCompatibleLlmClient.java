@@ -11,10 +11,15 @@ import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.ServiceRelation;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
 import io.github.serfom256.intentflow.core.pipeline.LlmException;
+import io.github.serfom256.intentflow.core.pipeline.LlmHttpOptions;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
@@ -25,11 +30,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+@Slf4j
 public final class OpenAiCompatibleLlmClient implements LlmClient {
+
+    private static final long MAX_RETRY_AFTER = 30;
 
     private static final Pattern THINK_BLOCK = Pattern.compile("(?s)<think>.*?</think>");
     private static final Pattern CODE_FENCE = Pattern.compile("(?s)^```[a-zA-Z]*\\s*(.*?)\\s*```$");
@@ -77,6 +86,8 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
               Never substitute a different field for the one the user asked about, and never answer a
               narrower question by dropping a condition you cannot express (for example "my", "near me",
               or a field that is not listed): reply unsupported instead.
+            - When a service's description says which records the caller sees, its rows are already limited
+              to them: answer "my orders" with that service and no extra filter.
 
             Examples:
               books | filter author ~ "tolkien" | sort year desc
@@ -97,19 +108,31 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
     private final String apiKey;
     private final Duration timeout;
     private final Clock clock;
+    private final LlmHttpOptions options;
 
     public OpenAiCompatibleLlmClient(URI baseUrl, String model, String apiKey, Duration timeout) {
         this(baseUrl, model, apiKey, timeout, Clock.systemDefaultZone());
     }
 
     public OpenAiCompatibleLlmClient(URI baseUrl, String model, String apiKey, Duration timeout, Clock clock) {
+        this(baseUrl, model, apiKey, timeout, clock, LlmHttpOptions.DEFAULTS);
+    }
+
+    public OpenAiCompatibleLlmClient(URI baseUrl, String model, String apiKey, Duration timeout, Clock clock,
+            LlmHttpOptions options) {
         String base = baseUrl.toString();
         this.endpoint = URI.create((base.endsWith("/") ? base : base + "/") + "chat/completions");
         this.model = model;
         this.apiKey = apiKey;
         this.timeout = timeout;
         this.clock = clock;
-        this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.options = options;
+        ProxySelector proxy = options.proxy() != null ? options.proxy() : ProxySelector.getDefault();
+        HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10));
+        if (proxy != null) {
+            builder.proxy(proxy);
+        }
+        this.http = builder.build();
     }
 
     @Override
@@ -143,29 +166,77 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
+        options.headers().forEach(request::header);
         if (!apiKey.isEmpty()) {
-            request.header("Authorization", "Bearer " + apiKey);
+            boolean bearer = options.apiKeyHeader().equalsIgnoreCase("Authorization");
+            request.header(options.apiKeyHeader(), bearer ? "Bearer " + apiKey : apiKey);
         }
-
-        HttpResponse<String> response;
-        try {
-            response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
-        } catch (IOException e) {
-            throw new LlmException("LLM request to " + endpoint + " failed: " + e.getMessage(), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new LlmException("LLM request interrupted", e);
-        }
-
-        if (response.statusCode() / 100 != 2) {
-            throw new LlmException("LLM returned HTTP " + response.statusCode() + ": " + response.body());
-        }
+        HttpResponse<String> response = send(request.build());
 
         String dsl = cleanup(extractContent(response.body()));
         if (dsl.isEmpty()) {
             throw new LlmException("LLM returned an empty answer");
         }
         return DslSources.of(dsl);
+    }
+
+    private HttpResponse<String> send(HttpRequest request) {
+        Duration backoff = options.retryBackoff();
+        for (int attempt = 1;; attempt++) {
+            boolean last = attempt > options.maxRetries();
+            Duration wait = backoff;
+            try {
+                HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+                int status = response.statusCode();
+                if (status / 100 == 2) {
+                    return response;
+                }
+                log.debug("LLM returned HTTP {} (attempt {}): {}", status, attempt, abbreviated(response.body()));
+                if (last || !retryable(status)) {
+                    throw new LlmException("LLM returned HTTP " + status
+                            + (attempt > 1 ? " after " + attempt + " attempts" : ""));
+                }
+                wait = retryAfter(response).orElse(backoff);
+            } catch (HttpConnectTimeoutException | ConnectException e) {
+                if (last) {
+                    throw new LlmException("LLM at " + endpoint + " is not reachable: " + e.getMessage(), e);
+                }
+            } catch (IOException e) {
+                throw new LlmException("LLM request to " + endpoint + " failed: " + e.getMessage(), e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new LlmException("LLM request interrupted", e);
+            }
+            pause(wait);
+            backoff = backoff.multipliedBy(2);
+        }
+    }
+
+    private static boolean retryable(int status) {
+        return status == 408 || status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
+    }
+
+    private static Optional<Duration> retryAfter(HttpResponse<?> response) {
+        return response.headers().firstValue("Retry-After").flatMap(value -> {
+            try {
+                return Optional.of(Duration.ofSeconds(Math.min(Long.parseLong(value.strip()), MAX_RETRY_AFTER)));
+            } catch (NumberFormatException notSeconds) {
+                return Optional.empty();
+            }
+        });
+    }
+
+    private static void pause(Duration wait) {
+        try {
+            Thread.sleep(wait);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new LlmException("LLM request interrupted", e);
+        }
+    }
+
+    private static String abbreviated(String text) {
+        return text.length() <= 500 ? text : text.substring(0, 500) + "...";
     }
 
     static String systemPrompt(ServiceCatalog catalog, LocalDate today) {

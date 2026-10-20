@@ -28,6 +28,8 @@ Data Cassandra) maps the rows.
 - [Limitations](#limitations)
 - [Modules](#modules)
 - [How SQL is generated](#how-sql-is-generated)
+- [Access control](#access-control)
+- [Operations](#operations)
 - [Debugging](#debugging)
 - [Cassandra](#cassandra)
 - [Admin UI](#admin-ui)
@@ -289,7 +291,8 @@ into ad-hoc SQL. Not supported:
 - Window functions other than `top`: `RANK`, `LAG`/`LEAD` and running totals produce new columns, not entities
 - `CASE`, string concatenation, regular expressions, "starts with"/"ends with". Relative dates ("last 3 months")
   are turned into dates by the LLM
-- Questions about the person asking ("my orders", "near me"); there is no request context yet
+- Questions about the person asking ("near me"), unless an access policy limits a service to the caller's rows; see
+  [Access control](#access-control)
 - Relations on Cassandra
 
 ## Modules
@@ -369,6 +372,73 @@ class and its subclasses (`DTYPE IN (...)`). Hibernate `@Filter`s enabled on the
 query with their parameters bound, as Hibernate would for its own queries. Another executor can add such
 session-dependent conditions through `QueryExecutor.restrictions`.
 
+## Access control
+
+A request can say who asks; without one, the starter takes the caller from Spring Security (name and
+authorities). An `AccessPolicy` bean then decides, per caller, which services and fields may be queried and which
+rows are visible:
+
+```java
+@Bean
+AccessPolicy accessPolicy() {
+    return new AccessPolicy() {
+        public boolean canQuery(ServiceDescriptor service, IntentContext caller) {
+            return !service.name().value().equals("suppliers") || caller.hasRole("ROLE_BUYER");
+        }
+
+        public boolean canSee(ServiceDescriptor service, FieldMapping field, IntentContext caller) {
+            return !field.logical().value().equals("supplier_cost") || caller.hasRole("ROLE_BUYER");
+        }
+
+        public List<RuntimeRestriction> restrictions(ServiceDescriptor service, IntentContext caller) {
+            return service.name().value().equals("orders")
+                    ? List.of(RuntimeRestriction.equalTo("customer_id", caller.attribute("customerId")))
+                    : List.of();
+        }
+
+        public String scope(ServiceDescriptor service, IntentContext caller) {
+            return service.name().value().equals("orders") ? "only the current customer's own orders" : null;
+        }
+    };
+}
+```
+
+- The LLM is shown only what the caller may query, and the validator rejects anything else, so a hidden field
+  cannot be reached by rephrasing the question
+- Restrictions are added to every query of the service, including relation subqueries, with every executor.
+  A restriction value that is `null` matches no rows, so a caller without a customer id sees no orders
+- `scope` tells the LLM which rows the caller sees, so "my orders" is answered as "orders"
+- `resolve(request, Supplier.class)` for a service the caller may not query throws `AccessDeniedException`
+- Translations are cached per caller view, so callers with different permissions never share a cached query
+- An `IntentContextProvider` bean replaces the Spring Security mapping, for example to add a tenant or a customer
+  id; `IntentRequests.of(text, IntentContexts.of(...))` passes the caller explicitly
+
+The fields of the returned entities are not filtered: return a view without the fields a caller may not see.
+
+## Operations
+
+**Statement timeout.** Generated queries run in a read-only transaction with `intentflow.sql.statement-timeout`
+(30s) when the application has one transaction manager and IntentFlow starts the transaction. The `jdbc`,
+`spring-data-jdbc` and `jpa` executors apply the timeout to their statements; `jimmer` and the Cassandra executor
+set it on the statement themselves. OpenMapper statements take their timeout from a `ProceduresCustomizer`.
+
+**Metrics.** With Micrometer on the classpath, the starter records:
+
+| Meter                    | Type    | Tags                         |
+| ------------------------ | ------- | ---------------------------- |
+| `intentflow.requests`    | timer   | `service`, `outcome` (`answered`, `declined`, `rejected`, `denied`, `failed`) |
+| `intentflow.llm`         | timer   | `kind` (`generate`, `repair`), `outcome` |
+| `intentflow.cache`       | counter | `result` (`hit`, `miss`)     |
+| `intentflow.query`       | timer   | `service`, `kind` (`rows`, `aggregate`), `outcome` |
+| `intentflow.query.rows`  | summary | `service`, `kind`            |
+
+Any `PipelineListener` bean hears the same events.
+
+**LLM connection.** The client uses the JVM's proxy settings (`https.proxyHost`, `java.net.useSystemProxies`) or
+`intentflow.llm.proxy`. `intentflow.llm.api-key-header: api-key` sends the key the way Azure OpenAI expects, and
+`intentflow.llm.headers` adds headers to every call. Rate limits (429) and server errors (5xx) are retried with
+backoff, honoring `Retry-After`; error messages carry the status code but not the provider's response body.
+
 ## Debugging
 
 - `response.trace()` gives the DSL, the SQL and its parameters; the SQL runs as-is in `psql` or `mysql`
@@ -416,8 +486,13 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.enabled                    | true                        | Turns the auto-configuration on or off              |
 | intentflow.llm.base-url               | http://localhost:1234/v1    | OpenAI-compatible API                               |
 | intentflow.llm.model                  | -                           | Model id; required unless you define an `LlmClient` |
-| intentflow.llm.api-key                | empty                       | Bearer token; empty for local servers               |
+| intentflow.llm.api-key                | empty                       | API key; empty for local servers                    |
+| intentflow.llm.api-key-header         | Authorization               | Header for the key: `Authorization` sends `Bearer <key>`, any other name the key as is |
+| intentflow.llm.headers                | empty                       | Extra headers sent with every call                  |
+| intentflow.llm.proxy                  | JVM proxy settings          | Proxy URL, e.g. `http://proxy.corp:3128`            |
 | intentflow.llm.timeout                | 60s                         | Timeout of one LLM call                             |
+| intentflow.llm.max-retries            | 2                           | Retries after a 429 or 5xx answer                   |
+| intentflow.llm.retry-backoff          | 500ms                       | First wait between retries; doubles each time       |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
@@ -429,6 +504,8 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.time-zone                  | the JVM's zone              | Zone for dates without an offset, e.g. `Europe/Berlin` |
 | intentflow.schema.introspect          | true                        | Read keys and NOT NULL columns from the database    |
 | intentflow.sql.disabled-optimizations | empty                       | Optimizations to switch off                         |
+| intentflow.sql.statement-timeout      | 30s                         | Longest a generated query may run; 0 for no limit   |
+| intentflow.sql.read-only              | true                        | Run generated queries in a read-only transaction    |
 | intentflow.cassandra.max-scanned-rows | 10000                       | Rows one Cassandra query may read                   |
 
 ## Example application

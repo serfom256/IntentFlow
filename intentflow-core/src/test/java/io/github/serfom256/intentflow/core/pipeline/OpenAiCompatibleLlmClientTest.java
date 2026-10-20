@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
+import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import io.github.serfom256.intentflow.core.api.factories.UserTexts;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -32,9 +33,13 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,6 +81,10 @@ class OpenAiCompatibleLlmClientTest {
     private final AtomicReference<String> lastAuth = new AtomicReference<>();
     private volatile int status = 200;
     private volatile String reply = "";
+    private final Deque<Integer> statuses = new ConcurrentLinkedDeque<>();
+    private final AtomicInteger requests = new AtomicInteger();
+    private final AtomicReference<Headers> lastHeaders = new AtomicReference<>();
+    private volatile String retryAfter = null;
 
     @BeforeEach
     void start() throws IOException {
@@ -83,8 +92,15 @@ class OpenAiCompatibleLlmClientTest {
         server.createContext("/v1/chat/completions", exchange -> {
             lastRequest.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             lastAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
-            byte[] body = reply.getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(status, body.length);
+            lastHeaders.set(exchange.getRequestHeaders());
+            requests.incrementAndGet();
+            Integer next = statuses.poll();
+            int code = next != null ? next : status;
+            if (code != 200 && retryAfter != null) {
+                exchange.getResponseHeaders().add("Retry-After", retryAfter);
+            }
+            byte[] body = (code == 200 ? reply : "{\"error\":\"model not loaded\"}").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(code, body.length);
             exchange.getResponseBody().write(body);
             exchange.close();
         });
@@ -97,8 +113,13 @@ class OpenAiCompatibleLlmClientTest {
     }
 
     private LlmClient client(String apiKey) {
+        return client(apiKey, new LlmHttpOptions("Authorization", Map.of(), null, 2, Duration.ofMillis(1)));
+    }
+
+    private LlmClient client(String apiKey, LlmHttpOptions options) {
         URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
-        return LlmClients.openAiCompatible(base, "test-model", apiKey, Duration.ofSeconds(5));
+        return LlmClients.openAiCompatible(base, "test-model", apiKey, Duration.ofSeconds(5),
+                Clock.systemDefaultZone(), options);
     }
 
     private static String completion(String content) {
@@ -187,14 +208,65 @@ class OpenAiCompatibleLlmClientTest {
     }
 
     @Test
-    void nonSuccessStatusBecomesLlmException() {
+    void nonSuccessStatusBecomesLlmExceptionWithoutTheResponseBody() {
         status = 500;
-        reply = "{\"error\":\"model not loaded\"}";
 
         assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
                 .isInstanceOf(LlmException.class)
-                .hasMessageContaining("HTTP 500")
-                .hasMessageContaining("model not loaded");
+                .hasMessage("LLM returned HTTP 500 after 3 attempts")
+                .hasMessageNotContaining("model not loaded");
+        assertThat(requests.get()).isEqualTo(3);
+    }
+
+    @Test
+    void rateLimitsAndServerErrorsAreRetried() {
+        statuses.addAll(List.of(429, 503));
+        reply = completion("books");
+
+        assertThat(client("").generateDsl(UserTexts.of("x"), CATALOG).value()).isEqualTo("books");
+        assertThat(requests.get()).isEqualTo(3);
+    }
+
+    @Test
+    void retryAfterIsHonored() {
+        statuses.add(429);
+        retryAfter = "1";
+        reply = completion("books");
+
+        long start = System.nanoTime();
+        client("").generateDsl(UserTexts.of("x"), CATALOG);
+
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isGreaterThanOrEqualTo(Duration.ofSeconds(1));
+    }
+
+    @Test
+    void clientErrorsAreNotRetried() {
+        status = 401;
+
+        assertThatThrownBy(() -> client("sk-wrong").generateDsl(UserTexts.of("x"), CATALOG))
+                .isInstanceOf(LlmException.class).hasMessage("LLM returned HTTP 401");
+        assertThat(requests.get()).isEqualTo(1);
+    }
+
+    @Test
+    void zeroRetriesAsksOnce() {
+        status = 503;
+
+        assertThatThrownBy(() -> client("", new LlmHttpOptions("Authorization", Map.of(), null, 0, Duration.ZERO))
+                .generateDsl(UserTexts.of("x"), CATALOG)).hasMessage("LLM returned HTTP 503");
+        assertThat(requests.get()).isEqualTo(1);
+    }
+
+    @Test
+    void theKeyHeaderAndExtraHeadersAreConfigurable() {
+        reply = completion("books");
+        LlmHttpOptions azure = new LlmHttpOptions("api-key", Map.of("X-Team", "search"), null, 0, Duration.ZERO);
+
+        client("secret", azure).generateDsl(UserTexts.of("x"), CATALOG);
+
+        assertThat(lastHeaders.get().getFirst("api-key")).isEqualTo("secret");
+        assertThat(lastHeaders.get().getFirst("X-Team")).isEqualTo("search");
+        assertThat(lastAuth.get()).isNull();
     }
 
     @Test

@@ -32,3 +32,6 @@ bin/
 node_modules/
 /intentflow-examples/intentflow-shop-ui/dist/
 *.tsbuildinfo
+
+BACKLOG.md
+publish-local.sh

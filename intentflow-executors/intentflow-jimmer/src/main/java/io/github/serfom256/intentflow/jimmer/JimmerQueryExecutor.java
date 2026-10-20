@@ -15,6 +15,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -27,13 +28,20 @@ public final class JimmerQueryExecutor implements QueryExecutor {
 
     private final JSqlClientImplementor sqlClient;
     private final Map<Class<?>, Fetcher<?>> fetchers = new HashMap<>();
+    private final Duration statementTimeout;
 
     public JimmerQueryExecutor(JSqlClient sqlClient) {
         this(sqlClient, List.of());
     }
 
     public JimmerQueryExecutor(JSqlClient sqlClient, Collection<? extends Fetcher<?>> fetchers) {
+        this(sqlClient, fetchers, Duration.ZERO);
+    }
+
+    public JimmerQueryExecutor(JSqlClient sqlClient, Collection<? extends Fetcher<?>> fetchers,
+            Duration statementTimeout) {
         this.sqlClient = (JSqlClientImplementor) sqlClient;
+        this.statementTimeout = statementTimeout;
         for (Fetcher<?> fetcher : fetchers) {
             this.fetchers.put(fetcher.getJavaClass(), fetcher);
         }
@@ -93,8 +101,11 @@ public final class JimmerQueryExecutor implements QueryExecutor {
         });
     }
 
-    private static PreparedStatement prepare(Connection connection, BoundQuery query) throws SQLException {
+    private PreparedStatement prepare(Connection connection, BoundQuery query) throws SQLException {
         PreparedStatement statement = connection.prepareStatement(query.sql());
+        if (statementTimeout.isPositive()) {
+            statement.setQueryTimeout((int) Math.max(1, statementTimeout.toSeconds()));
+        }
         List<@Nullable Object> values = query.values();
         for (int i = 0; i < values.size(); i++) {
             statement.setObject(i + 1, values.get(i));

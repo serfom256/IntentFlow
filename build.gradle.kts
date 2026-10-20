@@ -1,3 +1,9 @@
+import com.vanniktech.maven.publish.MavenPublishBaseExtension
+
+plugins {
+    alias(libs.plugins.maven.publish) apply false
+}
+
 allprojects {
     group = "io.github.serfom256"
 
@@ -50,45 +56,62 @@ subprojects {
     }
 
     if (!projectDir.parentFile.name.equals("intentflow-examples")) {
-        pluginManager.apply("maven-publish")
-
-        configure<JavaPluginExtension> {
-            withSourcesJar()
-        }
+        pluginManager.apply("com.vanniktech.maven.publish")
 
         pluginManager.withPlugin("java-test-fixtures") {
             val java = components["java"] as AdhocComponentWithVariants
             java.withVariantsFromConfiguration(configurations["testFixturesApiElements"]) { skip() }
             java.withVariantsFromConfiguration(configurations["testFixturesRuntimeElements"]) { skip() }
+            afterEvaluate {
+                configurations.findByName("testFixturesSourcesElements")?.let {
+                    java.withVariantsFromConfiguration(it) { skip() }
+                }
+            }
+        }
+
+        tasks.withType<Javadoc>().configureEach {
+            (options as StandardJavadocDocletOptions).apply {
+                encoding = "UTF-8"
+                addStringOption("Xdoclint:none", "-quiet")
+            }
+        }
+
+        configure<MavenPublishBaseExtension> {
+            publishToMavenCentral()
+            if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+                signAllPublications()
+            }
+            pom {
+                name.set(project.name)
+                description.set("IntentFlow: plain-language questions to safe SQL, typed results")
+                inceptionYear.set("2026")
+                url.set("https://github.com/serfom256/IntentFlow")
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                        distribution.set("repo")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("serfom256")
+                        name.set("serfom256")
+                        url.set("https://github.com/serfom256")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/serfom256/IntentFlow")
+                    connection.set("scm:git:git://github.com/serfom256/IntentFlow.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/serfom256/IntentFlow.git")
+                }
+            }
         }
 
         configure<PublishingExtension> {
-            publications {
-                create<MavenPublication>("maven") {
-                    from(components["java"])
-                    versionMapping {
-                        allVariants { fromResolutionResult() }
-                    }
-                    pom {
-                        name.set(project.name)
-                        description.set("IntentFlow: plain-language questions to safe SQL, typed results")
-                        url.set("https://github.com/serfom256/IntentFlow")
-                        licenses {
-                            license {
-                                name.set("MIT License")
-                                url.set("https://opensource.org/licenses/MIT")
-                            }
-                        }
-                        developers {
-                            developer {
-                                id.set("serfom256")
-                                name.set("serfom256")
-                            }
-                        }
-                        scm {
-                            url.set("https://github.com/serfom256/IntentFlow")
-                        }
-                    }
+            publications.withType<MavenPublication>().configureEach {
+                versionMapping {
+                    allVariants { fromResolutionResult() }
                 }
             }
         }

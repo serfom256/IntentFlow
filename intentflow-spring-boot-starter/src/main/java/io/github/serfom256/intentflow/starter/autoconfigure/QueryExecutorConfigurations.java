@@ -97,8 +97,10 @@ final class QueryExecutorConfigurations {
         @ConditionalOnMissingBean(QueryExecutor.class)
         @ConditionalOnBean(JSqlClient.class)
         @ConditionalOnProperty(prefix = "intentflow", name = "executor", havingValue = "jimmer", matchIfMissing = true)
-        QueryExecutor intentFlowJimmerQueryExecutor(JSqlClient sqlClient, ObjectProvider<Fetcher<?>> fetchers) {
-            return new JimmerQueryExecutor(sqlClient, fetchers.orderedStream().toList());
+        QueryExecutor intentFlowJimmerQueryExecutor(JSqlClient sqlClient, ObjectProvider<Fetcher<?>> fetchers,
+                IntentFlowProperties properties) {
+            return new JimmerQueryExecutor(sqlClient, fetchers.orderedStream().toList(),
+                    properties.sql().statementTimeout());
         }
     }
 
@@ -148,7 +150,8 @@ final class QueryExecutorConfigurations {
             @Bean
             QueryExecutor intentFlowCassandraQueryExecutor(CqlSession session, CassandraConverter converter,
                     IntentFlowProperties properties) {
-                return new CassandraQueryExecutor(session, converter, properties.cassandra().maxScannedRows());
+                return new CassandraQueryExecutor(session, converter, properties.cassandra().maxScannedRows(),
+                        properties.sql().statementTimeout());
             }
         }
     }

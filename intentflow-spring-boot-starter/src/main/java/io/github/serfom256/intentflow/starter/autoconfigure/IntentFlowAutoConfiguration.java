@@ -1,16 +1,20 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
+import io.github.serfom256.intentflow.core.api.factories.IntentContexts;
 import io.github.serfom256.intentflow.core.catalog.CatalogOverrides;
 import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
+import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
 import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
+import io.github.serfom256.intentflow.core.pipeline.LlmHttpOptions;
+import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
@@ -41,6 +45,8 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
 import javax.sql.DataSource;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -68,7 +74,9 @@ import java.util.function.Function;
 @Import({ SqlDialectConfigurations.Jdbc.class, QueryExecutorConfigurations.OpenMapper.class,
         QueryExecutorConfigurations.Jpa.class,
         QueryExecutorConfigurations.Jimmer.class, QueryExecutorConfigurations.SpringDataJdbc.class,
-        QueryExecutorConfigurations.Cassandra.class, QueryExecutorConfigurations.Jdbc.class })
+        QueryExecutorConfigurations.Cassandra.class, QueryExecutorConfigurations.Jdbc.class,
+        PipelineObservers.SpringSecurity.class, PipelineObservers.Micrometer.class,
+        TransactionalQueryExecutor.Wiring.class })
 public class IntentFlowAutoConfiguration {
 
     @Bean
@@ -111,8 +119,12 @@ public class IntentFlowAutoConfiguration {
             throw new IllegalStateException(
                     "Set intentflow.llm.model (and intentflow.llm.base-url) or define an LlmClient bean.");
         }
+        ProxySelector proxy = llm.proxy() == null ? null
+                : ProxySelector.of(new InetSocketAddress(llm.proxy().getHost(), llm.proxy().getPort()));
+        LlmHttpOptions options = new LlmHttpOptions(llm.apiKeyHeader(), llm.headers(), proxy, llm.maxRetries(),
+                llm.retryBackoff());
         return LlmClients.openAiCompatible(llm.baseUrl(), llm.model(), llm.apiKey(), llm.timeout(),
-                clock.getIfAvailable(Clock::systemDefaultZone));
+                clock.getIfAvailable(Clock::systemDefaultZone), options);
     }
 
     @Bean
@@ -174,7 +186,9 @@ public class IntentFlowAutoConfiguration {
     IntentPipeline intentFlowPipeline(TextNormalizer normalizer, DslCache cache, LlmClient llm,
             DslParser parser, AstValidator validator, SqlBuilder sqlBuilder,
             ObjectProvider<QueryExecutor> executor, UriBuilder uriBuilder,
-            ServiceCatalog catalog, IntentFlowProperties properties) {
+            ServiceCatalog catalog, IntentFlowProperties properties, ObjectProvider<AccessPolicy> policy,
+            ObjectProvider<IntentContextProvider> callers, ObjectProvider<PipelineListener> listeners,
+            ObjectProvider<ExecutorWrapper> wrapper) {
         QueryExecutor queryExecutor = executor.getIfAvailable();
         if (queryExecutor == null) {
             throw new IllegalStateException("No QueryExecutor: configure a DataSource (spring.datasource.*) "
@@ -182,8 +196,15 @@ public class IntentFlowAutoConfiguration {
                     + "intentflow-jpa, intentflow-jimmer, intentflow-openmapper, intentflow-spring-data-jdbc, "
                     + "intentflow-spring-data-cassandra), or define a QueryExecutor bean.");
         }
+        ExecutorWrapper wrap = wrapper.getIfAvailable();
+        if (wrap != null) {
+            queryExecutor = wrap.apply(queryExecutor);
+        }
+        IntentContextProvider caller = callers.getIfAvailable(() -> IntentContexts::anonymous);
+        List<PipelineListener> observers = listeners.orderedStream().toList();
         return IntentPipelines.create(normalizer, cache, llm, parser, validator, sqlBuilder,
-                queryExecutor, uriBuilder, catalog, properties.llm().maxRepairs());
+                queryExecutor, uriBuilder, catalog, properties.llm().maxRepairs(),
+                policy.getIfAvailable(() -> AccessPolicy.ALLOW_ALL), caller::current, new CompositeListener(observers));
     }
 
 }

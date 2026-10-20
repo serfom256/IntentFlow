@@ -8,6 +8,8 @@ dependencies {
     annotationProcessor(libs.spring.boot.configuration.processor)
 
     compileOnly(libs.spring.jdbc)
+    compileOnly(libs.spring.security.core)
+    compileOnly(libs.micrometer.core)
     compileOnly(libs.spring.orm)
     compileOnly(libs.spring.data.jdbc)
     compileOnly(libs.spring.data.cassandra)
@@ -35,6 +37,8 @@ dependencies {
     testImplementation(libs.spring.boot.starter.data.jpa)
     testImplementation(libs.spring.boot.starter.data.cassandra)
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.security.core)
+    testImplementation(libs.micrometer.core)
     testImplementation(libs.jimmer.sql)
     testImplementation(libs.openmapper)
     testRuntimeOnly(libs.jackson3.databind)

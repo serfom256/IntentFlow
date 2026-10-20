@@ -3,6 +3,7 @@ package io.github.serfom256.intentflow.core.pipeline.factories;
 import io.github.serfom256.intentflow.core.api.UserText;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
+import io.github.serfom256.intentflow.core.pipeline.LlmHttpOptions;
 import io.github.serfom256.intentflow.core.pipeline.impl.OpenAiCompatibleLlmClient;
 import io.github.serfom256.intentflow.core.pipeline.impl.StubLlmClient;
 import lombok.AccessLevel;
@@ -27,5 +28,10 @@ public final class LlmClients {
     public static LlmClient openAiCompatible(URI baseUrl, String model, String apiKey, Duration timeout,
             Clock clock) {
         return new OpenAiCompatibleLlmClient(baseUrl, model, apiKey, timeout, clock);
+    }
+
+    public static LlmClient openAiCompatible(URI baseUrl, String model, String apiKey, Duration timeout,
+            Clock clock, LlmHttpOptions options) {
+        return new OpenAiCompatibleLlmClient(baseUrl, model, apiKey, timeout, clock, options);
     }
 }

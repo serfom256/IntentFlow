@@ -8,6 +8,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 
 @ConfigurationProperties("intentflow")
 public record IntentFlowProperties(
@@ -33,7 +34,12 @@ public record IntentFlowProperties(
             @Nullable String model,
             @DefaultValue("") String apiKey,
             @DefaultValue("60s") Duration timeout,
-            @DefaultValue("1") int maxRepairs) {
+            @DefaultValue("1") int maxRepairs,
+            @DefaultValue("Authorization") String apiKeyHeader,
+            @DefaultValue Map<String, String> headers,
+            @Nullable URI proxy,
+            @DefaultValue("2") int maxRetries,
+            @DefaultValue("500ms") Duration retryBackoff) {
     }
 
     public record Cache(
@@ -47,7 +53,10 @@ public record IntentFlowProperties(
     public record Schema(@DefaultValue("true") boolean introspect) {
     }
 
-    public record Sql(@DefaultValue List<String> disabledOptimizations) {
+    public record Sql(
+            @DefaultValue List<String> disabledOptimizations,
+            @DefaultValue("30s") Duration statementTimeout,
+            @DefaultValue("true") boolean readOnly) {
     }
 
     public record Cassandra(@DefaultValue("10000") int maxScannedRows) {

@@ -1,6 +1,7 @@
 package io.github.serfom256.intentflow.jimmer;
 
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
+import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceRelation;
@@ -28,11 +29,13 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 @Testcontainers(disabledWithoutDocker = true)
@@ -83,6 +86,23 @@ class JimmerRelationsIT {
 
         assertThat(orders).extracting(JOrder::id).containsExactly(11L);
         assertThat(orders.getFirst().customer().name()).isEqualTo("Ann");
+    }
+
+    @Test
+    void theStatementTimeoutCancelsASlowQuery() {
+        DifferentialDatabase.Endpoint e = RelationTables.prepare(DifferentialDatabase.POSTGRES);
+        JSqlClient sqlClient = JSqlClient.newBuilder()
+                .setConnectionManager(ConnectionManager.simpleConnectionManager(
+                        new DriverManagerDataSource(e.url(), e.user(), e.password())))
+                .setDialect(new PostgresDialect())
+                .build();
+        JimmerQueryExecutor executor = new JimmerQueryExecutor(sqlClient, List.of(), Duration.ofSeconds(1));
+        long start = System.nanoTime();
+
+        assertThatThrownBy(() -> executor.execute(
+                BoundQueries.of("SELECT c.id FROM rel_customer c, pg_sleep(5)"), JCustomer.class))
+                .hasMessageContaining("canceling statement");
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(4));
     }
 
     @ParameterizedTest
