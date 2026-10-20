@@ -45,6 +45,7 @@ spring-webmvc = { module = "org.springframework:spring-webmvc" }
 spring-security-core = { module = "org.springframework.security:spring-security-core" }
 spring-security-web = { module = "org.springframework.security:spring-security-web" }
 jackson2-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api" }
 spring-orm = { module = "org.springframework:spring-orm" }
 spring-data-jdbc = { module = "org.springframework.data:spring-data-jdbc" }

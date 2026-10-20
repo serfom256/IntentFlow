@@ -166,7 +166,7 @@ public final class SqlRenderer {
     private void expr(SqlExpr expr, SqlBuffer sql) {
         switch (expr) {
             case SqlExpr.Column column -> sql.text(column(column));
-            case SqlExpr.Param param -> sql.param(bindable(param.value()));
+            case SqlExpr.Param param -> dialect.literal(sql, bindable(param.value()));
             case SqlExpr.TimestampParam timestamp -> {
                 if (timestamp.bound() != null) {
                     sql.param(timestamp.value(), timestamp.bound());

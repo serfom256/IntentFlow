@@ -311,9 +311,14 @@ overrides it.
 
 | Module                  | Databases         |
 | ----------------------- | ----------------- |
-| `intentflow-postgresql` | PostgreSQL, H2    |
+| `intentflow-postgresql` | PostgreSQL        |
 | `intentflow-mysql`      | MySQL 8+, MariaDB |
+| `intentflow-h2`         | H2 2.x            |
 | `intentflow-cassandra`  | Cassandra 5       |
+
+`intentflow-h2` works with H2's default upper-case identifiers and with `DATABASE_TO_LOWER=TRUE`: plain names
+are written unquoted, so they match tables created without quotes, which is what Hibernate, Liquibase and
+`schema.sql` do. Keywords and mixed-case names are quoted.
 
 The build is tested against Spring Boot 3.2, 3.5 and 4.0. Spring Boot 3.0 and 3.1 are not supported, because the
 JDBC executors need `JdbcClient` (Spring Framework 6.1).
@@ -388,11 +393,12 @@ redeploy, and for trying questions against the live catalog. See the [admin READ
 A SQL dialect is a module with three parts:
 
 1. A `SqlDialect`: quoting, contains, timestamps, null ordering, casts, date functions and paging.
-   `PostgresDialect` and `MySqlDialect` are complete examples of about 100 lines. `capabilities()` declares what
+   `PostgresDialect`, `MySqlDialect` and `H2Dialect` are complete examples of about 100 lines. `capabilities()` declares what
    the database lacks (window functions, native booleans) and its limits (`in` list size, bound parameters), so a
    query it cannot run is rejected with a clear message instead of failing in the database
 2. A `META-INF/services/io.github.serfom256.intentflow.core.pipeline.SqlDialect` entry
-3. A test extending `DialectConformanceTest` that returns your `TestDatabase` (a Testcontainers container)
+3. A test extending `DialectConformanceTest` that returns your `TestDatabase` (a Testcontainers container, or
+   an in-memory URL as in `intentflow-h2`)
 
 The conformance test runs thousands of random queries against the real database and compares every result with an
 independent in-memory evaluation. `ExpectedSqlTest` pins the SQL of about 60 queries per dialect in `src/test/resources/expected-sql`, so any change to the
@@ -417,7 +423,7 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
 | intentflow.catalog.packages           | your application's packages | Where `@IntentService` classes are scanned          |
 | intentflow.executor                   | first available             | `openmapper`, `jpa`, `jimmer`, `spring-data-jdbc`, `cassandra` or `jdbc` |
-| intentflow.dialect                    | detected                    | `postgresql` or `mysql`                             |
+| intentflow.dialect                    | detected                    | `postgresql`, `mysql` or `h2`                       |
 | intentflow.max-skip                   | 10000                       | Largest `skip` a query may use                      |
 | intentflow.max-in-values              | 1000                        | Most values in one `in (...)`                       |
 | intentflow.time-zone                  | the JVM's zone              | Zone for dates without an offset, e.g. `Europe/Berlin` |

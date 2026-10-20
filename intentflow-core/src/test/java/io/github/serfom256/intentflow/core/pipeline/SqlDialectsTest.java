@@ -13,7 +13,6 @@ class SqlDialectsTest {
         assertThat(SqlDialects.named("MySQL").name()).isEqualTo("mysql");
         assertThat(SqlDialects.named("mariadb").name()).isEqualTo("mysql");
         assertThat(SqlDialects.named("postgres").name()).isEqualTo("postgresql");
-        assertThat(SqlDialects.named("H2").name()).isEqualTo("postgresql");
     }
 
     @Test
@@ -22,5 +21,8 @@ class SqlDialectsTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("available: [mysql, postgresql]")
                 .hasMessageContaining("intentflow-oracle");
+        assertThatThrownBy(() -> SqlDialects.named("H2"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("intentflow-h2");
     }
 }

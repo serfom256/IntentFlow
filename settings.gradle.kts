@@ -11,6 +11,7 @@ include(
 val dialects = listOf(
     "intentflow-postgresql", 
     "intentflow-mysql", 
+    "intentflow-h2",
     "intentflow-cassandra"
 )
 val executors = listOf(
@@ -32,6 +33,11 @@ executors.forEach {
 }
 
 val examples = listOf(
+    "intentflow-shop-domain",
+    "intentflow-shop-openmapper",
+    "intentflow-shop-jpa",
+    "intentflow-shop-jimmer",
+    "intentflow-shop-jdbc",
     "intentflow-shop-api",
     "intentflow-shop-ui"
 )

@@ -18,8 +18,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public final class JdbcSchemaIntrospector {
+
+    private static final Pattern UPPER_CASE = Pattern.compile("[A-Z_][A-Z0-9_]*");
 
     private JdbcSchemaIntrospector() {
     }
@@ -51,13 +56,27 @@ public final class JdbcSchemaIntrospector {
             for (String inSchema : schemas) {
                 Columns columns = columns(metaData, catalog, inSchema, candidate);
                 if (columns != null) {
-                    return new TableFacts(primaryKey(metaData, catalog, inSchema, candidate),
-                            uniqueKeys(metaData, catalog, inSchema, candidate), columns.notNull(), Map.of(),
-                            columns.zoned());
+                    UnaryOperator<String> folded = folded(metaData);
+                    return new TableFacts(
+                            primaryKey(metaData, catalog, inSchema, candidate).stream().map(folded).toList(),
+                            uniqueKeys(metaData, catalog, inSchema, candidate).stream()
+                                    .map(key -> key.stream().map(folded).toList()).toList(),
+                            names(columns.notNull(), folded), Map.of(), names(columns.zoned(), folded));
                 }
             }
         }
         return null;
+    }
+
+    private static UnaryOperator<String> folded(DatabaseMetaData metaData) throws SQLException {
+        if (!metaData.storesUpperCaseIdentifiers()) {
+            return UnaryOperator.identity();
+        }
+        return name -> UPPER_CASE.matcher(name).matches() ? name.toLowerCase(Locale.ROOT) : name;
+    }
+
+    private static Set<String> names(Set<String> columns, UnaryOperator<String> folded) {
+        return columns.stream().map(folded).collect(Collectors.toSet());
     }
 
     private static List<String> variants(String name) {

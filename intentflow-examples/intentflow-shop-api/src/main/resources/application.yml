@@ -10,16 +10,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
-      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
   jpa:
     open-in-view: false
 
 openmapper:
-  dao:
-    packagesToScan: io.github.serfom256.intentflow.examples.shop.openmapper
   model:
     packagesToScan: io.github.serfom256.intentflow.examples.shop.openmapper
 
@@ -46,9 +40,17 @@ logging:
 spring:
   config:
     activate:
-      on-profile: jpa
+      on-profile: "!jpa"
   autoconfigure:
-    exclude: io.github.serfom256.config.OpenMapperConfig
+    exclude:
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
+
+---
+spring:
+  config:
+    activate:
+      on-profile: jpa
 intentflow:
   executor: jpa
   catalog:
@@ -59,11 +61,6 @@ spring:
   config:
     activate:
       on-profile: jimmer
-  autoconfigure:
-    exclude:
-      - io.github.serfom256.config.OpenMapperConfig
-      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
-      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
 intentflow:
   executor: jimmer
   catalog:
@@ -74,11 +71,6 @@ spring:
   config:
     activate:
       on-profile: jdbc
-  autoconfigure:
-    exclude:
-      - io.github.serfom256.config.OpenMapperConfig
-      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
-      - org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration
 intentflow:
   executor: jdbc
   catalog:

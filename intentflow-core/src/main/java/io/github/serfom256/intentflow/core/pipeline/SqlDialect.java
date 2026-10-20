@@ -34,6 +34,16 @@ public interface SqlDialect {
      */
     void contains(SqlWriter sql, String column, String text);
 
+    /**
+     * A literal bound as a parameter. The default binds it as is. A database that
+     * types a parameter after the other operand, like H2, which would turn
+     * {@code 0.5} next to an integer column into {@code 1}, writes a cast that
+     * keeps the literal's own type.
+     */
+    default void literal(SqlWriter sql, DslLiteral value) {
+        sql.param(value);
+    }
+
     /** A bound text literal compared against a timestamp column. */
     void timestamp(SqlWriter sql, DslLiteral value);
 

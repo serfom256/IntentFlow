@@ -29,6 +29,7 @@ dependencies {
     testImplementation(projects.intentflowSpringDataCassandra)
     testImplementation(projects.intentflowPostgresql)
     testImplementation(projects.intentflowMysql)
+    testImplementation(projects.intentflowH2)
     testImplementation(libs.spring.boot.starter.jdbc)
     testImplementation(libs.spring.boot.starter.data.jdbc)
     testImplementation(libs.spring.boot.starter.data.jpa)

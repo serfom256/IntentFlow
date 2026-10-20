@@ -18,6 +18,7 @@ dependencies {
     testImplementation(libs.jakarta.servlet.api)
     testImplementation(libs.jackson2.databind)
     testImplementation(projects.intentflowPostgresql)
+    testImplementation(projects.intentflowH2)
     testImplementation(libs.h2)
     testImplementation(libs.spring.security.core)
     testImplementation(libs.spring.security.web)

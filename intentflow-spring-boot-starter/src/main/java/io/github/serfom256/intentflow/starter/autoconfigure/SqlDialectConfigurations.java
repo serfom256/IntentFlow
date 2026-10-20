@@ -43,7 +43,7 @@ final class SqlDialectConfigurations {
             return available.getFirst();
         }
         throw new IllegalStateException(available.isEmpty()
-                ? "No SQL dialect on the classpath: add intentflow-postgresql, intentflow-mysql or another dialect"
+                ? "No SQL dialect on the classpath: add intentflow-postgresql, intentflow-mysql, intentflow-h2 or another dialect"
                 : "Several SQL dialects on the classpath " + available.stream().map(SqlDialect::name).toList()
                         + " and no DataSource to choose from: set intentflow.dialect");
     }
@@ -110,9 +110,11 @@ final class SqlDialectConfigurations {
 
         static @Nullable SqlDialect dialectOf(String urlOrProduct, ClassLoader classLoader) {
             String value = urlOrProduct.toLowerCase(Locale.ROOT).replace("jdbc:tc:", "jdbc:");
-            if (value.startsWith("jdbc:postgresql:") || value.startsWith("jdbc:h2:")
-                    || value.equals("postgresql") || value.equals("h2")) {
+            if (value.startsWith("jdbc:postgresql:") || value.equals("postgresql")) {
                 return SqlDialects.named("postgresql", classLoader);
+            }
+            if (value.startsWith("jdbc:h2:") || value.equals("h2")) {
+                return SqlDialects.named("h2", classLoader);
             }
             if (value.startsWith("jdbc:mysql:") || value.startsWith("jdbc:mariadb:")
                     || value.equals("mysql") || value.equals("mariadb")) {

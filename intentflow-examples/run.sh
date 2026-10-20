@@ -22,14 +22,14 @@ LOG="$ROOT/intentflow-examples/intentflow-shop-api/build/run.log"
 cd "$ROOT"
 
 case "$MODE" in
-  testcontainers) API_TASK=(:intentflow-shop-api:bootTestRun "--args=--spring.profiles.active=$ORM") ;;
+  testcontainers) API_TASK=(:intentflow-shop-api:bootTestRun "-Porm=$ORM") ;;
   postgres)
     docker compose up -d --wait postgres
-    API_TASK=(:intentflow-shop-api:bootRun "--args=--spring.profiles.active=$ORM")
+    API_TASK=(:intentflow-shop-api:bootRun "-Porm=$ORM")
     ;;
   mysql)
     docker compose up -d --wait mysql
-    API_TASK=(:intentflow-shop-api:bootRun "--args=--spring.profiles.active=mysql,$ORM")
+    API_TASK=(:intentflow-shop-api:bootRun "-Porm=$ORM" "--args=--spring.profiles.active=mysql")
     ;;
   -h|--help) usage; exit 0 ;;
   *) usage; exit 1 ;;

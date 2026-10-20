@@ -258,9 +258,9 @@ class IntentFlowAutoConfigurationTest {
         runner.withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books | filter title == \"DUNE\""))
                 .run(ctx -> {
                     JdbcClient jdbc = ctx.getBean(JdbcClient.class);
-                    jdbc.sql("CREATE TABLE \"book\" (\"id\" BIGINT, \"title\" VARCHAR(100), \"price\" DECIMAL(6,2))")
+                    jdbc.sql("CREATE TABLE book (id BIGINT, title VARCHAR(100), price DECIMAL(6,2))")
                             .update();
-                    jdbc.sql("INSERT INTO \"book\" VALUES (7, 'Dune', 9.99), (8, 'Emma', 5.00)").update();
+                    jdbc.sql("INSERT INTO book VALUES (7, 'Dune', 9.99), (8, 'Emma', 5.00)").update();
 
                     IntentResponse<Book> response = ctx.getBean(IntentPipeline.class)
                             .resolve(IntentRequests.of("dune please"), Book.class);
@@ -272,7 +272,7 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void dialectComesFromTheJdbcUrl() {
-        runner.run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("postgresql"));
+        runner.run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("h2"));
         runner.withPropertyValues("spring.datasource.url=jdbc:mysql://localhost:3306/shop")
                 .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("mysql"));
         runner.withPropertyValues("spring.datasource.url=jdbc:mariadb://localhost:3306/shop",
@@ -287,7 +287,7 @@ class IntentFlowAutoConfigurationTest {
                 .withUserConfiguration(StubExecutor.class)
                 .withBean(DataSource.class, () -> new DriverManagerDataSource("jdbc:h2:mem:meta"))
                 .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES)
-                .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("postgresql"));
+                .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("h2"));
     }
 
     @Test

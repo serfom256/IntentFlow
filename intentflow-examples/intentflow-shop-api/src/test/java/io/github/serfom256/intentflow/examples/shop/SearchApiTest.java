@@ -14,9 +14,6 @@ import io.github.serfom256.intentflow.examples.shop.domain.Order;
 import io.github.serfom256.intentflow.examples.shop.domain.OrderStatus;
 import io.github.serfom256.intentflow.examples.shop.domain.Product;
 import io.github.serfom256.intentflow.examples.shop.store.CrudStore;
-import io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor;
-import io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor;
-import io.github.serfom256.intentflow.jpa.JpaQueryExecutor;
 import io.github.serfom256.intentflow.openmapper.OpenMapperQueryExecutor;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -75,12 +72,13 @@ class SearchApiTest extends ApiTestSupport {
     class Wiring {
 
         @Test
-        void theActiveProfilesOrmRunsTheQueries() {
-            Map<String, Class<?>> executors = Map.of("jpa", JpaQueryExecutor.class, "jimmer",
-                    JimmerQueryExecutor.class, "jdbc", JdbcQueryExecutor.class);
-            Class<?> expected = Arrays.stream(environment.getActiveProfiles()).map(executors::get)
-                    .filter(Objects::nonNull).findFirst().orElse(OpenMapperQueryExecutor.class);
-            assertThat(executor).isInstanceOf(expected);
+        void theActiveProfilesOrmRunsTheQueries() throws ClassNotFoundException {
+            Map<String, String> executors = Map.of("jpa", "io.github.serfom256.intentflow.jpa.JpaQueryExecutor",
+                    "jimmer", "io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor",
+                    "jdbc", "io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor");
+            String expected = Arrays.stream(environment.getActiveProfiles()).map(executors::get)
+                    .filter(Objects::nonNull).findFirst().orElse(OpenMapperQueryExecutor.class.getName());
+            assertThat(executor).isInstanceOf(Class.forName(expected));
         }
 
         @Test

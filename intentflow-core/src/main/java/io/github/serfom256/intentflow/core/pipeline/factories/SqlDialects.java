@@ -14,7 +14,6 @@ public final class SqlDialects {
 
     private static final Map<String, String> ALIASES = Map.of(
             "postgres", "postgresql",
-            "h2", "postgresql",
             "mariadb", "mysql");
 
     public static SqlDialect named(String name) {

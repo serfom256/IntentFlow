@@ -5,6 +5,8 @@ A complete example: a shop (products, customers, orders) with CRUD and plain-lan
 | Module                                       | Stack                                                                 |
 | -------------------------------------------- | --------------------------------------------------------------------- |
 | [`intentflow-shop-api`](intentflow-shop-api) | Spring Boot 4, IntentFlow with OpenMapper, JPA, Jimmer or JDBC, Liquibase, PostgreSQL or MySQL |
+| `intentflow-shop-domain`                     | Domain classes and the `CrudStore` interface the API is written against |
+| `intentflow-shop-{openmapper,jpa,jimmer,jdbc}` | One persistence layer each: entities, stores and their Spring configuration |
 | [`intentflow-shop-ui`](intentflow-shop-ui)   | React 19, TypeScript, Mantine 9, TanStack Router and Query, Vite      |
 
 The API also includes the [admin UI](../intentflow-admin-spring-boot-starter/README.md) at
@@ -25,7 +27,7 @@ This starts the API on port 8080 and the UI on http://localhost:5173; Ctrl+C sto
 ./gradlew :intentflow-shop-api:bootTestRun                                     # PostgreSQL in a throwaway container
 docker compose up -d --wait && ./gradlew :intentflow-shop-api:bootRun          # PostgreSQL from Docker Compose
 ./gradlew :intentflow-shop-api:bootRun --args=--spring.profiles.active=mysql   # MySQL from Docker Compose
-./gradlew :intentflow-shop-api:bootRun --args=--spring.profiles.active=jpa     # JPA instead of OpenMapper
+./gradlew :intentflow-shop-api:bootRun -Porm=jpa                              # JPA instead of OpenMapper
 ./gradlew :intentflow-shop-ui:dev                                              # the UI, proxying /api to port 8080
 ```
 
@@ -36,20 +38,27 @@ with `POSTGRES_PORT`, `MYSQL_PORT`, `CASSANDRA_PORT`) and keeps their data in `.
 ## Persistence layers
 
 The same shop runs on four persistence layers; a Spring profile picks one, and the REST API, UI and tests stay the
-same. Each lives in its own package, so you can read just the one you use:
+same. Each is a Gradle module of its own. The API depends on `intentflow-shop-openmapper` only; `-Porm=jpa`,
+`-Porm=jimmer` or `-Porm=jdbc` adds that module with `implementation` and turns on its profile for `bootRun` and
+`bootTestRun`. CRUD always runs on OpenMapper; the profile picks the entities and executor that search uses:
 
-| Profile                | Package       | Entities                                                       | Persistence                     |
-| ---------------------- | ------------- | -------------------------------------------------------------- | ------------------------------- |
-| `openmapper` (default) | `openmapper/` | `@Model` classes, relations with `@IntentRelation`             | `.fsql` procedures and DAOs     |
-| `jpa`                  | `jpa/`        | `@Entity` classes, relations from `@ManyToOne` / `@OneToMany`  | Spring Data JPA repositories    |
-| `jimmer`               | `jimmer/`     | Jimmer entity interfaces, relations from `@ManyToOne` / `@OneToMany` | `JSqlClient`              |
-| `jdbc`                 | `jdbc/`       | records, relations with `@IntentRelation`                      | `JdbcClient` with plain SQL     |
+| Profile                | Module                       | Entities                                                             | Search executor          |
+| ---------------------- | ---------------------------- | -------------------------------------------------------------------- | ------------------------ |
+| `openmapper` (default) | `intentflow-shop-openmapper` | `@Model` classes, relations with `@IntentRelation`                   | OpenMapper `Procedures`  |
+| `jpa`                  | `intentflow-shop-jpa`        | `@Entity` classes, relations from `@ManyToOne` / `@OneToMany`        | JPA `EntityManager`      |
+| `jimmer`               | `intentflow-shop-jimmer`     | Jimmer entity interfaces, relations from `@ManyToOne` / `@OneToMany` | `JSqlClient`             |
+| `jdbc`                 | `intentflow-shop-jdbc`       | records, relations with `@IntentRelation`                            | `JdbcClient`             |
 
 What changes per profile is small: which entities `intentflow.catalog.packages` scans, which executor
-`intentflow.executor` uses, and which ORM's auto-configuration is on (see `application.yml`). The shared code works
-with the plain classes in `domain/` through `CrudStore`; each package implements it and maps its entities to them.
-Field descriptions for the LLM live in `domain/Descriptions`, so every profile describes the shop identically.
-Combine with `mysql` as `--spring.profiles.active=mysql,jpa`.
+`intentflow.executor` uses, and whether JPA's auto-configuration is on (see `application.yml`). The shared code works
+with the plain classes in `intentflow-shop-domain` through `CrudStore`, and each module's `EntityMapper` turns its
+search results into them. Field descriptions for the LLM live in `Descriptions` there, so every profile describes the shop
+identically. Combine with MySQL as `-Porm=jpa --args=--spring.profiles.active=mysql`.
+
+`OpenMapperStore` is the one `CrudStore` implementation. It reads the entity's `@Model` primary key, its `@Field`
+columns and the table and page order of its `@IntentService` once, builds the statements, and runs them through
+OpenMapper's `Procedures`, binding enums the way OpenMapper's DAOs do. A new type needs a `@Model` entity and one
+bean in `OpenMapperStores`.
 
 ## API
 
