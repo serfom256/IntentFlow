@@ -15,6 +15,7 @@ import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
 import io.github.serfom256.intentflow.core.pipeline.LlmHttpOptions;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
+import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
@@ -76,6 +77,7 @@ import java.util.function.Function;
         QueryExecutorConfigurations.Jimmer.class, QueryExecutorConfigurations.SpringDataJdbc.class,
         QueryExecutorConfigurations.Cassandra.class, QueryExecutorConfigurations.Jdbc.class,
         PipelineObservers.SpringSecurity.class, PipelineObservers.Micrometer.class,
+        PipelineObservers.Observations.class, LlmHealthBoot4.class, LlmHealthBoot3.class,
         TransactionalQueryExecutor.Wiring.class })
 public class IntentFlowAutoConfiguration {
 
@@ -188,7 +190,7 @@ public class IntentFlowAutoConfiguration {
             ObjectProvider<QueryExecutor> executor, UriBuilder uriBuilder,
             ServiceCatalog catalog, IntentFlowProperties properties, ObjectProvider<AccessPolicy> policy,
             ObjectProvider<IntentContextProvider> callers, ObjectProvider<PipelineListener> listeners,
-            ObjectProvider<ExecutorWrapper> wrapper) {
+            ObjectProvider<PipelineTracer> tracer, ObjectProvider<ExecutorWrapper> wrapper) {
         QueryExecutor queryExecutor = executor.getIfAvailable();
         if (queryExecutor == null) {
             throw new IllegalStateException("No QueryExecutor: configure a DataSource (spring.datasource.*) "
@@ -204,7 +206,8 @@ public class IntentFlowAutoConfiguration {
         List<PipelineListener> observers = listeners.orderedStream().toList();
         return IntentPipelines.create(normalizer, cache, llm, parser, validator, sqlBuilder,
                 queryExecutor, uriBuilder, catalog, properties.llm().maxRepairs(),
-                policy.getIfAvailable(() -> AccessPolicy.ALLOW_ALL), caller::current, new CompositeListener(observers));
+                policy.getIfAvailable(() -> AccessPolicy.ALLOW_ALL), caller::current, new CompositeListener(observers),
+                tracer.getIfAvailable(() -> PipelineTracer.NONE));
     }
 
 }

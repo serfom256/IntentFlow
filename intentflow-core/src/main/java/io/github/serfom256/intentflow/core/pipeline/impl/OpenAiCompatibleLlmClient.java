@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 public final class OpenAiCompatibleLlmClient implements LlmClient {
 
     private static final long MAX_RETRY_AFTER = 30;
+    private static final Duration PING_TIMEOUT = Duration.ofSeconds(5);
 
     private static final Pattern THINK_BLOCK = Pattern.compile("(?s)<think>.*?</think>");
     private static final Pattern CODE_FENCE = Pattern.compile("(?s)^```[a-zA-Z]*\\s*(.*?)\\s*```$");
@@ -104,6 +105,7 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
 
     private final HttpClient http;
     private final URI endpoint;
+    private final URI models;
     private final String model;
     private final String apiKey;
     private final Duration timeout;
@@ -121,7 +123,9 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
     public OpenAiCompatibleLlmClient(URI baseUrl, String model, String apiKey, Duration timeout, Clock clock,
             LlmHttpOptions options) {
         String base = baseUrl.toString();
-        this.endpoint = URI.create((base.endsWith("/") ? base : base + "/") + "chat/completions");
+        String root = base.endsWith("/") ? base : base + "/";
+        this.endpoint = URI.create(root + "chat/completions");
+        this.models = URI.create(root + "models");
         this.model = model;
         this.apiKey = apiKey;
         this.timeout = timeout;
@@ -149,6 +153,12 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                         + "or unsupported \"<reason>\" if the request cannot be expressed.")));
     }
 
+    @Override
+    public void ping() {
+        Duration limit = timeout.compareTo(PING_TIMEOUT) < 0 ? timeout : PING_TIMEOUT;
+        send(authorized(HttpRequest.newBuilder(models).GET()).timeout(limit).build(), 0);
+    }
+
     private static String message(String role, String content) {
         return "{\"role\":" + MiniJson.quote(role) + ",\"content\":" + MiniJson.quote(content) + "}";
     }
@@ -162,16 +172,10 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 + messages.stream().map(m -> "," + m).collect(Collectors.joining())
                 + "]}";
 
-        HttpRequest.Builder request = HttpRequest.newBuilder(endpoint)
-                .timeout(timeout)
+        HttpRequest request = authorized(HttpRequest.newBuilder(endpoint)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body));
-        options.headers().forEach(request::header);
-        if (!apiKey.isEmpty()) {
-            boolean bearer = options.apiKeyHeader().equalsIgnoreCase("Authorization");
-            request.header(options.apiKeyHeader(), bearer ? "Bearer " + apiKey : apiKey);
-        }
-        HttpResponse<String> response = send(request.build());
+                .POST(HttpRequest.BodyPublishers.ofString(body))).build();
+        HttpResponse<String> response = send(request, options.maxRetries());
 
         String dsl = cleanup(extractContent(response.body()));
         if (dsl.isEmpty()) {
@@ -180,10 +184,20 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
         return DslSources.of(dsl);
     }
 
-    private HttpResponse<String> send(HttpRequest request) {
+    private HttpRequest.Builder authorized(HttpRequest.Builder request) {
+        request.timeout(timeout);
+        options.headers().forEach(request::header);
+        if (!apiKey.isEmpty()) {
+            boolean bearer = options.apiKeyHeader().equalsIgnoreCase("Authorization");
+            request.header(options.apiKeyHeader(), bearer ? "Bearer " + apiKey : apiKey);
+        }
+        return request;
+    }
+
+    private HttpResponse<String> send(HttpRequest request, int maxRetries) {
         Duration backoff = options.retryBackoff();
         for (int attempt = 1;; attempt++) {
-            boolean last = attempt > options.maxRetries();
+            boolean last = attempt > maxRetries;
             Duration wait = backoff;
             try {
                 HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
@@ -199,10 +213,10 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 wait = retryAfter(response).orElse(backoff);
             } catch (HttpConnectTimeoutException | ConnectException e) {
                 if (last) {
-                    throw new LlmException("LLM at " + endpoint + " is not reachable: " + e.getMessage(), e);
+                    throw new LlmException("LLM at " + request.uri() + " is not reachable: " + e.getMessage(), e);
                 }
             } catch (IOException e) {
-                throw new LlmException("LLM request to " + endpoint + " failed: " + e.getMessage(), e);
+                throw new LlmException("LLM request to " + request.uri() + " failed: " + e.getMessage(), e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new LlmException("LLM request interrupted", e);

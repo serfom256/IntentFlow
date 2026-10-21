@@ -9,6 +9,7 @@ import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
+import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
@@ -61,7 +62,25 @@ public final class IntentPipelines {
             AccessPolicy policy,
             Supplier<IntentContext> defaultCaller,
             PipelineListener listener) {
+        return create(normalizer, cache, llm, parser, validator, sqlBuilder, executor, uriBuilder, catalog,
+                maxRepairs, policy, defaultCaller, listener, PipelineTracer.NONE);
+    }
+
+    public static IntentPipeline create(TextNormalizer normalizer,
+            DslCache cache,
+            LlmClient llm,
+            DslParser parser,
+            AstValidator validator,
+            SqlBuilder sqlBuilder,
+            QueryExecutor executor,
+            UriBuilder uriBuilder,
+            ServiceCatalog catalog,
+            int maxRepairs,
+            AccessPolicy policy,
+            Supplier<IntentContext> defaultCaller,
+            PipelineListener listener,
+            PipelineTracer tracer) {
         return new DefaultIntentPipeline(normalizer, cache, llm, parser, validator, sqlBuilder, executor, uriBuilder,
-                catalog, maxRepairs, policy, defaultCaller, listener);
+                catalog, maxRepairs, policy, defaultCaller, listener, tracer);
     }
 }

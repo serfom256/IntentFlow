@@ -39,7 +39,8 @@ public record IntentFlowProperties(
             @DefaultValue Map<String, String> headers,
             @Nullable URI proxy,
             @DefaultValue("2") int maxRetries,
-            @DefaultValue("500ms") Duration retryBackoff) {
+            @DefaultValue("500ms") Duration retryBackoff,
+            @DefaultValue("30s") Duration healthInterval) {
     }
 
     public record Cache(

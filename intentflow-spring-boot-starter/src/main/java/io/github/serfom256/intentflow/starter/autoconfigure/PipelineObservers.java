@@ -1,7 +1,9 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
+import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -32,6 +34,17 @@ final class PipelineObservers {
         @Bean
         PipelineListener intentFlowMetrics(ObjectProvider<MeterRegistry> registry) {
             return new MicrometerPipelineListener(registry);
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(ObservationRegistry.class)
+    static class Observations {
+
+        @Bean
+        @ConditionalOnMissingBean
+        PipelineTracer intentFlowTracer(ObjectProvider<ObservationRegistry> registry) {
+            return new ObservationPipelineTracer(registry);
         }
     }
 }

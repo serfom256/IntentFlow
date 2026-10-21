@@ -104,6 +104,16 @@ class OpenAiCompatibleLlmClientTest {
             exchange.getResponseBody().write(body);
             exchange.close();
         });
+        server.createContext("/v1/models", exchange -> {
+            lastAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            requests.incrementAndGet();
+            Integer next = statuses.poll();
+            int code = next != null ? next : status;
+            byte[] body = "{\"data\":[]}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(code, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
         server.start();
     }
 
@@ -285,5 +295,38 @@ class OpenAiCompatibleLlmClientTest {
         assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
                 .isInstanceOf(LlmException.class)
                 .hasMessageContaining("empty answer");
+    }
+
+    @Test
+    void pingListsTheModelsWithTheKey() {
+        client("secret").ping();
+
+        assertThat(lastAuth.get()).isEqualTo("Bearer secret");
+        assertThat(requests.get()).isEqualTo(1);
+    }
+
+    @Test
+    void pingFailsOnceWithoutRetrying() {
+        status = 503;
+
+        assertThatThrownBy(() -> client("secret").ping()).isInstanceOf(LlmException.class)
+                .hasMessage("LLM returned HTTP 503");
+        assertThat(requests.get()).isEqualTo(1);
+    }
+
+    @Test
+    void pingReportsAnUnreachableEndpoint() {
+        LlmClient client = client("");
+        server.stop(0);
+
+        assertThatThrownBy(client::ping).isInstanceOf(LlmException.class)
+                .hasMessageContaining("/v1/models is not reachable");
+    }
+
+    @Test
+    void clientsThatCannotPingSaySo() {
+        LlmClient custom = (text, catalog) -> DslSources.of("books");
+
+        assertThatThrownBy(custom::ping).isInstanceOf(UnsupportedOperationException.class);
     }
 }

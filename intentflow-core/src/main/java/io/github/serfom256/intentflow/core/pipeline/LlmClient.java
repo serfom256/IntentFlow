@@ -23,4 +23,15 @@ public interface LlmClient {
     default DslSource repairDsl(UserText normalizedText, ServiceCatalog catalog, DslSource failed, String error) {
         return generateDsl(normalizedText, catalog);
     }
+
+    /**
+     * Checks that the model endpoint answers and accepts the credentials, without
+     * generating text, for a health
+     * check. Throws when it does not. The default throws
+     * {@link UnsupportedOperationException}, which a health
+     * check reports as unknown.
+     */
+    default void ping() {
+        throw new UnsupportedOperationException(getClass().getName() + " cannot check its endpoint");
+    }
 }

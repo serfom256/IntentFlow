@@ -32,6 +32,9 @@ import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener.Outcome;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
+import io.github.serfom256.intentflow.core.pipeline.PipelineTracer.Span;
+import io.github.serfom256.intentflow.core.pipeline.PipelineTracer.Stage;
+import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
@@ -50,6 +53,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -72,12 +76,13 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private final AccessPolicy policy;
     private final Supplier<IntentContext> defaultCaller;
     private final PipelineListener listener;
+    private final PipelineTracer tracer;
 
     public DefaultIntentPipeline(TextNormalizer normalizer, DslCache cache, LlmClient llm, DslParser parser,
             AstValidator validator, SqlBuilder sqlBuilder, QueryExecutor executor, UriBuilder uriBuilder,
             ServiceCatalog catalog, int maxRepairs) {
         this(normalizer, cache, llm, parser, validator, sqlBuilder, executor, uriBuilder, catalog, maxRepairs,
-                AccessPolicy.ALLOW_ALL, IntentContexts::anonymous, PipelineListener.NONE);
+                AccessPolicy.ALLOW_ALL, IntentContexts::anonymous, PipelineListener.NONE, PipelineTracer.NONE);
     }
 
     @Override
@@ -144,22 +149,47 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     }
 
     private <R> R observed(long start, @Nullable ServiceName service, Supplier<R> resolve) {
+        Span span = tracer.start(Stage.REQUEST);
         try {
             R response = resolve.get();
-            listener.request(response instanceof IntentResponse<?> r ? r.service() : service, Outcome.ANSWERED,
-                    since(start));
+            ended(span, start, response instanceof IntentResponse<?> r ? r.service() : service, Outcome.ANSWERED,
+                    null);
             return response;
         } catch (UnsupportedRequestException e) {
-            listener.request(service, Outcome.DECLINED, since(start));
+            ended(span, start, service, Outcome.DECLINED, null);
             throw e;
         } catch (DslParseException | ValidationException | ServiceNotFoundException e) {
-            listener.request(service, Outcome.REJECTED, since(start));
+            ended(span, start, service, Outcome.REJECTED, null);
             throw e;
         } catch (AccessDeniedException e) {
-            listener.request(service, Outcome.DENIED, since(start));
+            ended(span, start, service, Outcome.DENIED, null);
             throw e;
         } catch (RuntimeException e) {
-            listener.request(service, Outcome.FAILED, since(start));
+            ended(span, start, service, Outcome.FAILED, e);
+            throw e;
+        }
+    }
+
+    private void ended(Span span, long start, @Nullable ServiceName service, Outcome outcome,
+            @Nullable Throwable error) {
+        listener.request(service, outcome, since(start));
+        span.end(service, outcome.name().toLowerCase(Locale.ROOT), error);
+    }
+
+    private <R> R traced(Stage stage, @Nullable ServiceName service, Supplier<R> work) {
+        Span span = tracer.start(stage);
+        try {
+            R result = work.get();
+            span.end(service, "ok", null);
+            return result;
+        } catch (UnsupportedRequestException e) {
+            span.end(service, "declined", null);
+            throw e;
+        } catch (DslParseException | ValidationException | ServiceNotFoundException e) {
+            span.end(service, "rejected", e);
+            throw e;
+        } catch (RuntimeException e) {
+            span.end(service, "error", e);
             throw e;
         }
     }
@@ -192,9 +222,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private Compiled compile(IntentRequest request, Caller caller, ServiceCatalog scope,
             @Nullable ServiceDescriptor expected) {
         long start = System.nanoTime();
+        ServiceName expectedName = expected == null ? null : expected.name();
         UserText normalized = normalizer.normalize(request.text());
-        DslCacheKey key = new DslCacheKey(normalized, expected == null ? null : expected.name(),
-                caller.view().version());
+        DslCacheKey key = new DslCacheKey(normalized, expectedName, caller.view().version());
 
         Optional<DslSource> hit = cache.get(key);
         boolean cached = hit.isPresent();
@@ -205,7 +235,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             log.debug("DSL cache hit for '{}': {}", normalized.value(), dsl.value());
         } else {
             long llmStart = System.nanoTime();
-            dsl = askLlm(false, () -> llm.generateDsl(normalized, scope));
+            dsl = askLlm(false, expectedName, () -> llm.generateDsl(normalized, scope));
             log.debug("LLM translated '{}' in {} ms: {}", normalized.value(), millisSince(llmStart), dsl.value());
         }
 
@@ -213,7 +243,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         ValidatedQuery validated;
         while (true) {
             try {
-                validated = validate(dsl, expected, caller.view());
+                DslSource current = dsl;
+                validated = traced(Stage.VALIDATE, expectedName, () -> validate(current, expected, caller.view()));
                 break;
             } catch (UnsupportedRequestException declined) {
                 log.debug("Declined '{}': {}", normalized.value(), declined.getMessage());
@@ -229,7 +260,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 repairs++;
                 long llmStart = System.nanoTime();
                 DslSource failed = dsl;
-                dsl = askLlm(true, () -> llm.repairDsl(normalized, scope, failed, rejected.getMessage()));
+                dsl = askLlm(true, expectedName,
+                        () -> llm.repairDsl(normalized, scope, failed, rejected.getMessage()));
                 log.debug("LLM corrected '{}' in {} ms (attempt {} of {}): {}", normalized.value(),
                         millisSince(llmStart), repairs, maxRepairs, dsl.value());
             }
@@ -237,16 +269,17 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         if (!cached) {
             cache.put(key, dsl);
         }
-        BoundQuery query = sqlBuilder.build(validated, executor.shape(validated.service().resultType()),
-                caller.restrictions());
+        ValidatedQuery valid = validated;
+        BoundQuery query = traced(Stage.BUILD, valid.service().name(),
+                () -> sqlBuilder.build(valid, executor.shape(valid.service().resultType()), caller.restrictions()));
         log.debug("Query: {} binds={}", query.sql(), query.values());
         return new Compiled(normalized, dsl, cached, validated, query, start, repairs);
     }
 
-    private DslSource askLlm(boolean repair, Supplier<DslSource> call) {
+    private DslSource askLlm(boolean repair, @Nullable ServiceName service, Supplier<DslSource> call) {
         long start = System.nanoTime();
         try {
-            DslSource dsl = call.get();
+            DslSource dsl = traced(repair ? Stage.REPAIR : Stage.GENERATE, service, call);
             listener.llm(repair, since(start), false);
             return dsl;
         } catch (RuntimeException e) {
@@ -276,6 +309,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         Class<T> type = (Class<T>) validated.service().resultType();
         Aggregate aggregate = validated.ast().aggregate();
         long start = System.nanoTime();
+        Span span = tracer.start(Stage.QUERY);
         List<T> items;
         Aggregation aggregation;
         try {
@@ -286,10 +320,12 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             aggregation = aggregate == null ? null : aggregation(aggregate, executor.rows(query));
         } catch (RuntimeException e) {
             listener.query(validated.service().name(), aggregate != null, since(start), 0, true);
+            span.end(validated.service().name(), "error", e);
             throw e;
         }
         int rows = aggregation == null ? items.size() : aggregation.rows().size();
         listener.query(validated.service().name(), aggregate != null, since(start), rows, false);
+        span.end(validated.service().name(), "ok", null);
         MicroFrontendUri uri = uriBuilder.build(validated, items);
         log.debug("Resolved '{}' to {} with {} {} in {} ms", compiled.question().value(), uri.value(), rows,
                 aggregation == null ? type.getSimpleName() : "groups", millisSince(compiled.startNanos()));

@@ -436,6 +436,18 @@ with the timeout set; the application's `ProceduresCustomizer` beans still apply
 
 Any `PipelineListener` bean hears the same events.
 
+**Tracing.** When the application has an `ObservationRegistry` (Spring Boot Actuator sets one up), every stage of
+a question is a Micrometer observation named `intentflow.stage`, so a tracing bridge such as OpenTelemetry or
+Brave exports it as a span: `intentflow request` with `generate`, `repair`, `validate`, `build` and `query` inside
+it. Each carries the tags `stage`, `service` and `outcome`, and failed stages record their exception. A
+`PipelineTracer` bean replaces this with your own spans.
+
+**Health.** With Actuator, the `intentflowLlm` health indicator lists the models at `intentflow.llm.base-url`,
+which checks that the endpoint answers and accepts the key without spending tokens. The result is reused for
+`intentflow.llm.health-interval` (30s). It is part of `/actuator/health` but not of the liveness and readiness
+groups, so an LLM outage does not restart the application; `management.health.intentflow-llm.enabled=false`
+turns it off. A custom `LlmClient` reports `UNKNOWN` unless it implements `ping()`.
+
 **LLM connection.** The client uses the JVM's proxy settings (`https.proxyHost`, `java.net.useSystemProxies`) or
 `intentflow.llm.proxy`. `intentflow.llm.api-key-header: api-key` sends the key the way Azure OpenAI expects, and
 `intentflow.llm.headers` adds headers to every call. Rate limits (429) and server errors (5xx) are retried with
@@ -495,6 +507,7 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.timeout                | 60s                         | Timeout of one LLM call                             |
 | intentflow.llm.max-retries            | 2                           | Retries after a 429 or 5xx answer                   |
 | intentflow.llm.retry-backoff          | 500ms                       | First wait between retries; doubles each time       |
+| intentflow.llm.health-interval        | 30s                         | How long the LLM health check result is reused      |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |

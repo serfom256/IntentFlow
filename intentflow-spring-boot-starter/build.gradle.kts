@@ -10,6 +10,15 @@ dependencies {
     compileOnly(libs.spring.jdbc)
     compileOnly(libs.spring.security.core)
     compileOnly(libs.micrometer.core)
+    compileOnly(libs.micrometer.observation)
+    compileOnly(libs.spring.boot.health) {
+        version { strictly(libs.versions.springBoot.get()) }
+        isTransitive = false
+    }
+    compileOnly(libs.spring.boot.actuator) {
+        version { strictly(libs.versions.springBoot3.get()) }
+        isTransitive = false
+    }
     compileOnly(libs.spring.orm)
     compileOnly(libs.spring.data.jdbc)
     compileOnly(libs.spring.data.cassandra)
@@ -39,6 +48,11 @@ dependencies {
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.security.core)
     testImplementation(libs.micrometer.core)
+    testImplementation(libs.micrometer.observation)
+    testImplementation(
+        if (providers.gradleProperty("springBoot").orElse(libs.versions.springBoot).get().startsWith("3."))
+            libs.spring.boot.actuator else libs.spring.boot.health
+    )
     testImplementation(libs.jimmer.sql)
     testImplementation(libs.openmapper)
     testRuntimeOnly(libs.jackson3.databind)
