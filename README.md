@@ -420,7 +420,9 @@ The fields of the returned entities are not filtered: return a view without the 
 **Statement timeout.** Generated queries run in a read-only transaction with `intentflow.sql.statement-timeout`
 (30s) when the application has one transaction manager and IntentFlow starts the transaction. The `jdbc`,
 `spring-data-jdbc` and `jpa` executors apply the timeout to their statements; `jimmer` and the Cassandra executor
-set it on the statement themselves. OpenMapper statements take their timeout from a `ProceduresCustomizer`.
+set it on the statement themselves. For OpenMapper, IntentFlow runs entity queries through its own `Procedures`
+with the timeout set; the application's `ProceduresCustomizer` beans still apply to it, and the application's
+`Procedures` bean keeps its own settings.
 
 **Metrics.** With Micrometer on the classpath, the starter records:
 

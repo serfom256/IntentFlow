@@ -21,6 +21,7 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.metamodel.EntityType;
 import org.babyfish.jimmer.sql.JSqlClient;
 import org.babyfish.jimmer.sql.fetcher.Fetcher;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -54,8 +55,11 @@ final class QueryExecutorConfigurations {
         @ConditionalOnMissingBean(QueryExecutor.class)
         @ConditionalOnBean(Procedures.class)
         @ConditionalOnProperty(prefix = "intentflow", name = "executor", havingValue = "openmapper", matchIfMissing = true)
-        QueryExecutor intentFlowOpenMapperQueryExecutor(Procedures procedures, ObjectProvider<JdbcClient> jdbcClient) {
-            return new OpenMapperQueryExecutor(procedures, jdbcClient.getIfAvailable());
+        QueryExecutor intentFlowOpenMapperQueryExecutor(Procedures procedures, ObjectProvider<JdbcClient> jdbcClient,
+                IntentFlowProperties properties, BeanFactory beans) {
+            return new OpenMapperQueryExecutor(
+                    OpenMapperProcedures.withTimeout(procedures, properties.sql().statementTimeout(), beans),
+                    jdbcClient.getIfAvailable());
         }
     }
 
