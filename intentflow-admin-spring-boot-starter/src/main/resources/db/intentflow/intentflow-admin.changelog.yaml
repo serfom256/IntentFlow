@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - property:
+      name: intentflow.admin.table
+      value: intentflow_catalog_override
+  - changeSet:
+      id: intentflow-admin-1-catalog-override
+      author: intentflow
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: ${intentflow.admin.table}
+      changes:
+        - createTable:
+            tableName: ${intentflow.admin.table}
+            columns:
+              - column: { name: service, type: VARCHAR(100), constraints: { nullable: false } }
+              - column: { name: field, type: VARCHAR(100), constraints: { nullable: false } }
+              - column: { name: kind, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: text_value, type: VARCHAR(2000), constraints: { nullable: false } }
+        - addPrimaryKey:
+            tableName: ${intentflow.admin.table}
+            columnNames: service, field, kind

@@ -8,9 +8,11 @@ import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
+import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
+import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelineBuilder;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
@@ -33,6 +35,10 @@ class TokenUsageTest {
     private final List<String> events = new ArrayList<>();
 
     private IntentPipeline pipeline() {
+        return builder().build();
+    }
+
+    private IntentPipelineBuilder builder() {
         LlmClient llm = new LlmClient() {
             @Override
             public DslSource generateDsl(UserText text, ServiceCatalog catalog) {
@@ -60,8 +66,7 @@ class TokenUsageTest {
                     }
                 })
                 .catalog(CATALOG)
-                .listener(listener)
-                .build();
+                .listener(listener);
     }
 
     @Test
@@ -89,5 +94,24 @@ class TokenUsageTest {
     @Test
     void explainReportsTheTokensToo() {
         assertThat(pipeline().explain(IntentRequests.of("books by x")).tokens().total()).isEqualTo(1882);
+    }
+
+    @Test
+    void spansCarryTheTokens() {
+        List<String> spans = new ArrayList<>();
+        PipelineTracer tracer = stage -> new PipelineTracer.Span() {
+            @Override
+            public void usage(TokenUsage tokens, @Nullable String model) {
+                spans.add(stage + " " + tokens.total() + " " + model);
+            }
+
+            @Override
+            public void end(@Nullable ServiceName service, String outcome, @Nullable Throwable error) {
+            }
+        };
+
+        builder().tracer(tracer).build().resolve(IntentRequests.of("books by x"));
+
+        assertThat(spans).containsExactly("GENERATE 920 big", "REPAIR 962 small", "REQUEST 1882 null");
     }
 }

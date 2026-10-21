@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.api.UserText;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
@@ -39,7 +40,7 @@ class ObservabilityAutoConfigurationTest {
     private final LlmClient llm = new LlmClient() {
         @Override
         public DslSource generateDsl(UserText normalizedText, ServiceCatalog catalog) {
-            return DslSources.of("books");
+            return DslSources.of("books", new TokenUsage(300, 9), "local-model");
         }
 
         @Override
@@ -91,6 +92,12 @@ class ObservabilityAutoConfigurationTest {
             });
             Observation.Context request = stopped.getLast();
             assertThat(tags(request)).containsEntry("service", "books").containsEntry("outcome", "answered");
+            assertThat(highCardinality(stopped.getFirst())).containsEntry("gen_ai.usage.input_tokens", "300")
+                    .containsEntry("gen_ai.usage.output_tokens", "9")
+                    .containsEntry("gen_ai.response.model", "local-model");
+            assertThat(highCardinality(request)).containsEntry("gen_ai.usage.input_tokens", "300")
+                    .doesNotContainKey("gen_ai.response.model");
+            assertThat(tags(stopped.getFirst())).doesNotContainKey("gen_ai.usage.input_tokens");
             assertThat(stopped.subList(0, 4)).allSatisfy(context -> assertThat(
                     context.getParentObservation().getContextView()).isSameAs(request));
         });
@@ -132,6 +139,11 @@ class ObservabilityAutoConfigurationTest {
     void theHealthCheckCanBeTurnedOff() {
         runner.withPropertyValues("management.health.intentflow-llm.enabled=false")
                 .run(ctx -> assertThat(ctx).doesNotHaveBean(HEALTH));
+    }
+
+    private static Map<String, String> highCardinality(Observation.Context context) {
+        return context.getHighCardinalityKeyValues().stream()
+                .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
     }
 
     private static Map<String, String> tags(Observation.Context context) {

@@ -10,6 +10,10 @@ dependencies {
     compileOnly(libs.spring.jdbc)
     compileOnly(libs.spring.security.core)
     compileOnly(libs.jakarta.servlet.api)
+    compileOnly(libs.spring.boot.sql) {
+        version { strictly(libs.versions.springBoot.get()) }
+        isTransitive = false
+    }
     annotationProcessor(libs.spring.boot.configuration.processor)
 
     testImplementation(libs.spring.boot.starter.test)
@@ -20,6 +24,10 @@ dependencies {
     testImplementation(projects.intentflowPostgresql)
     testImplementation(projects.intentflowH2)
     testImplementation(libs.h2)
+    testImplementation(libs.liquibase.core)
+    if (!providers.gradleProperty("springBoot").orElse(libs.versions.springBoot).get().startsWith("3.")) {
+        testImplementation(libs.spring.boot.liquibase)
+    }
     testImplementation(libs.spring.security.core)
     testImplementation(libs.spring.security.web)
     testImplementation(testFixtures(projects.intentflowCore))

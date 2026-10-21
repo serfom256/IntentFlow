@@ -4,6 +4,7 @@ import io.github.serfom256.intentflow.core.catalog.CatalogOverrides;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.ServiceOverride;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -18,6 +19,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 public final class JdbcCatalogOverrides implements CatalogOverrides {
+
+    public static final String CHANGELOG = "db/intentflow/intentflow-admin.changelog.yaml";
 
     private static final Pattern TABLE_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,62}");
     private static final String SERVICE_LEVEL = "";
@@ -46,7 +49,13 @@ public final class JdbcCatalogOverrides implements CatalogOverrides {
                     + "field VARCHAR(100) NOT NULL, kind VARCHAR(20) NOT NULL, text_value VARCHAR(2000) NOT NULL, "
                     + "PRIMARY KEY (service, field, kind))");
         }
-        reload();
+        try {
+            reload();
+        } catch (BadSqlGrammarException e) {
+            throw new IllegalStateException("The IntentFlow admin table " + table + " cannot be read. Include "
+                    + "classpath:" + CHANGELOG + " in your Liquibase changelog, or set "
+                    + "intentflow.admin.create-table=true to let the admin create it.", e);
+        }
     }
 
     @Override

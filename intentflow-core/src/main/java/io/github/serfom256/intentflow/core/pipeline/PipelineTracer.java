@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import org.jspecify.annotations.Nullable;
 
@@ -40,5 +41,14 @@ public interface PipelineTracer {
     interface Span {
 
         void end(@Nullable ServiceName service, String outcome, @Nullable Throwable error);
+
+        /**
+         * Tokens the LLM used, called before {@link #end} on {@code GENERATE} and
+         * {@code REPAIR} spans and, with
+         * the request's total, on the {@code REQUEST} span; {@code model} is
+         * {@code null} on the request span.
+         */
+        default void usage(TokenUsage tokens, @Nullable String model) {
+        }
     }
 }

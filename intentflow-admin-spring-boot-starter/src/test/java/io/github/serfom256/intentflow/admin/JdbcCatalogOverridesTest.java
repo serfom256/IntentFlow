@@ -61,4 +61,14 @@ class JdbcCatalogOverridesTest {
         assertThatThrownBy(() -> new JdbcCatalogOverrides(dataSource, "x; DROP TABLE y", true, Duration.ZERO))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void aMissingTableExplainsHowToCreateIt() {
+        assertThatThrownBy(() -> new JdbcCatalogOverrides(dataSource, "intentflow_catalog_override", false,
+                Duration.ZERO))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("intentflow_catalog_override")
+                .hasMessageContaining("classpath:db/intentflow/intentflow-admin.changelog.yaml")
+                .hasMessageContaining("intentflow.admin.create-table=true");
+    }
 }

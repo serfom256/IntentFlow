@@ -25,7 +25,8 @@ public record IntentFlowProperties(
         @DefaultValue Sql sql,
         @DefaultValue Cassandra cassandra,
         @DefaultValue Audit audit,
-        @DefaultValue Logging logging) {
+        @DefaultValue Logging logging,
+        @DefaultValue Results results) {
 
     public ZoneId zone() {
         return timeZone == null || timeZone.isBlank() ? ZoneId.systemDefault() : ZoneId.of(timeZone.strip());
@@ -96,5 +97,8 @@ public record IntentFlowProperties(
     }
 
     public record Logging(@DefaultValue("false") boolean values) {
+    }
+
+    public record Results(@DefaultValue("false") boolean visibleFieldsOnly) {
     }
 }

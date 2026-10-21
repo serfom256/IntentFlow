@@ -122,12 +122,17 @@ class JpaRelationsIT {
     }
 
     private static IntentPipeline answering(DifferentialDatabase db, String dsl) {
+        return answering(db, dsl, false);
+    }
+
+    private static IntentPipeline answering(DifferentialDatabase db, String dsl, boolean visibleFieldsOnly) {
         manager(db).clear();
         return IntentPipelines.builder()
                 .llm((t, c) -> DslSources.of(dsl))
                 .sqlBuilder(SqlBuilders.create(db.dialect(), FACTS))
                 .executor(new JpaQueryExecutor(manager(db)))
                 .catalog(CATALOG)
+                .visibleFieldsOnly(visibleFieldsOnly)
                 .build();
     }
 
@@ -179,5 +184,22 @@ class JpaRelationsIT {
         assertThat(active.trace().optimizations()).contains("key-projection");
         assertThat(answering(db, "active_orders | count").resolve(IntentRequests.of("q"), ActiveOrder.class)
                 .aggregation().rows().getFirst().value()).isEqualTo(new BigDecimal("4"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(DifferentialDatabase.class)
+    void visibleFieldsOnlyReturnsDetachedCopiesWithLoadedRelations(DifferentialDatabase db) {
+        List<Order> orders = answering(db, "orders | filter customer.vip == true and status == \"paid\"", true)
+                .resolve(IntentRequests.of("q"), Order.class).items();
+        List<Customer> customers = answering(db, "customers | filter id == 2", true)
+                .resolve(IntentRequests.of("q"), Customer.class).items();
+
+        Order order = orders.getFirst();
+        assertThat(manager(db).contains(order)).isFalse();
+        assertThat(order.total).isEqualByComparingTo("50.00");
+        assertThat(order.doubled).isNull();
+        assertThat(order.customer.name).isEqualTo("Ann");
+        assertThat(order.customer.orders).isNull();
+        assertThat(customers.getFirst().orders).isNotEmpty().allSatisfy(o -> assertThat(o.doubled).isNull());
     }
 }

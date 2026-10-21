@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,6 +43,7 @@ public class IntentFlowAdminAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
+        @DependsOnDatabaseInitialization
         CatalogOverrides intentFlowCatalogOverrides(DataSource dataSource, IntentFlowAdminProperties properties) {
             log.info("IntentFlow admin keeps catalog overrides in table {}", properties.table());
             return new JdbcCatalogOverrides(dataSource, properties.table(), properties.createTable(),

@@ -484,6 +484,7 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.cassandra.max-scanned-rows | 10000                       | Rows one Cassandra query may read                   |
 | intentflow.audit.enabled              | false                       | One line per question and per catalog change on the `intentflow.audit` logger; an `AuditLog` bean replaces it |
 | intentflow.logging.values             | false                       | Show questions, DSL literals, bind values and LLM response bodies in logs |
+| intentflow.results.visible-fields-only | false                      | Return copies with only `@IntentField` fields the caller may see; others are null |
 | management.health.intentflow-llm.enabled | true                     | LLM health indicator; lists the models without spending tokens |
 
 ## Example application

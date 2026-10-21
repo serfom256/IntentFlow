@@ -96,7 +96,7 @@ Outside Spring, `ServiceCatalogs.withOverrides(catalog, overrides)` applies over
 | intentflow.admin.path                   | /intentflow-admin           | Where the UI is served; the API is under `<path>/api` |
 | intentflow.admin.storage                | auto                        | `auto` (table with a `DataSource`, else memory), `jdbc` or `memory` |
 | intentflow.admin.table                  | intentflow_catalog_override | Table for the overrides                              |
-| intentflow.admin.create-table           | true                        | Create the table if it does not exist                |
+| intentflow.admin.create-table           | true                        | Create the table if it does not exist; `false` with Liquibase: include `db/intentflow/intentflow-admin.changelog.yaml` (table name parameter `intentflow.admin.table`) |
 | intentflow.admin.refresh-interval       | 30s                         | How often an instance re-reads the table             |
 | intentflow.admin.index-advisor          | true                        | Show the query plan and index suggestions            |
 | intentflow.admin.security.enabled       | true                        | `false` opens the admin to everyone                  |

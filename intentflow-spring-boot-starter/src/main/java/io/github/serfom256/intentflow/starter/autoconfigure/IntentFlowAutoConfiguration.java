@@ -272,6 +272,7 @@ public class IntentFlowAutoConfiguration {
                 .rateLimiter(rateLimiter)
                 .audit(audit)
                 .logValues(properties.logging().values())
+                .visibleFieldsOnly(properties.results().visibleFieldsOnly())
                 .build();
     }
 

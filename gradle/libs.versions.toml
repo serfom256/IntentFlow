@@ -52,6 +52,9 @@ micrometer-core = { module = "io.micrometer:micrometer-core" }
 micrometer-observation = { module = "io.micrometer:micrometer-observation" }
 spring-boot-health = { module = "org.springframework.boot:spring-boot-health" }
 spring-boot-actuator = { module = "org.springframework.boot:spring-boot-actuator" }
+spring-boot-sql = { module = "org.springframework.boot:spring-boot-sql" }
+spring-boot-liquibase = { module = "org.springframework.boot:spring-boot-liquibase" }
+liquibase-core = { module = "org.liquibase:liquibase-core" }
 resilience4j-circuitbreaker = { module = "io.github.resilience4j:resilience4j-circuitbreaker", version.ref = "resilience4j" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api" }
 spring-orm = { module = "org.springframework:spring-orm" }

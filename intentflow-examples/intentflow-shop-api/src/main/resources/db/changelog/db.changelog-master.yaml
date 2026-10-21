@@ -125,3 +125,6 @@ databaseChangeLog:
             sql: >
               ALTER TABLE product ADD CONSTRAINT product_discount_chk CHECK (discount BETWEEN 0 AND 90);
               UPDATE product SET discount = 5 + MOD(id * 7, 6) * 5 WHERE MOD(id, 5) = 0;
+
+  - include:
+      file: db/intentflow/intentflow-admin.changelog.yaml

@@ -18,6 +18,7 @@ import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
 import io.github.serfom256.intentflow.core.pipeline.UriBuilder;
 import io.github.serfom256.intentflow.core.pipeline.impl.DefaultIntentPipeline;
+import io.github.serfom256.intentflow.core.pipeline.impl.VisibleEntities;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Supplier;
@@ -41,6 +42,7 @@ public final class IntentPipelineBuilder {
     private LlmRateLimiter rateLimiter = LlmRateLimiter.NONE;
     private AuditLog audit = AuditLog.NONE;
     private boolean logValues;
+    private boolean visibleFieldsOnly;
 
     IntentPipelineBuilder() {
     }
@@ -133,11 +135,22 @@ public final class IntentPipelineBuilder {
         return this;
     }
 
+    public IntentPipelineBuilder visibleFieldsOnly(boolean visibleFieldsOnly) {
+        this.visibleFieldsOnly = visibleFieldsOnly;
+        return this;
+    }
+
     public IntentPipeline build() {
-        return new DefaultIntentPipeline(normalizer, cache != null ? cache : DslCaches.create(),
-                require(llm, "llm"), parser, validator, require(sqlBuilder, "sqlBuilder"),
-                require(executor, "executor"), uriBuilder, require(catalog, "catalog"), maxRepairs, accessPolicy,
-                defaultCaller, listener, tracer, rateLimiter, audit, logValues);
+        LlmClient client = require(llm, "llm");
+        SqlBuilder sql = require(sqlBuilder, "sqlBuilder");
+        QueryExecutor queries = require(executor, "executor");
+        ServiceCatalog services = require(catalog, "catalog");
+        if (visibleFieldsOnly) {
+            VisibleEntities.check(services);
+        }
+        return new DefaultIntentPipeline(normalizer, cache != null ? cache : DslCaches.create(), client, parser,
+                validator, sql, queries, uriBuilder, services, maxRepairs, accessPolicy, defaultCaller, listener,
+                tracer, rateLimiter, audit, logValues, visibleFieldsOnly);
     }
 
     private static <T> T require(@Nullable T value, String name) {

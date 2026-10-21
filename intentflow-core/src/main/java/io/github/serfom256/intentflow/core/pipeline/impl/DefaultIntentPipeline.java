@@ -85,6 +85,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private final LlmRateLimiter rateLimiter;
     private final AuditLog audit;
     private final boolean logValues;
+    private final boolean visibleFieldsOnly;
 
     @Override
     public IntentResponse<?> resolve(IntentRequest request) {
@@ -194,6 +195,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             @Nullable RuntimeException cause, IntentRequest request, Trail trail) {
         Duration elapsed = since(start);
         listener.request(service, outcome, elapsed);
+        if (!trail.tokens.equals(TokenUsage.NONE)) {
+            span.usage(trail.tokens, null);
+        }
         span.end(service, outcome.name().toLowerCase(Locale.ROOT), outcome == Outcome.FAILED ? cause : null);
         if (audit == AuditLog.NONE) {
             return;
@@ -214,6 +218,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         Span span = tracer.start(stage);
         try {
             R result = work.get();
+            if (result instanceof DslSource dsl && !dsl.usage().equals(TokenUsage.NONE)) {
+                span.usage(dsl.usage(), dsl.model());
+            }
             span.end(service, "ok", null);
             return result;
         } catch (UnsupportedRequestException e) {
@@ -378,6 +385,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         listener.query(validated.service().name(), aggregate != null, since(start), rows, false);
         span.end(validated.service().name(), "ok", null);
         MicroFrontendUri uri = uriBuilder.build(validated, items);
+        if (visibleFieldsOnly) {
+            items = VisibleEntities.of(items, validated.service(), caller.view());
+        }
         log.debug("Resolved '{}' to {} with {} {} in {} ms", text(compiled.question().value()), uri.value(), rows,
                 aggregation == null ? type.getSimpleName() : "groups", millisSince(compiled.startNanos()));
         return IntentResponses.of(validated.service().name(), type, items, uri, aggregation, compiled.trace());

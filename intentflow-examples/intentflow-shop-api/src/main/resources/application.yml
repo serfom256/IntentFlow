@@ -29,6 +29,7 @@ intentflow:
   cache:
     ttl: 30m
   admin:
+    create-table: false
     security:
       password: ${INTENTFLOW_ADMIN_PASSWORD:admin}
 
