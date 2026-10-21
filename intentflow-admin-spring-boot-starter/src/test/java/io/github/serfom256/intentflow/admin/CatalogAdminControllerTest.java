@@ -6,6 +6,8 @@ import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
+import io.github.serfom256.intentflow.core.pipeline.AuditLog;
+import io.github.serfom256.intentflow.core.pipeline.CatalogChangeAudit;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
@@ -19,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.nullValue;
@@ -37,6 +40,7 @@ class CatalogAdminControllerTest {
     private static final ServiceName BOOKS = ServiceNames.of("books");
 
     private final List<String> prompts = new CopyOnWriteArrayList<>();
+    private final List<CatalogChangeAudit> changes = new CopyOnWriteArrayList<>();
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CatalogAdminController(new CatalogAdmin(catalog,
             IntentPipelines.builder()
                     .llm((text, scope) -> {
@@ -53,7 +57,13 @@ class CatalogAdminControllerTest {
                         }
                     })
                     .catalog(catalog)
-                    .build())))
+                    .build(),
+            null, new AuditLog() {
+                @Override
+                public void catalogChange(CatalogChangeAudit audit) {
+                    changes.add(audit);
+                }
+            })))
             .build();
 
     @Test
@@ -72,6 +82,7 @@ class CatalogAdminControllerTest {
     @Test
     void savesAnOverrideThatTheLlmSeesAndResetRestoresTheDeclaredValues() throws Exception {
         mvc.perform(put("/intentflow-admin/api/services/books").contentType(MediaType.APPLICATION_JSON)
+                .requestAttr(AdminAccessInterceptor.USER, "lea")
                 .content("""
                         {"description": "Every book we sell", "uri": "/catalog/{{isbn}}",
                          "fields": {"title": "full title including subtitle", "isbn": " "}}
@@ -88,12 +99,17 @@ class CatalogAdminControllerTest {
                 .andExpect(jsonPath("$.dsl").value("books | filter title ~ \"dune\""))
                 .andExpect(jsonPath("$.sql").value(startsWith("SELECT * FROM \"book\" WHERE")));
 
-        mvc.perform(delete("/intentflow-admin/api/services/books"))
+        mvc.perform(delete("/intentflow-admin/api/services/books").requestAttr(AdminAccessInterceptor.USER, "max"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.overrideDescription").value(nullValue()))
                 .andExpect(jsonPath("$.fields[1].overrideDescription").value(nullValue()));
 
         assertThat(prompts).containsExactly("full title including subtitle");
+        assertThat(changes).extracting(CatalogChangeAudit::user, CatalogChangeAudit::action,
+                change -> change.before().description(), change -> change.after().description())
+                .containsExactly(
+                        tuple("lea", CatalogChangeAudit.Action.UPDATED, null, "Every book we sell"),
+                        tuple("max", CatalogChangeAudit.Action.RESET, "Every book we sell", null));
     }
 
     @Test

@@ -3,6 +3,7 @@ package io.github.serfom256.intentflow.admin;
 import io.github.serfom256.intentflow.core.catalog.CatalogOverrides;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
+import io.github.serfom256.intentflow.core.pipeline.AuditLog;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -109,9 +110,10 @@ public class IntentFlowAdminAutoConfiguration {
 
         @Bean
         CatalogAdmin intentFlowCatalogAdmin(ServiceCatalog catalog, ObjectProvider<IntentPipeline> pipeline,
-                ObjectProvider<DataSource> dataSource) {
+                ObjectProvider<DataSource> dataSource, ObjectProvider<AuditLog> audit) {
             DataSource source = properties.indexAdvisor() ? dataSource.getIfUnique() : null;
-            return new CatalogAdmin(catalog, pipeline.getObject(), source == null ? null : new IndexAdvisor(source));
+            return new CatalogAdmin(catalog, pipeline.getObject(), source == null ? null : new IndexAdvisor(source),
+                    audit.getIfAvailable(() -> AuditLog.NONE));
         }
 
         @Bean

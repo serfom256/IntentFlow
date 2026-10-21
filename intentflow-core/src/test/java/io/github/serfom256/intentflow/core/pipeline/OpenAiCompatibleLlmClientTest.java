@@ -125,7 +125,7 @@ class OpenAiCompatibleLlmClientTest {
     }
 
     private LlmClient client(String apiKey) {
-        return client(apiKey, new LlmHttpOptions("Authorization", Map.of(), null, 2, Duration.ofMillis(1)));
+        return client(apiKey, new LlmHttpOptions("Authorization", Map.of(), null, 2, Duration.ofMillis(1), false));
     }
 
     private LlmClient client(String apiKey, LlmHttpOptions options) {
@@ -264,15 +264,17 @@ class OpenAiCompatibleLlmClientTest {
     void zeroRetriesAsksOnce() {
         status = 503;
 
-        assertThatThrownBy(() -> client("", new LlmHttpOptions("Authorization", Map.of(), null, 0, Duration.ZERO))
-                .generateDsl(UserTexts.of("x"), CATALOG)).hasMessage("LLM returned HTTP 503");
+        assertThatThrownBy(
+                () -> client("", new LlmHttpOptions("Authorization", Map.of(), null, 0, Duration.ZERO, false))
+                        .generateDsl(UserTexts.of("x"), CATALOG))
+                .hasMessage("LLM returned HTTP 503");
         assertThat(requests.get()).isEqualTo(1);
     }
 
     @Test
     void theKeyHeaderAndExtraHeadersAreConfigurable() {
         reply = completion("books");
-        LlmHttpOptions azure = new LlmHttpOptions("api-key", Map.of("X-Team", "search"), null, 0, Duration.ZERO);
+        LlmHttpOptions azure = new LlmHttpOptions("api-key", Map.of("X-Team", "search"), null, 0, Duration.ZERO, false);
 
         client("secret", azure).generateDsl(UserTexts.of("x"), CATALOG);
 
@@ -287,7 +289,16 @@ class OpenAiCompatibleLlmClientTest {
 
         assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
                 .isInstanceOf(LlmException.class)
-                .hasMessageContaining("Unexpected LLM response shape");
+                .hasMessage("Unexpected LLM response shape");
+    }
+
+    @Test
+    void theResponseBodyStaysOutOfErrors() {
+        reply = "{\"echo\":\"salary of ann smith\"}";
+
+        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
+                .isInstanceOf(LlmException.class)
+                .message().doesNotContain("salary");
     }
 
     @Test

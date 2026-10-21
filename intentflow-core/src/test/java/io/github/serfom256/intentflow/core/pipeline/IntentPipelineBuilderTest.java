@@ -47,10 +47,10 @@ class IntentPipelineBuilderTest {
     @Test
     void buildNamesTheFirstMissingPart() {
         assertThatThrownBy(() -> IntentPipelines.builder().build()).isInstanceOf(IllegalStateException.class)
-                .hasMessage("IntentPipeline needs llm(...) before build()");
+                .hasMessage("IntentPipeline requires llm(...) before build()");
         assertThatThrownBy(() -> IntentPipelines.builder().llm((text, catalog) -> DslSources.of("books"))
                 .sqlBuilder(SqlBuilders.create(new PostgresDialect())).build())
-                .hasMessage("IntentPipeline needs executor(...) before build()");
+                .hasMessage("IntentPipeline requires executor(...) before build()");
     }
 
     @Test

@@ -23,7 +23,9 @@ public record IntentFlowProperties(
         @DefaultValue Catalog catalog,
         @DefaultValue Schema schema,
         @DefaultValue Sql sql,
-        @DefaultValue Cassandra cassandra) {
+        @DefaultValue Cassandra cassandra,
+        @DefaultValue Audit audit,
+        @DefaultValue Logging logging) {
 
     public ZoneId zone() {
         return timeZone == null || timeZone.isBlank() ? ZoneId.systemDefault() : ZoneId.of(timeZone.strip());
@@ -88,5 +90,11 @@ public record IntentFlowProperties(
     }
 
     public record Cassandra(@DefaultValue("10000") int maxScannedRows) {
+    }
+
+    public record Audit(@DefaultValue("false") boolean enabled) {
+    }
+
+    public record Logging(@DefaultValue("false") boolean values) {
     }
 }

@@ -24,6 +24,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.AccessDeniedException;
 import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
+import io.github.serfom256.intentflow.core.pipeline.AuditLog;
 import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslCacheKey;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
@@ -37,6 +38,7 @@ import io.github.serfom256.intentflow.core.pipeline.PipelineTracer.Span;
 import io.github.serfom256.intentflow.core.pipeline.PipelineTracer.Stage;
 import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
+import io.github.serfom256.intentflow.core.pipeline.QuestionAudit;
 import io.github.serfom256.intentflow.core.pipeline.RateLimitExceededException;
 import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
@@ -51,6 +53,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -80,13 +83,16 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private final PipelineListener listener;
     private final PipelineTracer tracer;
     private final LlmRateLimiter rateLimiter;
+    private final AuditLog audit;
+    private final boolean logValues;
 
     @Override
     public IntentResponse<?> resolve(IntentRequest request) {
         long start = System.nanoTime();
-        return observed(start, null, () -> {
-            Caller caller = caller(request);
-            return execute(compile(request, caller, caller.view(), null), caller);
+        Trail trail = new Trail();
+        return observed(start, null, request, trail, () -> {
+            Caller caller = caller(request, trail);
+            return execute(compile(request, caller, caller.view(), null, trail), caller, trail);
         });
     }
 
@@ -94,24 +100,27 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     public <T> IntentResponse<T> resolve(IntentRequest request, Class<T> resultType) {
         long start = System.nanoTime();
         ServiceDescriptor service = serviceFor(resultType);
-        return observed(start, service.name(), () -> {
-            Caller caller = caller(request);
+        Trail trail = new Trail();
+        return observed(start, service.name(), request, trail, () -> {
+            Caller caller = caller(request, trail);
             ServiceDescriptor own = permitted(service, caller);
-            return execute(compile(request, caller, scopeOf(own, caller.view()), own), caller);
+            return execute(compile(request, caller, scopeOf(own, caller.view()), own, trail), caller, trail);
         });
     }
 
     @Override
     public IntentTrace explain(IntentRequest request) {
-        Caller caller = caller(request);
-        return compile(request, caller, caller.view(), null).trace();
+        Trail trail = new Trail();
+        Caller caller = caller(request, trail);
+        return compile(request, caller, caller.view(), null, trail).trace();
     }
 
     @Override
     public IntentTrace explain(IntentRequest request, Class<?> resultType) {
-        Caller caller = caller(request);
+        Trail trail = new Trail();
+        Caller caller = caller(request, trail);
         ServiceDescriptor own = permitted(serviceFor(resultType), caller);
-        return compile(request, caller, scopeOf(own, caller.view()), own).trace();
+        return compile(request, caller, scopeOf(own, caller.view()), own, trail).trace();
     }
 
     private record Caller(IntentContext context, ServiceCatalog view,
@@ -127,8 +136,19 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         }
     }
 
-    private Caller caller(IntentRequest request) {
+    private static final class Trail {
+
+        private @Nullable IntentContext caller;
+        private @Nullable String dsl;
+        private boolean cached;
+        private @Nullable BoundQuery query;
+        private int rows;
+        private TokenUsage tokens = TokenUsage.NONE;
+    }
+
+    private Caller caller(IntentRequest request, Trail trail) {
         IntentContext context = request.context() != null ? request.context() : defaultCaller.get();
+        trail.caller = context;
         if (policy == AccessPolicy.ALLOW_ALL) {
             return new Caller(context, catalog, executor::restrictions);
         }
@@ -144,35 +164,50 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 "The caller may not query " + service.name().value()));
     }
 
-    private <R> R observed(long start, @Nullable ServiceName service, Supplier<R> resolve) {
+    private <R> R observed(long start, @Nullable ServiceName service, IntentRequest request, Trail trail,
+            Supplier<R> resolve) {
         Span span = tracer.start(Stage.REQUEST);
         try {
             R response = resolve.get();
             ended(span, start, response instanceof IntentResponse<?> r ? r.service() : service, Outcome.ANSWERED,
-                    null);
+                    null, request, trail);
             return response;
         } catch (UnsupportedRequestException e) {
-            ended(span, start, service, Outcome.DECLINED, null);
+            ended(span, start, service, Outcome.DECLINED, e, request, trail);
             throw e;
         } catch (DslParseException | ValidationException | ServiceNotFoundException e) {
-            ended(span, start, service, Outcome.REJECTED, null);
+            ended(span, start, service, Outcome.REJECTED, e, request, trail);
             throw e;
         } catch (AccessDeniedException e) {
-            ended(span, start, service, Outcome.DENIED, null);
+            ended(span, start, service, Outcome.DENIED, e, request, trail);
             throw e;
         } catch (RateLimitExceededException e) {
-            ended(span, start, service, Outcome.LIMITED, null);
+            ended(span, start, service, Outcome.LIMITED, e, request, trail);
             throw e;
         } catch (RuntimeException e) {
-            ended(span, start, service, Outcome.FAILED, e);
+            ended(span, start, service, Outcome.FAILED, e, request, trail);
             throw e;
         }
     }
 
     private void ended(Span span, long start, @Nullable ServiceName service, Outcome outcome,
-            @Nullable Throwable error) {
-        listener.request(service, outcome, since(start));
-        span.end(service, outcome.name().toLowerCase(Locale.ROOT), error);
+            @Nullable RuntimeException cause, IntentRequest request, Trail trail) {
+        Duration elapsed = since(start);
+        listener.request(service, outcome, elapsed);
+        span.end(service, outcome.name().toLowerCase(Locale.ROOT), outcome == Outcome.FAILED ? cause : null);
+        if (audit == AuditLog.NONE) {
+            return;
+        }
+        try {
+            IntentContext who = trail.caller != null ? trail.caller : request.context();
+            BoundQuery query = trail.query;
+            audit.question(new QuestionAudit(Instant.now(), who == null ? null : who.principal(),
+                    who == null ? null : who.tenant(), request.text().value(), service, outcome, trail.dsl,
+                    trail.cached, query == null ? null : query.sql(), query == null ? List.of() : query.values(),
+                    trail.rows, trail.tokens, elapsed, cause == null ? null : cause.getMessage()));
+        } catch (RuntimeException e) {
+            log.warn("IntentFlow audit log {} failed", audit.getClass().getName(), e);
+        }
     }
 
     private <R> R traced(Stage stage, @Nullable ServiceName service, Supplier<R> work) {
@@ -219,7 +254,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     }
 
     private Compiled compile(IntentRequest request, Caller caller, ServiceCatalog scope,
-            @Nullable ServiceDescriptor expected) {
+            @Nullable ServiceDescriptor expected, Trail trail) {
         long start = System.nanoTime();
         ServiceName expectedName = expected == null ? null : expected.name();
         UserText normalized = normalizer.normalize(request.text());
@@ -227,18 +262,23 @@ public final class DefaultIntentPipeline implements IntentPipeline {
 
         Optional<DslSource> hit = cache.get(key);
         boolean cached = hit.isPresent();
+        trail.cached = cached;
         listener.cache(cached);
         DslSource dsl;
         TokenUsage tokens = TokenUsage.NONE;
         if (cached) {
             dsl = hit.get();
-            log.debug("DSL cache hit for '{}': {}", normalized.value(), dsl.value());
+            trail.dsl = dsl.value();
+            log.debug("DSL cache hit for '{}': {}", text(normalized.value()), dsl(dsl.value()));
         } else {
             rateLimiter.acquire(caller.context());
             long llmStart = System.nanoTime();
             dsl = askLlm(false, expectedName, () -> llm.generateDsl(normalized, scope));
             tokens = dsl.usage();
-            log.debug("LLM translated '{}' in {} ms: {}", normalized.value(), millisSince(llmStart), dsl.value());
+            trail.dsl = dsl.value();
+            trail.tokens = tokens;
+            log.debug("LLM translated '{}' in {} ms: {}", text(normalized.value()), millisSince(llmStart),
+                    dsl(dsl.value()));
         }
 
         int repairs = 0;
@@ -249,13 +289,14 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 validated = traced(Stage.VALIDATE, expectedName, () -> validate(current, expected, caller.view()));
                 break;
             } catch (UnsupportedRequestException declined) {
-                log.debug("Declined '{}': {}", normalized.value(), declined.getMessage());
+                log.debug("Declined '{}': {}", text(normalized.value()), text(declined.getMessage()));
                 if (!cached) {
                     cache.put(key, dsl);
                 }
                 throw declined;
             } catch (DslParseException | ValidationException | ServiceNotFoundException rejected) {
-                log.debug("Rejected DSL for '{}': {} ({})", normalized.value(), dsl.value(), rejected.getMessage());
+                log.debug("Rejected DSL for '{}': {} ({})", text(normalized.value()), dsl(dsl.value()),
+                        text(rejected.getMessage()));
                 if (cached || repairs >= maxRepairs) {
                     throw rejected;
                 }
@@ -265,8 +306,10 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 dsl = askLlm(true, expectedName,
                         () -> llm.repairDsl(normalized, scope, failed, rejected.getMessage()));
                 tokens = tokens.plus(dsl.usage());
-                log.debug("LLM corrected '{}' in {} ms (attempt {} of {}): {}", normalized.value(),
-                        millisSince(llmStart), repairs, maxRepairs, dsl.value());
+                trail.dsl = dsl.value();
+                trail.tokens = tokens;
+                log.debug("LLM corrected '{}' in {} ms (attempt {} of {}): {}", text(normalized.value()),
+                        millisSince(llmStart), repairs, maxRepairs, dsl(dsl.value()));
             }
         }
         if (!cached) {
@@ -275,7 +318,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         ValidatedQuery valid = validated;
         BoundQuery query = traced(Stage.BUILD, valid.service().name(),
                 () -> sqlBuilder.build(valid, executor.shape(valid.service().resultType()), caller.restrictions()));
-        log.debug("Query: {} binds={}", query.sql(), query.values());
+        trail.query = query;
+        log.debug("Query: {} binds={}", query.sql(), LogValues.values(logValues, query.values()));
         return new Compiled(normalized, dsl, cached, validated, query, start, repairs, tokens);
     }
 
@@ -308,7 +352,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         return ValidatedQueries.of(catalog.get(validated.service().name()), validated.ast(), related);
     }
 
-    private <T> IntentResponse<T> execute(Compiled compiled, Caller caller) {
+    private <T> IntentResponse<T> execute(Compiled compiled, Caller caller, Trail trail) {
         ValidatedQuery validated = compiled.validated();
         BoundQuery query = compiled.query();
         @SuppressWarnings("unchecked")
@@ -330,10 +374,11 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             throw e;
         }
         int rows = aggregation == null ? items.size() : aggregation.rows().size();
+        trail.rows = rows;
         listener.query(validated.service().name(), aggregate != null, since(start), rows, false);
         span.end(validated.service().name(), "ok", null);
         MicroFrontendUri uri = uriBuilder.build(validated, items);
-        log.debug("Resolved '{}' to {} with {} {} in {} ms", compiled.question().value(), uri.value(), rows,
+        log.debug("Resolved '{}' to {} with {} {} in {} ms", text(compiled.question().value()), uri.value(), rows,
                 aggregation == null ? type.getSimpleName() : "groups", millisSince(compiled.startNanos()));
         return IntentResponses.of(validated.service().name(), type, items, uri, aggregation, compiled.trace());
     }
@@ -355,6 +400,14 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         return new Aggregation(aggregate.function().keyword(),
                 aggregate.argument() == null ? null : Expressions.print(aggregate.argument()),
                 aggregate.groupNames(), out);
+    }
+
+    private Object text(@Nullable String text) {
+        return text == null ? "" : LogValues.text(logValues, text);
+    }
+
+    private Object dsl(String dsl) {
+        return LogValues.dsl(logValues, dsl);
     }
 
     private static Duration since(long nanoStart) {

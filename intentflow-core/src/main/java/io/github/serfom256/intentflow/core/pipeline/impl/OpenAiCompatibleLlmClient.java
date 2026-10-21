@@ -178,8 +178,17 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 .POST(HttpRequest.BodyPublishers.ofString(body))).build();
         HttpResponse<String> response = send(request, options.maxRetries());
 
-        Object root = parse(response.body());
-        String dsl = cleanup(extractContent(root, response.body()));
+        Object root;
+        String dsl;
+        try {
+            root = parse(response.body());
+            dsl = cleanup(extractContent(root));
+        } catch (LlmException e) {
+            if (options.logBodies()) {
+                log.debug("Unreadable LLM response: {}", abbreviated(response.body()));
+            }
+            throw e;
+        }
         if (dsl.isEmpty()) {
             throw new LlmException("LLM returned an empty answer");
         }
@@ -208,7 +217,8 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 if (status / 100 == 2) {
                     return response;
                 }
-                log.debug("LLM returned HTTP {} (attempt {}): {}", status, attempt, abbreviated(response.body()));
+                log.debug("LLM returned HTTP {} (attempt {}): {}", status, attempt,
+                        options.logBodies() ? abbreviated(response.body()) : response.body().length() + " chars");
                 if (last || !retryable(status)) {
                     throw new LlmException("LLM returned HTTP " + status
                             + (attempt > 1 ? " after " + attempt + " attempts" : ""));
@@ -312,7 +322,7 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
         try {
             return MiniJson.parse(responseBody);
         } catch (RuntimeException e) {
-            throw new LlmException("Unexpected LLM response shape: " + responseBody, e);
+            throw new LlmException("LLM response is not JSON", e);
         }
     }
 
@@ -325,20 +335,20 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
         return TokenUsage.NONE;
     }
 
-    private static String extractContent(Object root, String responseBody) {
+    private static String extractContent(Object root) {
         try {
             Object choices = ((Map<?, ?>) root).get("choices");
             Object first = ((List<?>) choices).getFirst();
             Object message = ((Map<?, ?>) first).get("message");
             Object content = ((Map<?, ?>) message).get("content");
             if (!(content instanceof String s)) {
-                throw new LlmException("LLM response has no text content: " + responseBody);
+                throw new LlmException("LLM response has no text content");
             }
             return s;
         } catch (RuntimeException e) {
             if (e instanceof LlmException le)
                 throw le;
-            throw new LlmException("Unexpected LLM response shape: " + responseBody, e);
+            throw new LlmException("Unexpected LLM response shape", e);
         }
     }
 

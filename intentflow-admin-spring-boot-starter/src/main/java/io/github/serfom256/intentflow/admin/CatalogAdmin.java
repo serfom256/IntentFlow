@@ -11,12 +11,17 @@ import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
 import io.github.serfom256.intentflow.core.catalog.ServiceOverride;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.catalog.impl.OverlayServiceCatalog;
+import io.github.serfom256.intentflow.core.pipeline.AuditLog;
+import io.github.serfom256.intentflow.core.pipeline.CatalogChangeAudit;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 
+@Slf4j
 public final class CatalogAdmin {
 
     public record FieldView(String name, String column, String type, List<String> allowedValues,
@@ -53,13 +58,16 @@ public final class CatalogAdmin {
     private final CatalogOverrides overrides;
     private final IntentPipeline pipeline;
     private final @Nullable IndexAdvisor advisor;
+    private final AuditLog audit;
 
     public CatalogAdmin(ServiceCatalog catalog, IntentPipeline pipeline) {
-        this(catalog, pipeline, null);
+        this(catalog, pipeline, null, AuditLog.NONE);
     }
 
-    public CatalogAdmin(ServiceCatalog catalog, IntentPipeline pipeline, @Nullable IndexAdvisor advisor) {
+    public CatalogAdmin(ServiceCatalog catalog, IntentPipeline pipeline, @Nullable IndexAdvisor advisor,
+            AuditLog audit) {
         this.advisor = advisor;
+        this.audit = audit;
         if (!(catalog instanceof OverlayServiceCatalog overlay)) {
             throw new IllegalStateException("The IntentFlow admin needs the catalog wrapped with CatalogOverrides; "
                     + "a user-defined ServiceCatalog bean must use ServiceCatalogs.withOverrides(...)");
@@ -88,20 +96,33 @@ public final class CatalogAdmin {
                 service.uriTemplate().value(), override.uri(), fields, relations);
     }
 
-    public ServiceView update(String name, ServiceOverride override) {
+    public ServiceView update(String name, ServiceOverride override, @Nullable String user) {
         ServiceDescriptor service = declared.get(ServiceNames.of(name));
         List<String> problems = override.problems(service);
         if (!problems.isEmpty()) {
             throw new InvalidOverrideException(problems);
         }
+        ServiceOverride before = overrides.find(service.name()).orElse(ServiceOverride.NONE);
         overrides.put(service.name(), override);
+        audited(user, service.name(), CatalogChangeAudit.Action.UPDATED, before, override);
         return service(name);
     }
 
-    public ServiceView reset(String name) {
+    public ServiceView reset(String name, @Nullable String user) {
         ServiceDescriptor service = declared.get(ServiceNames.of(name));
+        ServiceOverride before = overrides.find(service.name()).orElse(ServiceOverride.NONE);
         overrides.remove(service.name());
+        audited(user, service.name(), CatalogChangeAudit.Action.RESET, before, ServiceOverride.NONE);
         return service(name);
+    }
+
+    private void audited(@Nullable String user, ServiceName service, CatalogChangeAudit.Action action,
+            ServiceOverride before, ServiceOverride after) {
+        try {
+            audit.catalogChange(new CatalogChangeAudit(Instant.now(), user, service, action, before, after));
+        } catch (RuntimeException e) {
+            log.warn("IntentFlow audit log {} failed", audit.getClass().getName(), e);
+        }
     }
 
     public ExplainView explain(String question, @Nullable String scope) {

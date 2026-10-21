@@ -9,6 +9,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
+import io.github.serfom256.intentflow.core.pipeline.AuditLog;
 import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
@@ -23,6 +24,7 @@ import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
 import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
 import io.github.serfom256.intentflow.core.pipeline.UriBuilder;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
+import io.github.serfom256.intentflow.core.pipeline.factories.AuditLogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
@@ -128,7 +130,7 @@ public class IntentFlowAutoConfiguration {
         ProxySelector proxy = llm.proxy() == null ? null
                 : ProxySelector.of(new InetSocketAddress(llm.proxy().getHost(), llm.proxy().getPort()));
         LlmHttpOptions options = new LlmHttpOptions(llm.apiKeyHeader(), llm.headers(), proxy, llm.maxRetries(),
-                llm.retryBackoff());
+                llm.retryBackoff(), properties.logging().values());
         Clock today = clock.getIfAvailable(Clock::systemDefaultZone);
         LlmCircuitBreaker breaker = breakers.getIfAvailable(() -> (client, name) -> builtInBreaker(client, llm));
         LlmClient primary = guarded(LlmClients.openAiCompatible(llm.baseUrl(), llm.model(), llm.apiKey(),
@@ -156,6 +158,12 @@ public class IntentFlowAutoConfiguration {
     static LlmClient builtInBreaker(LlmClient client, IntentFlowProperties.Llm llm) {
         return LlmClients.circuitBreaker(client, llm.circuitBreaker().failureThreshold(),
                 llm.circuitBreaker().openFor());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    AuditLog intentFlowAuditLog(IntentFlowProperties properties) {
+        return properties.audit().enabled() ? AuditLogs.slf4j() : AuditLog.NONE;
     }
 
     @Bean
@@ -232,7 +240,7 @@ public class IntentFlowAutoConfiguration {
             ServiceCatalog catalog, IntentFlowProperties properties, ObjectProvider<AccessPolicy> policy,
             ObjectProvider<IntentContextProvider> callers, ObjectProvider<PipelineListener> listeners,
             ObjectProvider<PipelineTracer> tracer, ObjectProvider<ExecutorWrapper> wrapper,
-            LlmRateLimiter rateLimiter) {
+            LlmRateLimiter rateLimiter, AuditLog audit) {
         QueryExecutor queryExecutor = executor.getIfAvailable();
         if (queryExecutor == null) {
             throw new IllegalStateException("No QueryExecutor: configure a DataSource (spring.datasource.*) "
@@ -262,6 +270,8 @@ public class IntentFlowAutoConfiguration {
                 .listener(new CompositeListener(observers))
                 .tracer(tracer.getIfAvailable(() -> PipelineTracer.NONE))
                 .rateLimiter(rateLimiter)
+                .audit(audit)
+                .logValues(properties.logging().values())
                 .build();
     }
 

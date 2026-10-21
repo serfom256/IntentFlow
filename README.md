@@ -482,6 +482,8 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.sql.statement-timeout      | 30s                         | Longest a generated query may run; 0 for no limit   |
 | intentflow.sql.read-only              | true                        | Run generated queries in a read-only transaction    |
 | intentflow.cassandra.max-scanned-rows | 10000                       | Rows one Cassandra query may read                   |
+| intentflow.audit.enabled              | false                       | One line per question and per catalog change on the `intentflow.audit` logger; an `AuditLog` bean replaces it |
+| intentflow.logging.values             | false                       | Show questions, DSL literals, bind values and LLM response bodies in logs |
 | management.health.intentflow-llm.enabled | true                     | LLM health indicator; lists the models without spending tokens |
 
 ## Example application

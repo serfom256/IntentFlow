@@ -51,7 +51,11 @@ public class CatalogAdminController {
 
     @GetMapping("/session")
     public SessionView session(HttpServletRequest request) {
-        return new SessionView((String) request.getAttribute(AdminAccessInterceptor.USER), csrf(request));
+        return new SessionView(user(request), csrf(request));
+    }
+
+    private static @Nullable String user(HttpServletRequest request) {
+        return (String) request.getAttribute(AdminAccessInterceptor.USER);
     }
 
     @GetMapping("/services")
@@ -65,14 +69,15 @@ public class CatalogAdminController {
     }
 
     @PutMapping("/services/{name}")
-    public CatalogAdmin.ServiceView update(@PathVariable("name") String name, @RequestBody OverrideRequest request) {
+    public CatalogAdmin.ServiceView update(@PathVariable("name") String name, @RequestBody OverrideRequest request,
+            HttpServletRequest http) {
         return admin.update(name, new ServiceOverride(request.description(), request.uri(),
-                request.fields() == null ? Map.of() : request.fields()));
+                request.fields() == null ? Map.of() : request.fields()), user(http));
     }
 
     @DeleteMapping("/services/{name}")
-    public CatalogAdmin.ServiceView reset(@PathVariable("name") String name) {
-        return admin.reset(name);
+    public CatalogAdmin.ServiceView reset(@PathVariable("name") String name, HttpServletRequest http) {
+        return admin.reset(name, user(http));
     }
 
     @PostMapping("/explain")

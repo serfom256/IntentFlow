@@ -5,6 +5,7 @@ import io.github.serfom256.intentflow.core.api.factories.IntentContexts;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
+import io.github.serfom256.intentflow.core.pipeline.AuditLog;
 import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
@@ -38,6 +39,8 @@ public final class IntentPipelineBuilder {
     private PipelineListener listener = PipelineListener.NONE;
     private PipelineTracer tracer = PipelineTracer.NONE;
     private LlmRateLimiter rateLimiter = LlmRateLimiter.NONE;
+    private AuditLog audit = AuditLog.NONE;
+    private boolean logValues;
 
     IntentPipelineBuilder() {
     }
@@ -120,11 +123,21 @@ public final class IntentPipelineBuilder {
         return this;
     }
 
+    public IntentPipelineBuilder audit(AuditLog audit) {
+        this.audit = audit;
+        return this;
+    }
+
+    public IntentPipelineBuilder logValues(boolean logValues) {
+        this.logValues = logValues;
+        return this;
+    }
+
     public IntentPipeline build() {
         return new DefaultIntentPipeline(normalizer, cache != null ? cache : DslCaches.create(),
                 require(llm, "llm"), parser, validator, require(sqlBuilder, "sqlBuilder"),
                 require(executor, "executor"), uriBuilder, require(catalog, "catalog"), maxRepairs, accessPolicy,
-                defaultCaller, listener, tracer, rateLimiter);
+                defaultCaller, listener, tracer, rateLimiter, audit, logValues);
     }
 
     private static <T> T require(@Nullable T value, String name) {
