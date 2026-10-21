@@ -213,10 +213,10 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 wait = retryAfter(response).orElse(backoff);
             } catch (HttpConnectTimeoutException | ConnectException e) {
                 if (last) {
-                    throw new LlmException("LLM at " + request.uri() + " is not reachable: " + e.getMessage(), e);
+                    throw new LlmException("LLM at " + request.uri() + " is not reachable: " + reason(e), e);
                 }
             } catch (IOException e) {
-                throw new LlmException("LLM request to " + request.uri() + " failed: " + e.getMessage(), e);
+                throw new LlmException("LLM request to " + request.uri() + " failed: " + reason(e), e);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new LlmException("LLM request interrupted", e);
@@ -224,6 +224,10 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
             pause(wait);
             backoff = backoff.multipliedBy(2);
         }
+    }
+
+    private static String reason(Exception e) {
+        return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
     }
 
     private static boolean retryable(int status) {

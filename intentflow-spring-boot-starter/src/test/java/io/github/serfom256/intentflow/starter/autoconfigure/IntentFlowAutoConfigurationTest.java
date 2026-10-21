@@ -33,7 +33,7 @@ import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
 import io.github.serfom256.intentflow.core.pipeline.UriBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
-import io.github.serfom256.intentflow.core.pipeline.impl.OpenAiCompatibleLlmClient;
+import io.github.serfom256.intentflow.core.pipeline.impl.CircuitBreakerLlmClient;
 import io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor;
 import io.github.serfom256.intentflow.jimmer.JimmerNameResolver;
 import io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor;
@@ -106,7 +106,7 @@ class IntentFlowAutoConfigurationTest {
                     .hasSingleBean(SqlBuilder.class)
                     .hasSingleBean(UriBuilder.class)
                     .hasSingleBean(QueryExecutor.class);
-            assertThat(ctx.getBean(LlmClient.class)).isInstanceOf(OpenAiCompatibleLlmClient.class);
+            assertThat(ctx.getBean(LlmClient.class)).isInstanceOf(CircuitBreakerLlmClient.class);
         });
     }
 

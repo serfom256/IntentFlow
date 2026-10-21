@@ -5,6 +5,7 @@ BOOT_VERSION="${1:?usage: consumer-probe.sh <spring-boot-version>}"
 IF_VERSION="$(./gradlew -q properties --property version | sed -n 's/^version: //p')"
 PROBE="$(mktemp -d)"
 status=0
+OPTIONAL="spring-security|micrometer-core|resilience4j|spring-boot-actuator|spring-boot-health|spring-orm|jakarta\.persistence|spring-data|jimmer|openmapper"
 
 emit_pom() {
   mkdir -p "$1"
@@ -34,7 +35,7 @@ intentflow_dep() {
 echo "== Probe A: the starter alone must not pull in any executor, dialect or database driver =="
 emit_pom "$PROBE/a" "" ""
 mvn -B -q -f "$PROBE/a/pom.xml" dependency:tree -DoutputFile="$PROBE/a/tree.txt"
-leaked="$(grep -E "intentflow-(jdbc|jpa|jimmer|openmapper|spring-data|postgresql|mysql|h2|cassandra)|spring-jdbc|HikariCP|hibernate|java-driver-core|postgresql:|mysql-connector" "$PROBE/a/tree.txt" || true)"
+leaked="$(grep -E "intentflow-(jdbc|jpa|jimmer|openmapper|spring-data|postgresql|mysql|h2|cassandra)|spring-jdbc|HikariCP|hibernate|java-driver-core|postgresql:|mysql-connector|$OPTIONAL" "$PROBE/a/tree.txt" || true)"
 if [ -n "$leaked" ]; then
   echo "FAIL: the starter pulled in optional modules:"
   echo "$leaked"
@@ -67,6 +68,15 @@ if [ "$(echo "$framework_versions" | wc -l)" -gt 1 ]; then
   status=1
 else
   echo "OK: Spring Framework modules agree on ${framework_versions}."
+fi
+
+optional="$(grep -E "$OPTIONAL" "$PROBE/b/tree.txt" || true)"
+if [ -n "$optional" ]; then
+  echo "FAIL: optional libraries on the application's classpath, so Probe C would not test running without them:"
+  echo "$optional"
+  status=1
+else
+  echo "OK: no Spring Security, micrometer-core, Resilience4j, Actuator, JPA or Spring Data on the classpath."
 fi
 
 echo

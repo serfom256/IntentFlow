@@ -78,6 +78,7 @@ import java.util.function.Function;
         QueryExecutorConfigurations.Cassandra.class, QueryExecutorConfigurations.Jdbc.class,
         PipelineObservers.SpringSecurity.class, PipelineObservers.Micrometer.class,
         PipelineObservers.Observations.class, LlmHealthBoot4.class, LlmHealthBoot3.class,
+        Resilience4jLlmClient.Wiring.class,
         TransactionalQueryExecutor.Wiring.class })
 public class IntentFlowAutoConfiguration {
 
@@ -115,7 +116,8 @@ public class IntentFlowAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    LlmClient intentFlowLlmClient(IntentFlowProperties properties, ObjectProvider<Clock> clock) {
+    LlmClient intentFlowLlmClient(IntentFlowProperties properties, ObjectProvider<Clock> clock,
+            ObjectProvider<LlmCircuitBreaker> breakers) {
         IntentFlowProperties.Llm llm = properties.llm();
         if (!StringUtils.hasText(llm.model())) {
             throw new IllegalStateException(
@@ -125,8 +127,33 @@ public class IntentFlowAutoConfiguration {
                 : ProxySelector.of(new InetSocketAddress(llm.proxy().getHost(), llm.proxy().getPort()));
         LlmHttpOptions options = new LlmHttpOptions(llm.apiKeyHeader(), llm.headers(), proxy, llm.maxRetries(),
                 llm.retryBackoff());
-        return LlmClients.openAiCompatible(llm.baseUrl(), llm.model(), llm.apiKey(), llm.timeout(),
-                clock.getIfAvailable(Clock::systemDefaultZone), options);
+        Clock today = clock.getIfAvailable(Clock::systemDefaultZone);
+        LlmCircuitBreaker breaker = breakers.getIfAvailable(() -> (client, name) -> builtInBreaker(client, llm));
+        LlmClient primary = guarded(LlmClients.openAiCompatible(llm.baseUrl(), llm.model(), llm.apiKey(),
+                llm.timeout(), today, options), llm, breaker, "intentflow-llm");
+        IntentFlowProperties.Llm.Fallback fallback = llm.fallback();
+        if (!StringUtils.hasText(fallback.model())) {
+            return primary;
+        }
+        LlmClient secondary = LlmClients.openAiCompatible(
+                fallback.baseUrl() != null ? fallback.baseUrl() : llm.baseUrl(), fallback.model(),
+                fallback.apiKey() != null ? fallback.apiKey() : llm.apiKey(), llm.timeout(), today, options);
+        return LlmClients.withFallback(primary, guarded(secondary, llm, breaker, "intentflow-llm-fallback"));
+    }
+
+    private static LlmClient guarded(LlmClient client, IntentFlowProperties.Llm llm, LlmCircuitBreaker breaker,
+            String name) {
+        LlmClient guarded = client;
+        IntentFlowProperties.Llm.Concurrency concurrency = llm.concurrency();
+        if (concurrency.maxCalls() > 0) {
+            guarded = LlmClients.limited(guarded, concurrency.maxCalls(), concurrency.maxWait());
+        }
+        return llm.circuitBreaker().failureThreshold() > 0 ? breaker.wrap(guarded, name) : guarded;
+    }
+
+    static LlmClient builtInBreaker(LlmClient client, IntentFlowProperties.Llm llm) {
+        return LlmClients.circuitBreaker(client, llm.circuitBreaker().failureThreshold(),
+                llm.circuitBreaker().openFor());
     }
 
     @Bean

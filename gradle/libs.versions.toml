@@ -8,6 +8,7 @@ jimmer = "0.12.3"
 jspecify = "1.0.0"
 junit = "5.11.4"
 lombok = "1.18.42"
+resilience4j = "2.4.0"
 openmapper = "2.1.0"
 slf4j = "2.0.17"
 springBoot = "4.0.0"
@@ -51,6 +52,7 @@ micrometer-core = { module = "io.micrometer:micrometer-core" }
 micrometer-observation = { module = "io.micrometer:micrometer-observation" }
 spring-boot-health = { module = "org.springframework.boot:spring-boot-health" }
 spring-boot-actuator = { module = "org.springframework.boot:spring-boot-actuator" }
+resilience4j-circuitbreaker = { module = "io.github.resilience4j:resilience4j-circuitbreaker", version.ref = "resilience4j" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api" }
 spring-orm = { module = "org.springframework:spring-orm" }
 spring-data-jdbc = { module = "org.springframework.data:spring-data-jdbc" }

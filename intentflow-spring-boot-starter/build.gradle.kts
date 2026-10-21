@@ -11,6 +11,7 @@ dependencies {
     compileOnly(libs.spring.security.core)
     compileOnly(libs.micrometer.core)
     compileOnly(libs.micrometer.observation)
+    compileOnly(libs.resilience4j.circuitbreaker)
     compileOnly(libs.spring.boot.health) {
         version { strictly(libs.versions.springBoot.get()) }
         isTransitive = false
@@ -49,6 +50,7 @@ dependencies {
     testImplementation(libs.spring.security.core)
     testImplementation(libs.micrometer.core)
     testImplementation(libs.micrometer.observation)
+    testImplementation(libs.resilience4j.circuitbreaker)
     testImplementation(
         if (providers.gradleProperty("springBoot").orElse(libs.versions.springBoot).get().startsWith("3."))
             libs.spring.boot.actuator else libs.spring.boot.health

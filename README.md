@@ -316,12 +316,8 @@ overrides it.
 | ----------------------- | ----------------- |
 | `intentflow-postgresql` | PostgreSQL        |
 | `intentflow-mysql`      | MySQL 8+, MariaDB |
-| `intentflow-h2`         | H2 2.x            |
+| `intentflow-h2`         | H2 2.x, with or without `DATABASE_TO_LOWER` |
 | `intentflow-cassandra`  | Cassandra 5       |
-
-`intentflow-h2` works with H2's default upper-case identifiers and with `DATABASE_TO_LOWER=TRUE`: plain names
-are written unquoted, so they match tables created without quotes, which is what Hibernate, Liquibase and
-`schema.sql` do. Keywords and mixed-case names are quoted.
 
 The build is tested against Spring Boot 3.2, 3.5 and 4.0. Spring Boot 3.0 and 3.1 are not supported, because the
 JDBC executors need `JdbcClient` (Spring Framework 6.1).
@@ -374,18 +370,13 @@ session-dependent conditions through `QueryExecutor.restrictions`.
 
 ## Access control
 
-A request can say who asks; without one, the starter takes the caller from Spring Security (name and
-authorities). An `AccessPolicy` bean then decides, per caller, which services and fields may be queried and which
-rows are visible:
+An `AccessPolicy` bean decides, per caller, which services and fields the LLM sees and which rows every query
+returns. The caller comes from Spring Security, an `IntentContextProvider` bean, or `IntentRequests.of(text, context)`.
 
 ```java
 @Bean
 AccessPolicy accessPolicy() {
     return new AccessPolicy() {
-        public boolean canQuery(ServiceDescriptor service, IntentContext caller) {
-            return !service.name().value().equals("suppliers") || caller.hasRole("ROLE_BUYER");
-        }
-
         public boolean canSee(ServiceDescriptor service, FieldMapping field, IntentContext caller) {
             return !field.logical().value().equals("supplier_cost") || caller.hasRole("ROLE_BUYER");
         }
@@ -395,63 +386,20 @@ AccessPolicy accessPolicy() {
                     ? List.of(RuntimeRestriction.equalTo("customer_id", caller.attribute("customerId")))
                     : List.of();
         }
-
-        public String scope(ServiceDescriptor service, IntentContext caller) {
-            return service.name().value().equals("orders") ? "only the current customer's own orders" : null;
-        }
     };
 }
 ```
 
-- The LLM is shown only what the caller may query, and the validator rejects anything else, so a hidden field
-  cannot be reached by rephrasing the question
-- Restrictions are added to every query of the service, including relation subqueries, with every executor.
-  A restriction value that is `null` matches no rows, so a caller without a customer id sees no orders
-- `scope` tells the LLM which rows the caller sees, so "my orders" is answered as "orders"
-- `resolve(request, Supplier.class)` for a service the caller may not query throws `AccessDeniedException`
-- Translations are cached per caller view, so callers with different permissions never share a cached query
-- An `IntentContextProvider` bean replaces the Spring Security mapping, for example to add a tenant or a customer
-  id; `IntentRequests.of(text, IntentContexts.of(...))` passes the caller explicitly
-
-The fields of the returned entities are not filtered: return a view without the fields a caller may not see.
-
 ## Operations
 
-**Statement timeout.** Generated queries run in a read-only transaction with `intentflow.sql.statement-timeout`
-(30s) when the application has one transaction manager and IntentFlow starts the transaction. The `jdbc`,
-`spring-data-jdbc` and `jpa` executors apply the timeout to their statements; `jimmer` and the Cassandra executor
-set it on the statement themselves. For OpenMapper, IntentFlow runs entity queries through its own `Procedures`
-with the timeout set; the application's `ProceduresCustomizer` beans still apply to it, and the application's
-`Procedures` bean keeps its own settings.
-
-**Metrics.** With Micrometer on the classpath, the starter records:
-
-| Meter                    | Type    | Tags                         |
-| ------------------------ | ------- | ---------------------------- |
-| `intentflow.requests`    | timer   | `service`, `outcome` (`answered`, `declined`, `rejected`, `denied`, `failed`) |
-| `intentflow.llm`         | timer   | `kind` (`generate`, `repair`), `outcome` |
-| `intentflow.cache`       | counter | `result` (`hit`, `miss`)     |
-| `intentflow.query`       | timer   | `service`, `kind` (`rows`, `aggregate`), `outcome` |
-| `intentflow.query.rows`  | summary | `service`, `kind`            |
-
-Any `PipelineListener` bean hears the same events.
-
-**Tracing.** When the application has an `ObservationRegistry` (Spring Boot Actuator sets one up), every stage of
-a question is a Micrometer observation named `intentflow.stage`, so a tracing bridge such as OpenTelemetry or
-Brave exports it as a span: `intentflow request` with `generate`, `repair`, `validate`, `build` and `query` inside
-it. Each carries the tags `stage`, `service` and `outcome`, and failed stages record their exception. A
-`PipelineTracer` bean replaces this with your own spans.
-
-**Health.** With Actuator, the `intentflowLlm` health indicator lists the models at `intentflow.llm.base-url`,
-which checks that the endpoint answers and accepts the key without spending tokens. The result is reused for
-`intentflow.llm.health-interval` (30s). It is part of `/actuator/health` but not of the liveness and readiness
-groups, so an LLM outage does not restart the application; `management.health.intentflow-llm.enabled=false`
-turns it off. A custom `LlmClient` reports `UNKNOWN` unless it implements `ping()`.
-
-**LLM connection.** The client uses the JVM's proxy settings (`https.proxyHost`, `java.net.useSystemProxies`) or
-`intentflow.llm.proxy`. `intentflow.llm.api-key-header: api-key` sends the key the way Azure OpenAI expects, and
-`intentflow.llm.headers` adds headers to every call. Rate limits (429) and server errors (5xx) are retried with
-backoff, honoring `Retry-After`; error messages carry the status code but not the provider's response body.
+| Meter                   | Type        | Tags                                                                          |
+| ----------------------- | ----------- | ----------------------------------------------------------------------------- |
+| `intentflow.requests`   | timer       | `service`, `outcome` (`answered`, `declined`, `rejected`, `denied`, `failed`) |
+| `intentflow.llm`        | timer       | `kind` (`generate`, `repair`), `outcome`                                      |
+| `intentflow.cache`      | counter     | `result` (`hit`, `miss`)                                                      |
+| `intentflow.query`      | timer       | `service`, `kind` (`rows`, `aggregate`), `outcome`                            |
+| `intentflow.query.rows` | summary     | `service`, `kind`                                                             |
+| `intentflow.stage`      | observation | `stage`, `service`, `outcome`; a span per pipeline stage                      |
 
 ## Debugging
 
@@ -507,7 +455,14 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.timeout                | 60s                         | Timeout of one LLM call                             |
 | intentflow.llm.max-retries            | 2                           | Retries after a 429 or 5xx answer                   |
 | intentflow.llm.retry-backoff          | 500ms                       | First wait between retries; doubles each time       |
-| intentflow.llm.health-interval        | 30s                         | How long the LLM health check result is reused      |
+| intentflow.llm.health-interval        | 30s                         | How long the `intentflowLlm` health result is reused |
+| intentflow.llm.concurrency.max-calls  | 0                           | Most LLM calls in flight; 0 for no limit            |
+| intentflow.llm.concurrency.max-wait   | 10s                         | How long a call waits for a free slot               |
+| intentflow.llm.circuit-breaker.failure-threshold | 5                | Failed calls in a row that open the circuit; 0 turns it off. With a Resilience4j `CircuitBreakerRegistry` bean, its `intentflow-llm` and `intentflow-llm-fallback` breakers are used instead |
+| intentflow.llm.circuit-breaker.open-for | 30s                       | How long an open circuit fails calls before trying again |
+| intentflow.llm.fallback.model         | none                        | Model to ask when the primary fails                 |
+| intentflow.llm.fallback.base-url      | intentflow.llm.base-url     | Endpoint of the fallback model                      |
+| intentflow.llm.fallback.api-key       | intentflow.llm.api-key      | API key for the fallback endpoint                   |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
@@ -522,6 +477,7 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.sql.statement-timeout      | 30s                         | Longest a generated query may run; 0 for no limit   |
 | intentflow.sql.read-only              | true                        | Run generated queries in a read-only transaction    |
 | intentflow.cassandra.max-scanned-rows | 10000                       | Rows one Cassandra query may read                   |
+| management.health.intentflow-llm.enabled | true                     | LLM health indicator; lists the models without spending tokens |
 
 ## Example application
 

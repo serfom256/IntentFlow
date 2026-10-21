@@ -40,7 +40,23 @@ public record IntentFlowProperties(
             @Nullable URI proxy,
             @DefaultValue("2") int maxRetries,
             @DefaultValue("500ms") Duration retryBackoff,
-            @DefaultValue("30s") Duration healthInterval) {
+            @DefaultValue("30s") Duration healthInterval,
+            @DefaultValue Concurrency concurrency,
+            @DefaultValue CircuitBreaker circuitBreaker,
+            @DefaultValue Fallback fallback) {
+
+        public record Concurrency(
+                @DefaultValue("0") int maxCalls,
+                @DefaultValue("10s") Duration maxWait) {
+        }
+
+        public record CircuitBreaker(
+                @DefaultValue("5") int failureThreshold,
+                @DefaultValue("30s") Duration openFor) {
+        }
+
+        public record Fallback(@Nullable URI baseUrl, @Nullable String model, @Nullable String apiKey) {
+        }
     }
 
     public record Cache(
