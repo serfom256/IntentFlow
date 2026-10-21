@@ -167,6 +167,7 @@ Only the question → DSL translation is cached; every call runs the query. Fail
 | `ServiceNotFoundException`    | the DSL addresses an unknown or out-of-scope service         | 422                 |
 | `ScanLimitExceededException`  | a Cassandra query read too many rows                         | 422                 |
 | `LlmException`                | the LLM failed, timed out or returned nothing                | 503                 |
+| `RateLimitExceededException`  | the caller asked too many new questions; `retryAfter()`      | 429                 |
 
 ## Query DSL
 
@@ -396,6 +397,7 @@ AccessPolicy accessPolicy() {
 | ----------------------- | ----------- | ----------------------------------------------------------------------------- |
 | `intentflow.requests`   | timer       | `service`, `outcome` (`answered`, `declined`, `rejected`, `denied`, `failed`) |
 | `intentflow.llm`        | timer       | `kind` (`generate`, `repair`), `outcome`                                      |
+| `intentflow.llm.tokens` | counter     | `model`, `kind`, `type` (`prompt`, `completion`); also in `trace().tokens()`  |
 | `intentflow.cache`      | counter     | `result` (`hit`, `miss`)                                                      |
 | `intentflow.query`      | timer       | `service`, `kind` (`rows`, `aggregate`), `outcome`                            |
 | `intentflow.query.rows` | summary     | `service`, `kind`                                                             |
@@ -463,6 +465,9 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.fallback.model         | none                        | Model to ask when the primary fails                 |
 | intentflow.llm.fallback.base-url      | intentflow.llm.base-url     | Endpoint of the fallback model                      |
 | intentflow.llm.fallback.api-key       | intentflow.llm.api-key      | API key for the fallback endpoint                   |
+| intentflow.llm.rate-limit.questions   | 0                           | New questions (cache misses) a caller may ask per period; 0 for no limit. An `LlmRateLimiter` bean replaces it |
+| intentflow.llm.rate-limit.period      | 1m                          | The period of the rate limit                        |
+| intentflow.llm.rate-limit.per         | principal                   | `principal` or `tenant`                             |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |

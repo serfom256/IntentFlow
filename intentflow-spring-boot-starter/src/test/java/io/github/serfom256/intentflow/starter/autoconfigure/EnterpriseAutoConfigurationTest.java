@@ -1,6 +1,7 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
 import io.github.serfom256.intentflow.core.api.IntentContext;
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.api.factories.IntentContexts;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
@@ -11,6 +12,7 @@ import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
+import io.github.serfom256.intentflow.core.pipeline.RateLimitExceededException;
 import io.github.serfom256.intentflow.starter.autoconfigure.fixtures.Book;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -47,7 +49,8 @@ class EnterpriseAutoConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
             .withBean(DataSource.class, () -> dataSource)
-            .withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books"))
+            .withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books", new TokenUsage(120, 4),
+                    "local-model"))
             .withBean(QueryExecutor.class, () -> new QueryExecutor() {
                 @Override
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
@@ -154,6 +157,29 @@ class EnterpriseAutoConfigurationTest {
             assertThat(meters.get("intentflow.cache").tag("result", "hit").counter().count()).isEqualTo(1);
             assertThat(meters.get("intentflow.llm").tag("kind", "generate").timer().count()).isEqualTo(1);
             assertThat(meters.get("intentflow.query").tag("service", "books").timer().count()).isEqualTo(2);
+            assertThat(meters.get("intentflow.llm.tokens").tag("model", "local-model").tag("type", "prompt")
+                    .counter().count()).isEqualTo(120);
+            assertThat(meters.get("intentflow.llm.tokens").tag("kind", "generate").tag("type", "completion")
+                    .counter().count()).isEqualTo(4);
         });
+    }
+
+    @Test
+    void aTenantSharesItsLlmRateLimit() {
+        runner.withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withPropertyValues("intentflow.llm.rate-limit.questions=1", "intentflow.llm.rate-limit.per=tenant")
+                .run(ctx -> {
+                    IntentPipeline pipeline = ctx.getBean(IntentPipeline.class);
+                    IntentContext ann = IntentContexts.of("ann", "acme", Set.of());
+                    IntentContext bob = IntentContexts.of("bob", "acme", Set.of());
+
+                    pipeline.resolve(IntentRequests.of("books", ann), Book.class);
+                    pipeline.resolve(IntentRequests.of("books", bob), Book.class);
+
+                    assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("all the books", bob), Book.class))
+                            .isInstanceOf(RateLimitExceededException.class);
+                    assertThat(ctx.getBean(MeterRegistry.class).get("intentflow.requests").tag("outcome", "limited")
+                            .timer().count()).isEqualTo(1);
+                });
     }
 }

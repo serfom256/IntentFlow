@@ -13,13 +13,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.schema.JdbcSchemaIntrospector;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
@@ -127,11 +122,12 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
             facts.merge(service.table().value(), ServiceDescriptors.factsOf(t, List.of()), TableFacts::merge);
             ServiceDescriptors.restrictionOf(t, List.of()).ifPresent(sql -> restrictions.put(service.name(), sql));
         }
-        IntentPipeline pipeline = IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
-                (text, scope) -> DslSources.of(dsl), DslParsers.create(), AstValidators.create(),
-                SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, restrictions)),
-                new PlainJdbcExecutor(endpoint),
-                UriBuilders.create(), catalog);
+        IntentPipeline pipeline = IntentPipelines.builder()
+                .llm((text, scope) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, restrictions)))
+                .executor(new PlainJdbcExecutor(endpoint))
+                .catalog(catalog)
+                .build();
         return pipeline.resolve(IntentRequests.of("q"), type);
     }
 
@@ -196,11 +192,13 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         } catch (SQLException e) {
             throw new IllegalStateException(e);
         }
-        IntentPipeline pipeline = IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
-                (text, scope) -> DslSources.of(dsl), DslParsers.create(), AstValidators.create(),
-                SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, Map.of()),
-                        EnumSet.allOf(Optimization.class), zone),
-                new PlainJdbcExecutor(endpoint), UriBuilders.create(), ServiceCatalogs.fromAnnotated(Event.class));
+        IntentPipeline pipeline = IntentPipelines.builder()
+                .llm((text, scope) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, Map.of()),
+                        EnumSet.allOf(Optimization.class), zone))
+                .executor(new PlainJdbcExecutor(endpoint))
+                .catalog(ServiceCatalogs.fromAnnotated(Event.class))
+                .build();
         return pipeline.resolve(IntentRequests.of("q"), Event.class).items().stream().map(Event::id).toList();
     }
 

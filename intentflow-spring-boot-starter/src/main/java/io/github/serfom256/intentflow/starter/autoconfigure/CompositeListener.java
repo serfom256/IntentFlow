@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,11 @@ final class CompositeListener implements PipelineListener {
     @Override
     public void llm(boolean repair, Duration elapsed, boolean failed) {
         each(l -> l.llm(repair, elapsed, failed));
+    }
+
+    @Override
+    public void tokens(@Nullable String model, boolean repair, TokenUsage usage) {
+        each(l -> l.tokens(model, repair, usage));
     }
 
     @Override

@@ -1,6 +1,5 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import io.github.serfom256.intentflow.core.api.IntentRequest;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.UserText;
@@ -23,13 +22,10 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
 import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -110,16 +106,13 @@ class IntentPipelineTest {
     private final RecordingExecutor executor = new RecordingExecutor();
 
     private IntentPipeline pipeline(LlmClient llm) {
-        return IntentPipelines.create(
-                TextNormalizers.create(),
-                DslCaches.create(Duration.ofMinutes(5), 100),
-                llm,
-                DslParsers.create(),
-                AstValidators.create(),
-                SqlBuilders.create(new PostgresDialect()),
-                executor,
-                UriBuilders.create(),
-                CATALOG);
+        return IntentPipelines.builder()
+                .llm(llm)
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(executor)
+                .catalog(CATALOG)
+                .cache(DslCaches.create(Duration.ofMinutes(5), 100))
+                .build();
     }
 
     @Test
@@ -249,9 +242,12 @@ class IntentPipelineTest {
                 return (List<T>) List.of("not a book");
             }
         };
-        IntentPipeline pipe = IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
-                (text, catalog) -> DslSources.of("books"), DslParsers.create(), AstValidators.create(),
-                SqlBuilders.create(new PostgresDialect()), broken, UriBuilders.create(), CATALOG);
+        IntentPipeline pipe = IntentPipelines.builder()
+                .llm((text, catalog) -> DslSources.of("books"))
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(broken)
+                .catalog(CATALOG)
+                .build();
 
         assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("x"), Book.class))
                 .hasMessageContaining("java.lang.String");

@@ -43,7 +43,8 @@ public record IntentFlowProperties(
             @DefaultValue("30s") Duration healthInterval,
             @DefaultValue Concurrency concurrency,
             @DefaultValue CircuitBreaker circuitBreaker,
-            @DefaultValue Fallback fallback) {
+            @DefaultValue Fallback fallback,
+            @DefaultValue RateLimit rateLimit) {
 
         public record Concurrency(
                 @DefaultValue("0") int maxCalls,
@@ -56,6 +57,16 @@ public record IntentFlowProperties(
         }
 
         public record Fallback(@Nullable URI baseUrl, @Nullable String model, @Nullable String apiKey) {
+        }
+
+        public record RateLimit(
+                @DefaultValue("0") int questions,
+                @DefaultValue("1m") Duration period,
+                @DefaultValue("principal") Per per) {
+
+            public enum Per {
+                PRINCIPAL, TENANT
+            }
         }
     }
 

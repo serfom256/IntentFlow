@@ -10,13 +10,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 
@@ -48,12 +43,15 @@ class CatalogOverridesTest {
                 return (List<T>) List.of(new Book(7, "Dune", "978-0441013593"));
             }
         };
-        return IntentPipelines.create(TextNormalizers.create(), DslCaches.create(), (text, scope) -> {
-            promptedDescriptions.add(scope.get(BOOKS).fields().get(1).description());
-            return DslSources.of("books | take 1");
-        },
-                DslParsers.create(), AstValidators.create(), SqlBuilders.create(new PostgresDialect()), executor,
-                UriBuilders.create(), catalog);
+        return IntentPipelines.builder()
+                .llm((text, scope) -> {
+                    promptedDescriptions.add(scope.get(BOOKS).fields().get(1).description());
+                    return DslSources.of("books | take 1");
+                })
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(executor)
+                .catalog(catalog)
+                .build();
     }
 
     private static String description(ServiceDescriptor service, String field) {

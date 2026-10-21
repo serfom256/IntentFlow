@@ -7,13 +7,8 @@ import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -43,18 +38,22 @@ class CatalogAdminControllerTest {
 
     private final List<String> prompts = new CopyOnWriteArrayList<>();
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CatalogAdminController(new CatalogAdmin(catalog,
-            IntentPipelines.create(TextNormalizers.create(), DslCaches.create(), (text, scope) -> {
-                prompts.add(scope.get(BOOKS).fields().get(1).description());
-                return text.value().contains("decline")
-                        ? DslSources.of("unsupported \"no such data\"")
-                        : DslSources.of("books | filter title ~ \"dune\"");
-            }, DslParsers.create(), AstValidators.create(), SqlBuilders.create(new PostgresDialect()),
-                    new QueryExecutor() {
+            IntentPipelines.builder()
+                    .llm((text, scope) -> {
+                        prompts.add(scope.get(BOOKS).fields().get(1).description());
+                        return text.value().contains("decline")
+                                ? DslSources.of("unsupported \"no such data\"")
+                                : DslSources.of("books | filter title ~ \"dune\"");
+                    })
+                    .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                    .executor(new QueryExecutor() {
                         @Override
                         public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                             throw new AssertionError("explain must not run queries");
                         }
-                    }, UriBuilders.create(), catalog))))
+                    })
+                    .catalog(catalog)
+                    .build())))
             .build();
 
     @Test

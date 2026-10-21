@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import org.jspecify.annotations.Nullable;
 
@@ -17,7 +18,9 @@ import java.time.Duration;
  * {@code DECLINED} when the LLM said the
  * catalog cannot answer it, {@code REJECTED} when the query did not parse or
  * validate after the allowed repairs,
- * {@code DENIED} when the caller may not query the service, and {@code FAILED}
+ * {@code DENIED} when the caller may not query the service, {@code LIMITED}
+ * when
+ * the caller hit the LLM rate limit, and {@code FAILED}
  * when the LLM or the database
  * failed.
  */
@@ -27,7 +30,7 @@ public interface PipelineListener {
     };
 
     enum Outcome {
-        ANSWERED, DECLINED, REJECTED, DENIED, FAILED
+        ANSWERED, DECLINED, REJECTED, DENIED, LIMITED, FAILED
     }
 
     /** A translation was looked up in the DSL cache. */
@@ -39,6 +42,14 @@ public interface PipelineListener {
      * set.
      */
     default void llm(boolean repair, Duration elapsed, boolean failed) {
+    }
+
+    /**
+     * An LLM call reported its token usage; {@code model} is {@code null} when the
+     * client does not say which
+     * model answered.
+     */
+    default void tokens(@Nullable String model, boolean repair, TokenUsage usage) {
     }
 
     /**

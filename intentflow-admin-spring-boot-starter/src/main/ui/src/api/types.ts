@@ -48,6 +48,7 @@ export interface ExplainView {
   sql: string;
   parameters: unknown[];
   repairs: number;
+  tokens: number;
   optimizations: string[];
   advice: IndexAdvice | null;
 }

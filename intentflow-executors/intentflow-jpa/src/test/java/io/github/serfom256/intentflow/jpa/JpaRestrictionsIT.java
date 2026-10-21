@@ -12,13 +12,8 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
 import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
@@ -117,10 +112,12 @@ class JpaRestrictionsIT {
 
     private static <T> IntentResponse<T> resolve(DifferentialDatabase db, String dsl, Class<T> type) {
         manager(db).clear();
-        IntentPipeline pipeline = IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
-                (t, c) -> DslSources.of(dsl), DslParsers.create(), AstValidators.create(),
-                SqlBuilders.create(db.dialect(), facts()), new JpaQueryExecutor(manager(db)), UriBuilders.create(),
-                CATALOG);
+        IntentPipeline pipeline = IntentPipelines.builder()
+                .llm((t, c) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(db.dialect(), facts()))
+                .executor(new JpaQueryExecutor(manager(db)))
+                .catalog(CATALOG)
+                .build();
         return pipeline.resolve(IntentRequests.of("q"), type);
     }
 

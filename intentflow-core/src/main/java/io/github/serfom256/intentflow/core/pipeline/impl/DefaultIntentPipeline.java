@@ -7,8 +7,8 @@ import io.github.serfom256.intentflow.core.api.IntentRequest;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.IntentTrace;
 import io.github.serfom256.intentflow.core.api.MicroFrontendUri;
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.api.UserText;
-import io.github.serfom256.intentflow.core.api.factories.IntentContexts;
 import io.github.serfom256.intentflow.core.api.factories.IntentResponses;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
@@ -30,12 +30,14 @@ import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
+import io.github.serfom256.intentflow.core.pipeline.LlmRateLimiter;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener.Outcome;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
 import io.github.serfom256.intentflow.core.pipeline.PipelineTracer.Span;
 import io.github.serfom256.intentflow.core.pipeline.PipelineTracer.Stage;
 import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
+import io.github.serfom256.intentflow.core.pipeline.RateLimitExceededException;
 import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.TextNormalizer;
@@ -77,13 +79,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private final Supplier<IntentContext> defaultCaller;
     private final PipelineListener listener;
     private final PipelineTracer tracer;
-
-    public DefaultIntentPipeline(TextNormalizer normalizer, DslCache cache, LlmClient llm, DslParser parser,
-            AstValidator validator, SqlBuilder sqlBuilder, QueryExecutor executor, UriBuilder uriBuilder,
-            ServiceCatalog catalog, int maxRepairs) {
-        this(normalizer, cache, llm, parser, validator, sqlBuilder, executor, uriBuilder, catalog, maxRepairs,
-                AccessPolicy.ALLOW_ALL, IntentContexts::anonymous, PipelineListener.NONE, PipelineTracer.NONE);
-    }
+    private final LlmRateLimiter rateLimiter;
 
     @Override
     public IntentResponse<?> resolve(IntentRequest request) {
@@ -123,11 +119,11 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     }
 
     private record Compiled(UserText question, DslSource dsl, boolean cached, ValidatedQuery validated,
-            BoundQuery query, long startNanos, int repairs) {
+            BoundQuery query, long startNanos, int repairs, TokenUsage tokens) {
 
         IntentTrace trace() {
             return IntentResponses.trace(dsl.value(), cached, query.sql(), new ArrayList<>(query.values()),
-                    query.optimizations(), repairs);
+                    query.optimizations(), repairs, tokens);
         }
     }
 
@@ -163,6 +159,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             throw e;
         } catch (AccessDeniedException e) {
             ended(span, start, service, Outcome.DENIED, null);
+            throw e;
+        } catch (RateLimitExceededException e) {
+            ended(span, start, service, Outcome.LIMITED, null);
             throw e;
         } catch (RuntimeException e) {
             ended(span, start, service, Outcome.FAILED, e);
@@ -230,12 +229,15 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         boolean cached = hit.isPresent();
         listener.cache(cached);
         DslSource dsl;
+        TokenUsage tokens = TokenUsage.NONE;
         if (cached) {
             dsl = hit.get();
             log.debug("DSL cache hit for '{}': {}", normalized.value(), dsl.value());
         } else {
+            rateLimiter.acquire(caller.context());
             long llmStart = System.nanoTime();
             dsl = askLlm(false, expectedName, () -> llm.generateDsl(normalized, scope));
+            tokens = dsl.usage();
             log.debug("LLM translated '{}' in {} ms: {}", normalized.value(), millisSince(llmStart), dsl.value());
         }
 
@@ -262,6 +264,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 DslSource failed = dsl;
                 dsl = askLlm(true, expectedName,
                         () -> llm.repairDsl(normalized, scope, failed, rejected.getMessage()));
+                tokens = tokens.plus(dsl.usage());
                 log.debug("LLM corrected '{}' in {} ms (attempt {} of {}): {}", normalized.value(),
                         millisSince(llmStart), repairs, maxRepairs, dsl.value());
             }
@@ -273,7 +276,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         BoundQuery query = traced(Stage.BUILD, valid.service().name(),
                 () -> sqlBuilder.build(valid, executor.shape(valid.service().resultType()), caller.restrictions()));
         log.debug("Query: {} binds={}", query.sql(), query.values());
-        return new Compiled(normalized, dsl, cached, validated, query, start, repairs);
+        return new Compiled(normalized, dsl, cached, validated, query, start, repairs, tokens);
     }
 
     private DslSource askLlm(boolean repair, @Nullable ServiceName service, Supplier<DslSource> call) {
@@ -281,6 +284,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         try {
             DslSource dsl = traced(repair ? Stage.REPAIR : Stage.GENERATE, service, call);
             listener.llm(repair, since(start), false);
+            if (!dsl.usage().equals(TokenUsage.NONE)) {
+                listener.tokens(dsl.model(), repair, dsl.usage());
+            }
             return dsl;
         } catch (RuntimeException e) {
             listener.llm(repair, since(start), true);

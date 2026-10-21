@@ -4,6 +4,7 @@ import io.github.serfom256.intentflow.core.api.Aggregation;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.IntentTrace;
 import io.github.serfom256.intentflow.core.api.MicroFrontendUri;
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.api.impl.DefaultIntentResponse;
 import io.github.serfom256.intentflow.core.api.impl.DefaultIntentTrace;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
@@ -37,5 +38,10 @@ public final class IntentResponses {
     public static IntentTrace trace(String dsl, boolean cached, String query, List<Object> parameters,
             List<String> optimizations, int repairs) {
         return new DefaultIntentTrace(dsl, cached, query, parameters, optimizations, repairs);
+    }
+
+    public static IntentTrace trace(String dsl, boolean cached, String query, List<Object> parameters,
+            List<String> optimizations, int repairs, TokenUsage tokens) {
+        return new DefaultIntentTrace(dsl, cached, query, parameters, optimizations, repairs, tokens);
     }
 }

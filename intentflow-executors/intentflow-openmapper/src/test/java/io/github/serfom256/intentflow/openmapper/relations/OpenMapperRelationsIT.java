@@ -12,13 +12,8 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.RelationTables;
@@ -121,9 +116,12 @@ class OpenMapperRelationsIT {
     }
 
     private <T> List<T> resolve(DifferentialDatabase db, SchemaFacts facts, String dsl, Class<T> type) {
-        return IntentPipelines.create(TextNormalizers.create(), DslCaches.create(), (t, c) -> DslSources.of(dsl),
-                DslParsers.create(), AstValidators.create(), SqlBuilders.create(db.dialect(), facts),
-                executor(db), UriBuilders.create(), CATALOG).resolve(IntentRequests.of("q"), type).items();
+        return IntentPipelines.builder()
+                .llm((t, c) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(db.dialect(), facts))
+                .executor(executor(db))
+                .catalog(CATALOG)
+                .build().resolve(IntentRequests.of("q"), type).items();
     }
 
     private static List<Long> orderIds(Customer customer) {

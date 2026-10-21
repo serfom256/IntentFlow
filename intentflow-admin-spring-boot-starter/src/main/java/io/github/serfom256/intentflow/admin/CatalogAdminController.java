@@ -4,12 +4,15 @@ import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
 import io.github.serfom256.intentflow.core.catalog.ServiceOverride;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import io.github.serfom256.intentflow.core.pipeline.LlmException;
+import io.github.serfom256.intentflow.core.pipeline.RateLimitExceededException;
 import io.github.serfom256.intentflow.core.pipeline.UnsupportedRequestException;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -105,6 +108,13 @@ public class CatalogAdminController {
     @ExceptionHandler({ ValidationException.class, DslParseException.class })
     ProblemDetail rejected(RuntimeException e) {
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "rejected", e.getMessage());
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<ProblemDetail> limited(RateLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(Math.max(1, e.retryAfter().toSeconds())))
+                .body(problem(HttpStatus.TOO_MANY_REQUESTS, "limited", e.getMessage()));
     }
 
     @ExceptionHandler(LlmException.class)

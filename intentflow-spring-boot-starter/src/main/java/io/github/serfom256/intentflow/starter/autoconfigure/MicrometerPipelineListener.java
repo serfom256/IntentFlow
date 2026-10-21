@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
 import io.micrometer.core.instrument.Counter;
@@ -37,6 +38,22 @@ final class MicrometerPipelineListener implements PipelineListener {
                     .tag("kind", repair ? "repair" : "generate").tag("outcome", failed ? "error" : "ok")
                     .register(meters).record(elapsed);
         }
+    }
+
+    @Override
+    public void tokens(@Nullable String model, boolean repair, TokenUsage usage) {
+        MeterRegistry meters = registry.getIfAvailable();
+        if (meters != null) {
+            String kind = repair ? "repair" : "generate";
+            String name = model == null ? "unknown" : model;
+            tokenCounter(meters, name, kind, "prompt").increment(usage.promptTokens());
+            tokenCounter(meters, name, kind, "completion").increment(usage.completionTokens());
+        }
+    }
+
+    private static Counter tokenCounter(MeterRegistry meters, String model, String kind, String type) {
+        return Counter.builder("intentflow.llm.tokens").description("Tokens the LLM used").baseUnit("tokens")
+                .tag("model", model).tag("kind", kind).tag("type", type).register(meters);
     }
 
     @Override

@@ -9,13 +9,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.RelationTables;
 import org.babyfish.jimmer.sql.JSqlClient;
@@ -63,9 +58,12 @@ class JimmerRelationsIT {
     }
 
     private static IntentPipeline answering(DifferentialDatabase db, String dsl) {
-        return IntentPipelines.create(TextNormalizers.create(), DslCaches.create(), (t, c) -> DslSources.of(dsl),
-                DslParsers.create(), AstValidators.create(), SqlBuilders.create(db.dialect()), executor(db),
-                UriBuilders.create(), CATALOG);
+        return IntentPipelines.builder()
+                .llm((t, c) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(db.dialect()))
+                .executor(executor(db))
+                .catalog(CATALOG)
+                .build();
     }
 
     @Test

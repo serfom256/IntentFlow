@@ -12,13 +12,8 @@ import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 
@@ -77,9 +72,13 @@ class PipelineTracerTest {
                 return List.of();
             }
         };
-        return IntentPipelines.create(TextNormalizers.create(), DslCaches.create(), llm, DslParsers.create(),
-                AstValidators.create(), SqlBuilders.create(new PostgresDialect()), executor, UriBuilders.create(),
-                CATALOG, 1, AccessPolicy.ALLOW_ALL, IntentContexts::anonymous, PipelineListener.NONE, tracer);
+        return IntentPipelines.builder()
+                .llm(llm)
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(executor)
+                .catalog(CATALOG)
+                .tracer(tracer)
+                .build();
     }
 
     @Test
@@ -138,19 +137,25 @@ class PipelineTracerTest {
     @Test
     void aDeniedRequestIsTraced() {
         IntentContext anyone = IntentContexts.anonymous();
-        IntentPipeline pipeline = IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
-                (text, catalog) -> DslSources.of("books"), DslParsers.create(), AstValidators.create(),
-                SqlBuilders.create(new PostgresDialect()), new QueryExecutor() {
+        IntentPipeline pipeline = IntentPipelines.builder()
+                .llm((text, catalog) -> DslSources.of("books"))
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         return List.of();
                     }
-                }, UriBuilders.create(), CATALOG, 1, new AccessPolicy() {
+                })
+                .catalog(CATALOG)
+                .accessPolicy(new AccessPolicy() {
                     @Override
                     public boolean canQuery(ServiceDescriptor service, IntentContext caller) {
                         return false;
                     }
-                }, () -> anyone, PipelineListener.NONE, tracer);
+                })
+                .defaultCaller(() -> anyone)
+                .tracer(tracer)
+                .build();
 
         assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("q"), Book.class))
                 .isInstanceOf(AccessDeniedException.class);

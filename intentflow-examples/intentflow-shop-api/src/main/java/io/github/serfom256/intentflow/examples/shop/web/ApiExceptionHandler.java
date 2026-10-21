@@ -3,6 +3,7 @@ package io.github.serfom256.intentflow.examples.shop.web;
 import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import io.github.serfom256.intentflow.core.pipeline.LlmException;
+import io.github.serfom256.intentflow.core.pipeline.RateLimitExceededException;
 import io.github.serfom256.intentflow.core.pipeline.ScanLimitExceededException;
 import io.github.serfom256.intentflow.core.pipeline.UnsupportedRequestException;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
@@ -61,6 +62,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         log.warn("search too broad: {}", e.getMessage());
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Question too broad",
                 "Answering it would read too many rows. Add a condition and try again.");
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<ProblemDetail> tooManyQuestions(RateLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(Math.max(1, e.retryAfter().toSeconds())))
+                .body(problem(HttpStatus.TOO_MANY_REQUESTS, "Too many questions",
+                        "You asked too many new questions. Try again in a moment."));
     }
 
     @ExceptionHandler(LlmException.class)

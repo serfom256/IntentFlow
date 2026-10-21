@@ -155,6 +155,11 @@ export function ExplainPanel({ service, services }: { service?: string; services
               <Badge variant="light" color={explain.data.cached ? "gray" : "indigo"}>
                 {explain.data.cached ? "from cache" : "translated by the LLM"}
               </Badge>
+              {explain.data.tokens > 0 && (
+                <Badge variant="light" color="gray">
+                  {explain.data.tokens.toLocaleString()} tokens
+                </Badge>
+              )}
               {explain.data.repairs > 0 && (
                 <Badge variant="light" color="orange">
                   corrected {explain.data.repairs}× after a rejected query

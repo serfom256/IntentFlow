@@ -10,12 +10,8 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 
@@ -43,13 +39,17 @@ class CachingAndLimitsTest {
     };
 
     private IntentPipeline pipeline(Deque<String> answers, AtomicInteger calls, AstValidator validator) {
-        return IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
-                (text, catalog) -> {
+        return IntentPipelines.builder()
+                .llm((text, catalog) -> {
                     calls.incrementAndGet();
                     return DslSources.of(answers.size() > 1 ? answers.poll() : answers.peek());
-                },
-                DslParsers.create(), validator, SqlBuilders.create(new PostgresDialect()), executor,
-                UriBuilders.create(), CATALOG, 0);
+                })
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(executor)
+                .catalog(CATALOG)
+                .validator(validator)
+                .maxRepairs(0)
+                .build();
     }
 
     @Test
@@ -63,13 +63,15 @@ class CachingAndLimitsTest {
                 return List.of();
             }
         };
-        IntentPipeline pipeline = IntentPipelines.create(TextNormalizers.create(), DslCaches.create(),
-                (text, catalog) -> {
+        IntentPipeline pipeline = IntentPipelines.builder()
+                .llm((text, catalog) -> {
                     calls.incrementAndGet();
                     return DslSources.of("books | filter title == \"Dune\"");
-                },
-                DslParsers.create(), AstValidators.create(), SqlBuilders.create(new PostgresDialect()), counting,
-                UriBuilders.create(), CATALOG);
+                })
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(counting)
+                .catalog(CATALOG)
+                .build();
 
         IntentTrace trace = pipeline.explain(IntentRequests.of("dune"), Book.class);
 

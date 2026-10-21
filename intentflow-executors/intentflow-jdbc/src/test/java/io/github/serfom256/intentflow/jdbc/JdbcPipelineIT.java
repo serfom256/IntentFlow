@@ -1,6 +1,5 @@
 package io.github.serfom256.intentflow.jdbc;
 
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -19,14 +18,9 @@ import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
 import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
-
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -91,16 +85,12 @@ class JdbcPipelineIT {
     }
 
     private static IntentResponse<Book> resolve(String dsl) {
-        IntentPipeline pipeline = IntentPipelines.create(
-                TextNormalizers.create(),
-                DslCaches.create(),
-                (text, catalog) -> DslSources.of(dsl),
-                DslParsers.create(),
-                AstValidators.create(),
-                SqlBuilders.create(new PostgresDialect()),
-                new JdbcQueryExecutor(jdbc),
-                UriBuilders.create(),
-                CATALOG);
+        IntentPipeline pipeline = IntentPipelines.builder()
+                .llm((text, catalog) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(new JdbcQueryExecutor(jdbc))
+                .catalog(CATALOG)
+                .build();
         return pipeline.resolve(IntentRequests.of("q"), Book.class);
     }
 

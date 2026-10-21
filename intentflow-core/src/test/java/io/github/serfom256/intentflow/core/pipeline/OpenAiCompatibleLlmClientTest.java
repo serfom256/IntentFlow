@@ -2,7 +2,9 @@ package io.github.serfom256.intentflow.core.pipeline;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.api.factories.UserTexts;
+import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
@@ -328,5 +330,27 @@ class OpenAiCompatibleLlmClientTest {
         LlmClient custom = (text, catalog) -> DslSources.of("books");
 
         assertThatThrownBy(custom::ping).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void readsTokenUsageAndTheAnsweringModel() {
+        reply = "{\"model\":\"test-model-2026\",\"usage\":{\"prompt_tokens\":812,\"completion_tokens\":15,"
+                + "\"total_tokens\":827},\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"books\"}}]}";
+
+        DslSource dsl = client("").generateDsl(UserTexts.of("books"), CATALOG);
+
+        assertThat(dsl.usage()).isEqualTo(new TokenUsage(812, 15));
+        assertThat(dsl.usage().total()).isEqualTo(827);
+        assertThat(dsl.model()).isEqualTo("test-model-2026");
+    }
+
+    @Test
+    void withoutUsageTheAnswerHasNoneAndTheConfiguredModel() {
+        reply = completion("books");
+
+        DslSource dsl = client("").generateDsl(UserTexts.of("books"), CATALOG);
+
+        assertThat(dsl.usage()).isEqualTo(TokenUsage.NONE);
+        assertThat(dsl.model()).isEqualTo("test-model");
     }
 }

@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.api.UserText;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -177,11 +178,13 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 .POST(HttpRequest.BodyPublishers.ofString(body))).build();
         HttpResponse<String> response = send(request, options.maxRetries());
 
-        String dsl = cleanup(extractContent(response.body()));
+        Object root = parse(response.body());
+        String dsl = cleanup(extractContent(root, response.body()));
         if (dsl.isEmpty()) {
             throw new LlmException("LLM returned an empty answer");
         }
-        return DslSources.of(dsl);
+        return DslSources.of(dsl, usage(root),
+                root instanceof Map<?, ?> map && map.get("model") instanceof String answered ? answered : model);
     }
 
     private HttpRequest.Builder authorized(HttpRequest.Builder request) {
@@ -305,9 +308,25 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
         return sb.toString();
     }
 
-    private static String extractContent(String responseBody) {
+    private static Object parse(String responseBody) {
         try {
-            Object root = MiniJson.parse(responseBody);
+            return MiniJson.parse(responseBody);
+        } catch (RuntimeException e) {
+            throw new LlmException("Unexpected LLM response shape: " + responseBody, e);
+        }
+    }
+
+    private static TokenUsage usage(Object root) {
+        if (root instanceof Map<?, ?> map && map.get("usage") instanceof Map<?, ?> usage
+                && usage.get("prompt_tokens") instanceof Number prompt
+                && usage.get("completion_tokens") instanceof Number completion) {
+            return new TokenUsage(prompt.longValue(), completion.longValue());
+        }
+        return TokenUsage.NONE;
+    }
+
+    private static String extractContent(Object root, String responseBody) {
+        try {
             Object choices = ((Map<?, ?>) root).get("choices");
             Object first = ((List<?>) choices).getFirst();
             Object message = ((Map<?, ?>) first).get("message");

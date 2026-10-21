@@ -44,12 +44,7 @@ import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -665,9 +660,11 @@ public abstract class DifferentialTestBase {
     }
 
     private IntentPipeline pipelineAnswering(String dsl) {
-        return IntentPipelines.create(
-                TextNormalizers.create(), DslCaches.create(), (text, catalog) -> DslSources.of(dsl),
-                DslParsers.create(), AstValidators.create(), sqlBuilder(), executor,
-                UriBuilders.create(), ServiceCatalogs.of(gadgets));
+        return IntentPipelines.builder()
+                .llm((text, catalog) -> DslSources.of(dsl))
+                .sqlBuilder(sqlBuilder())
+                .executor(executor)
+                .catalog(ServiceCatalogs.of(gadgets))
+                .build();
     }
 }

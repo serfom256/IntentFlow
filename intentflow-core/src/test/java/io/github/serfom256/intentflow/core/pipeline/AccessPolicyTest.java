@@ -19,13 +19,8 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener.Outcome;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -130,9 +125,16 @@ class AccessPolicyTest {
                 events.add((service == null ? "-" : service.value()) + " " + outcome);
             }
         };
-        return IntentPipelines.create(TextNormalizers.create(), DslCaches.create(), llm, DslParsers.create(),
-                AstValidators.create(), SqlBuilders.create(new PostgresDialect()), executor, UriBuilders.create(),
-                CATALOG, 0, POLICY, () -> defaultCaller, listener);
+        return IntentPipelines.builder()
+                .llm(llm)
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(executor)
+                .catalog(CATALOG)
+                .maxRepairs(0)
+                .accessPolicy(POLICY)
+                .defaultCaller(() -> defaultCaller)
+                .listener(listener)
+                .build();
     }
 
     @Test

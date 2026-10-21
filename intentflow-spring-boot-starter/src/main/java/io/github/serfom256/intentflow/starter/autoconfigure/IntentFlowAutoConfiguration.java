@@ -14,6 +14,7 @@ import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
 import io.github.serfom256.intentflow.core.pipeline.LlmHttpOptions;
+import io.github.serfom256.intentflow.core.pipeline.LlmRateLimiter;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
 import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
@@ -26,6 +27,7 @@ import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.LlmClients;
+import io.github.serfom256.intentflow.core.pipeline.factories.LlmRateLimiters;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
 import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
@@ -158,6 +160,18 @@ public class IntentFlowAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    LlmRateLimiter intentFlowLlmRateLimiter(IntentFlowProperties properties) {
+        IntentFlowProperties.Llm.RateLimit limit = properties.llm().rateLimit();
+        if (limit.questions() <= 0) {
+            return LlmRateLimiter.NONE;
+        }
+        return limit.per() == IntentFlowProperties.Llm.RateLimit.Per.TENANT
+                ? LlmRateLimiters.perTenant(limit.questions(), limit.period())
+                : LlmRateLimiters.perPrincipal(limit.questions(), limit.period());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     TextNormalizer intentFlowTextNormalizer() {
         return TextNormalizers.create();
     }
@@ -217,7 +231,8 @@ public class IntentFlowAutoConfiguration {
             ObjectProvider<QueryExecutor> executor, UriBuilder uriBuilder,
             ServiceCatalog catalog, IntentFlowProperties properties, ObjectProvider<AccessPolicy> policy,
             ObjectProvider<IntentContextProvider> callers, ObjectProvider<PipelineListener> listeners,
-            ObjectProvider<PipelineTracer> tracer, ObjectProvider<ExecutorWrapper> wrapper) {
+            ObjectProvider<PipelineTracer> tracer, ObjectProvider<ExecutorWrapper> wrapper,
+            LlmRateLimiter rateLimiter) {
         QueryExecutor queryExecutor = executor.getIfAvailable();
         if (queryExecutor == null) {
             throw new IllegalStateException("No QueryExecutor: configure a DataSource (spring.datasource.*) "
@@ -231,10 +246,23 @@ public class IntentFlowAutoConfiguration {
         }
         IntentContextProvider caller = callers.getIfAvailable(() -> IntentContexts::anonymous);
         List<PipelineListener> observers = listeners.orderedStream().toList();
-        return IntentPipelines.create(normalizer, cache, llm, parser, validator, sqlBuilder,
-                queryExecutor, uriBuilder, catalog, properties.llm().maxRepairs(),
-                policy.getIfAvailable(() -> AccessPolicy.ALLOW_ALL), caller::current, new CompositeListener(observers),
-                tracer.getIfAvailable(() -> PipelineTracer.NONE));
+        return IntentPipelines.builder()
+                .llm(llm)
+                .sqlBuilder(sqlBuilder)
+                .executor(queryExecutor)
+                .catalog(catalog)
+                .normalizer(normalizer)
+                .cache(cache)
+                .parser(parser)
+                .validator(validator)
+                .uriBuilder(uriBuilder)
+                .maxRepairs(properties.llm().maxRepairs())
+                .accessPolicy(policy.getIfAvailable(() -> AccessPolicy.ALLOW_ALL))
+                .defaultCaller(caller::current)
+                .listener(new CompositeListener(observers))
+                .tracer(tracer.getIfAvailable(() -> PipelineTracer.NONE))
+                .rateLimiter(rateLimiter)
+                .build();
     }
 
 }

@@ -10,13 +10,8 @@ import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.Test;
 
@@ -60,9 +55,13 @@ class RepairTest {
                 return List.of();
             }
         };
-        return IntentPipelines.create(TextNormalizers.create(), DslCaches.create(), llm, DslParsers.create(),
-                AstValidators.create(), SqlBuilders.create(new PostgresDialect()), executor, UriBuilders.create(),
-                CATALOG, maxRepairs);
+        return IntentPipelines.builder()
+                .llm(llm)
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .executor(executor)
+                .catalog(CATALOG)
+                .maxRepairs(maxRepairs)
+                .build();
     }
 
     @Test

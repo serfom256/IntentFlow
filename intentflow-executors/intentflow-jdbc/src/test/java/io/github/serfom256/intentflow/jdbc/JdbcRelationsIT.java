@@ -11,13 +11,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
-import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
-import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.pipeline.factories.TextNormalizers;
-import io.github.serfom256.intentflow.core.pipeline.factories.UriBuilders;
 import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.RelationTables;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -62,12 +57,13 @@ class JdbcRelationsIT {
     }
 
     private static IntentPipeline answering(DifferentialDatabase database, String dsl) {
-        return IntentPipelines.create(
-                TextNormalizers.create(), DslCaches.create(), (text, catalog) -> DslSources.of(dsl),
-                DslParsers.create(), AstValidators.create(), SqlBuilders.create(database.dialect()),
-                executor(database), UriBuilders.create(),
-                ServiceCatalogs.of(ServiceDescriptors.fromAnnotated(Customer.class),
-                        ServiceDescriptors.fromAnnotated(Order.class)));
+        return IntentPipelines.builder()
+                .llm((text, catalog) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(database.dialect()))
+                .executor(executor(database))
+                .catalog(ServiceCatalogs.of(ServiceDescriptors.fromAnnotated(Customer.class),
+                        ServiceDescriptors.fromAnnotated(Order.class)))
+                .build();
     }
 
     private static List<Long> customers(DifferentialDatabase db, String dsl) {
