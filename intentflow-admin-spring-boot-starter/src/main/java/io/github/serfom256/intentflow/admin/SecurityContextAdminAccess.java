@@ -10,10 +10,12 @@ import java.util.List;
 
 final class SecurityContextAdminAccess implements AdminAccess {
 
-    private final List<String> authorities;
+    private final List<String> editors;
+    private final List<String> viewers;
 
-    SecurityContextAdminAccess(List<String> authorities) {
-        this.authorities = List.copyOf(authorities);
+    SecurityContextAdminAccess(List<String> editors, List<String> viewers) {
+        this.editors = List.copyOf(editors);
+        this.viewers = List.copyOf(viewers);
     }
 
     @Override
@@ -23,8 +25,13 @@ final class SecurityContextAdminAccess implements AdminAccess {
                 || authentication instanceof AnonymousAuthenticationToken) {
             return Decision.unauthenticated(null);
         }
-        boolean admin = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority)
-                .anyMatch(authorities::contains);
-        return admin ? Decision.allowed(authentication.getName()) : Decision.forbidden(authentication.getName());
+        List<String> granted = authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).toList();
+        if (granted.stream().anyMatch(editors::contains)) {
+            return Decision.allowed(authentication.getName());
+        }
+        if (granted.stream().anyMatch(viewers::contains)) {
+            return Decision.readOnly(authentication.getName());
+        }
+        return Decision.forbidden(authentication.getName());
     }
 }

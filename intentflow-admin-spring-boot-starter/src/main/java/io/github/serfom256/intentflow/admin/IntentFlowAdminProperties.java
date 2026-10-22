@@ -31,6 +31,7 @@ public record IntentFlowAdminProperties(
     public record Security(
             @DefaultValue("true") boolean enabled,
             @DefaultValue("ROLE_ADMIN") List<String> authorities,
+            @DefaultValue List<String> readOnlyAuthorities,
             @DefaultValue("admin") String username,
             @Nullable String password,
             @Nullable String loginUrl) {

@@ -10,8 +10,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.oidc.OidcIdToken;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -19,12 +26,17 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -150,5 +162,81 @@ class AdminSecurityTest {
     void securityCanBeSwitchedOffExplicitly() {
         runner.withPropertyValues("intentflow.admin.security.enabled=false")
                 .run(ctx -> mvc(ctx).perform(get("/intentflow-admin/api/services")).andExpect(status().isOk()));
+    }
+
+    @Test
+    void readOnlyUsersBrowseAndExplainButCannotChangeOverrides() {
+        runner.withPropertyValues("intentflow.admin.security.read-only-authorities=ROLE_CATALOG_VIEWER",
+                "intentflow.dialect=postgresql").run(ctx -> {
+                    MockMvc mvc = mvc(ctx);
+                    SecurityContextHolder.getContext().setAuthentication(
+                            new TestingAuthenticationToken("vic", "x", "ROLE_CATALOG_VIEWER"));
+
+                    mvc.perform(get("/intentflow-admin/api/session"))
+                            .andExpect(status().isOk())
+                            .andExpect(jsonPath("$.user").value("vic"))
+                            .andExpect(jsonPath("$.editor").value(false));
+                    mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isOk());
+                    mvc.perform(post("/intentflow-admin/api/explain").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"question\": \"books\"}")).andExpect(status().isOk());
+                    mvc.perform(put("/intentflow-admin/api/services/books").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"description\": \"Every book\"}"))
+                            .andExpect(status().isForbidden())
+                            .andExpect(jsonPath("$.kind").value("read-only"));
+                    mvc.perform(delete("/intentflow-admin/api/services/books"))
+                            .andExpect(status().isForbidden());
+                });
+    }
+
+    @Test
+    void editorsCanChangeOverrides() {
+        runner.withPropertyValues("intentflow.admin.security.read-only-authorities=ROLE_CATALOG_VIEWER").run(ctx -> {
+            MockMvc mvc = mvc(ctx);
+            SecurityContextHolder.getContext().setAuthentication(
+                    new TestingAuthenticationToken("eda", "x", "ROLE_ADMIN"));
+
+            mvc.perform(get("/intentflow-admin/api/session")).andExpect(jsonPath("$.editor").value(true));
+            mvc.perform(put("/intentflow-admin/api/services/books").contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"description\": \"Every book\"}")).andExpect(status().isOk());
+        });
+    }
+
+    @Test
+    void usersWithNeitherRoleAreToldWhichAuthoritiesGrantAccess() {
+        runner.withPropertyValues("intentflow.admin.security.read-only-authorities=ROLE_CATALOG_VIEWER").run(ctx -> {
+            SecurityContextHolder.getContext().setAuthentication(
+                    new TestingAuthenticationToken("bob", "x", "ROLE_USER"));
+
+            mvc(ctx).perform(get("/intentflow-admin/api/services"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.authorities[0]").value("ROLE_ADMIN"))
+                    .andExpect(jsonPath("$.authorities[1]").value("ROLE_CATALOG_VIEWER"));
+        });
+    }
+
+    @Test
+    void anOidcLoginWithTheGuidesRoleMapperGetsItsRole() {
+        GrantedAuthoritiesMapper roles = OidcRoles.mapper("roles");
+        runner.withPropertyValues("intentflow.admin.security.authorities=ROLE_intentflow-editor",
+                "intentflow.admin.security.read-only-authorities=ROLE_intentflow-viewer").run(ctx -> {
+                    MockMvc mvc = mvc(ctx);
+                    SecurityContextHolder.getContext().setAuthentication(oidc(roles, "lena", "intentflow-viewer"));
+                    mvc.perform(get("/intentflow-admin/api/session"))
+                            .andExpect(jsonPath("$.user").value("lena"))
+                            .andExpect(jsonPath("$.editor").value(false));
+
+                    SecurityContextHolder.getContext().setAuthentication(oidc(roles, "omar", "intentflow-editor"));
+                    mvc.perform(get("/intentflow-admin/api/session")).andExpect(jsonPath("$.editor").value(true));
+                });
+    }
+
+    private static OAuth2AuthenticationToken oidc(GrantedAuthoritiesMapper roles, String user, String role) {
+        OidcIdToken token = OidcIdToken.withTokenValue("id-token").subject(user).issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(300)).claim("preferred_username", user)
+                .claim("roles", List.of(role)).build();
+        Collection<? extends GrantedAuthority> authorities = roles
+                .mapAuthorities(List.of(new OidcUserAuthority(token)));
+        DefaultOidcUser principal = new DefaultOidcUser(authorities, token, "preferred_username");
+        return new OAuth2AuthenticationToken(principal, authorities, "corporate-sso");
     }
 }

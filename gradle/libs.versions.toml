@@ -50,6 +50,7 @@ spring-jdbc = { module = "org.springframework:spring-jdbc" }
 spring-webmvc = { module = "org.springframework:spring-webmvc" }
 spring-security-core = { module = "org.springframework.security:spring-security-core" }
 spring-security-web = { module = "org.springframework.security:spring-security-web" }
+spring-security-oauth2-client = { module = "org.springframework.security:spring-security-oauth2-client" }
 jackson2-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
 jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
 micrometer-core = { module = "io.micrometer:micrometer-core" }
@@ -89,3 +90,5 @@ testing = ["junit-jupiter", "assertj-core"]
 spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
 node-gradle = { id = "com.github.node-gradle.node", version = "7.1.0" }
 maven-publish = { id = "com.vanniktech.maven.publish", version = "0.35.0" }
+cyclonedx = { id = "org.cyclonedx.bom", version = "3.5.0" }
+japicmp = { id = "me.champeau.gradle.japicmp", version = "0.4.6" }

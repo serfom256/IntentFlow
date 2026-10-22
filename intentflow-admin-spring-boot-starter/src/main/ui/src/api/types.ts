@@ -65,6 +65,7 @@ export interface ProblemDetail {
 
 export interface SessionView {
   user: string | null;
+  editor: boolean;
   csrf: { header: string; token: string } | null;
 }
 

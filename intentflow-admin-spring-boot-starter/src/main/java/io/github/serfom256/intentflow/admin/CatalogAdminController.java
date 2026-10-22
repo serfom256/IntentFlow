@@ -40,7 +40,7 @@ public class CatalogAdminController {
     public record Csrf(String header, String token) {
     }
 
-    public record SessionView(@Nullable String user, @Nullable Csrf csrf) {
+    public record SessionView(@Nullable String user, boolean editor, @Nullable Csrf csrf) {
     }
 
     private final CatalogAdmin admin;
@@ -51,7 +51,9 @@ public class CatalogAdminController {
 
     @GetMapping("/session")
     public SessionView session(HttpServletRequest request) {
-        return new SessionView(user(request), csrf(request));
+        return new SessionView(user(request),
+                !Boolean.FALSE.equals(request.getAttribute(AdminAccessInterceptor.EDITOR)),
+                csrf(request));
     }
 
     private static @Nullable String user(HttpServletRequest request) {

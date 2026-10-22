@@ -30,6 +30,7 @@ dependencies {
     }
     testImplementation(libs.spring.security.core)
     testImplementation(libs.spring.security.web)
+    testImplementation(libs.spring.security.oauth2.client)
     testImplementation(testFixtures(projects.intentflowCore))
     testRuntimeOnly(libs.postgresql)
     testRuntimeOnly(libs.mysql)

@@ -1,8 +1,10 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Button,
   Card,
+  Fieldset,
   Group,
   Loader,
   Stack,
@@ -16,9 +18,9 @@ import {
 import { useForm } from "@mantine/form";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
-import { IconArrowBackUp, IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
+import { IconArrowBackUp, IconDeviceFloppy, IconEye, IconRestore } from "@tabler/icons-react";
 import { useEffect } from "react";
-import { useResetOverride, useSaveOverride, useService } from "../api/hooks";
+import { useResetOverride, useSaveOverride, useService, useSession } from "../api/hooks";
 import type { ServiceView } from "../api/types";
 import { ErrorAlert } from "../components/ErrorAlert";
 import { ExplainPanel } from "../components/ExplainPanel";
@@ -55,6 +57,8 @@ function ChangedBadge() {
 
 export function ServicePage({ name }: { name: string }) {
   const service = useService(name);
+  const session = useSession();
+  const readOnly = session.data?.editor === false;
   const save = useSaveOverride(name);
   const reset = useResetOverride(name);
   const fieldNames = service.data?.fields.map((f) => f.name) ?? [];
@@ -137,7 +141,7 @@ export function ServicePage({ name }: { name: string }) {
           variant="default"
           color="red"
           leftSection={<IconRestore size={16} />}
-          disabled={!hasOverrides}
+          disabled={!hasOverrides || readOnly}
           loading={reset.isPending}
           onClick={confirmReset}
         >
@@ -145,130 +149,140 @@ export function ServicePage({ name }: { name: string }) {
         </Button>
       </Group>
 
+      {readOnly && (
+        <Alert variant="light" color="gray" icon={<IconEye size={16} />}>
+          Read-only access: you can browse the catalog and explain questions; an editor changes descriptions.
+        </Alert>
+      )}
+
       <form onSubmit={submit}>
-        <Stack gap="lg">
-          <Card withBorder padding="lg">
-            <Stack gap="md">
-              <Textarea
-                label={
-                  <Group gap={6}>
-                    Service description {form.values.description && <ChangedBadge />}
-                  </Group>
-                }
-                description={`Declared: ${view.declaredDescription ?? "none"}`}
-                placeholder={view.declaredDescription ?? "What the service contains, in the words users ask in"}
-                autosize
-                minRows={1}
-                maxRows={4}
-                {...form.getInputProps("description")}
-              />
-              <TextInput
-                label={
-                  <Group gap={6}>
-                    Path {form.values.uri && <ChangedBadge />}
-                  </Group>
-                }
-                description={`Declared: ${view.declaredUri}. Placeholders take the value of the first result.`}
-                placeholder={view.declaredUri}
-                ff="monospace"
-                {...form.getInputProps("uri")}
-              />
-              <Group gap={6}>
-                <Text size="xs" c="dimmed">
-                  Insert:
-                </Text>
-                {view.fields.map((f) => (
-                  <Badge
-                    key={f.name}
-                    variant="outline"
-                    style={{ cursor: "pointer", textTransform: "none" }}
-                    onClick={() => form.setFieldValue("uri", `${form.values.uri || view.declaredUri.replace(/\{\{\w+}}/g, "")}{{${f.name}}}`)}
-                  >
-                    {`{{${f.name}}}`}
-                  </Badge>
-                ))}
+        <Fieldset variant="unstyled" disabled={readOnly}>
+          <Stack gap="lg">
+            <Card withBorder padding="lg">
+              <Stack gap="md">
+                <Textarea
+                  label={
+                    <Group gap={6}>
+                      Service description {form.values.description && <ChangedBadge />}
+                    </Group>
+                  }
+                  description={`Declared: ${view.declaredDescription ?? "none"}`}
+                  placeholder={view.declaredDescription ?? "What the service contains, in the words users ask in"}
+                  autosize
+                  minRows={1}
+                  maxRows={4}
+                  {...form.getInputProps("description")}
+                />
+                <TextInput
+                  label={
+                    <Group gap={6}>
+                      Path {form.values.uri && <ChangedBadge />}
+                    </Group>
+                  }
+                  description={`Declared: ${view.declaredUri}. Placeholders take the value of the first result.`}
+                  placeholder={view.declaredUri}
+                  ff="monospace"
+                  {...form.getInputProps("uri")}
+                />
+                <Group gap={6}>
+                  <Text size="xs" c="dimmed">
+                    Insert:
+                  </Text>
+                  {view.fields.map((f) => (
+                    <Badge
+                      key={f.name}
+                      variant="outline"
+                      style={{ cursor: "pointer", textTransform: "none" }}
+                      onClick={() => form.setFieldValue("uri", `${form.values.uri || view.declaredUri.replace(/\{\{\w+}}/g, "")}{{${f.name}}}`)}
+                    >
+                      {`{{${f.name}}}`}
+                    </Badge>
+                  ))}
+                </Group>
+              </Stack>
+            </Card>
+
+            <Card withBorder padding={0}>
+              <Table.ScrollContainer minWidth={720}>
+                <Table verticalSpacing="sm" horizontalSpacing="md">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th w={260}>Field</Table.Th>
+                      <Table.Th>Description for the LLM</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {view.fields.map((field) => {
+                      const value = form.values.fields[field.name] ?? "";
+                      return (
+                        <Table.Tr key={field.name}>
+                          <Table.Td valign="top">
+                            <Group gap={6}>
+                              <Text fw={600} size="sm">
+                                {field.name}
+                              </Text>
+                              <Badge size="xs" variant="light">
+                                {field.type.toLowerCase()}
+                              </Badge>
+                              {value && <ChangedBadge />}
+                            </Group>
+                            <Text size="xs" c="dimmed" ff="monospace">
+                              {field.column}
+                            </Text>
+                            {field.allowedValues.length > 0 && (
+                              <Text size="xs" c="dimmed" lineClamp={2}>
+                                {field.allowedValues.join(", ")}
+                              </Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            <Group gap="xs" wrap="nowrap" align="flex-start">
+                              <Textarea
+                                flex={1}
+                                autosize
+                                minRows={1}
+                                maxRows={4}
+                                placeholder={field.declaredDescription ?? "No description declared"}
+                                description={field.declaredDescription ? `Declared: ${field.declaredDescription}` : undefined}
+                                value={value}
+                                onChange={(event) => form.setFieldValue(`fields.${field.name}`, event.currentTarget.value)}
+                              />
+                              <Tooltip label="Use the declared description">
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="gray"
+                                  mt={field.declaredDescription ? 22 : 4}
+                                  disabled={!value}
+                                  onClick={() => form.setFieldValue(`fields.${field.name}`, "")}
+                                  aria-label={`Clear the override of ${field.name}`}
+                                >
+                                  <IconArrowBackUp size={16} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+            </Card>
+
+            {form.errors.fields && <Text c="red" size="sm">{form.errors.fields}</Text>}
+            <ErrorAlert error={save.error} title="The changes were not saved" />
+            {!readOnly && (
+              <Group justify="flex-end">
+                <Button variant="default" disabled={!form.isDirty()} onClick={() => form.reset()}>
+                  Discard
+                </Button>
+                <Button type="submit" leftSection={<IconDeviceFloppy size={16} />} disabled={!form.isDirty()} loading={save.isPending}>
+                  Save
+                </Button>
               </Group>
-            </Stack>
-          </Card>
-
-          <Card withBorder padding={0}>
-            <Table.ScrollContainer minWidth={720}>
-              <Table verticalSpacing="sm" horizontalSpacing="md">
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th w={260}>Field</Table.Th>
-                    <Table.Th>Description for the LLM</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {view.fields.map((field) => {
-                    const value = form.values.fields[field.name] ?? "";
-                    return (
-                      <Table.Tr key={field.name}>
-                        <Table.Td valign="top">
-                          <Group gap={6}>
-                            <Text fw={600} size="sm">
-                              {field.name}
-                            </Text>
-                            <Badge size="xs" variant="light">
-                              {field.type.toLowerCase()}
-                            </Badge>
-                            {value && <ChangedBadge />}
-                          </Group>
-                          <Text size="xs" c="dimmed" ff="monospace">
-                            {field.column}
-                          </Text>
-                          {field.allowedValues.length > 0 && (
-                            <Text size="xs" c="dimmed" lineClamp={2}>
-                              {field.allowedValues.join(", ")}
-                            </Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          <Group gap="xs" wrap="nowrap" align="flex-start">
-                            <Textarea
-                              flex={1}
-                              autosize
-                              minRows={1}
-                              maxRows={4}
-                              placeholder={field.declaredDescription ?? "No description declared"}
-                              description={field.declaredDescription ? `Declared: ${field.declaredDescription}` : undefined}
-                              value={value}
-                              onChange={(event) => form.setFieldValue(`fields.${field.name}`, event.currentTarget.value)}
-                            />
-                            <Tooltip label="Use the declared description">
-                              <ActionIcon
-                                variant="subtle"
-                                color="gray"
-                                mt={field.declaredDescription ? 22 : 4}
-                                disabled={!value}
-                                onClick={() => form.setFieldValue(`fields.${field.name}`, "")}
-                                aria-label={`Clear the override of ${field.name}`}
-                              >
-                                <IconArrowBackUp size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                          </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          </Card>
-
-          {form.errors.fields && <Text c="red" size="sm">{form.errors.fields}</Text>}
-          <ErrorAlert error={save.error} title="The changes were not saved" />
-          <Group justify="flex-end">
-            <Button variant="default" disabled={!form.isDirty()} onClick={() => form.reset()}>
-              Discard
-            </Button>
-            <Button type="submit" leftSection={<IconDeviceFloppy size={16} />} disabled={!form.isDirty()} loading={save.isPending}>
-              Save
-            </Button>
-          </Group>
-        </Stack>
+            )}
+          </Stack>
+        </Fieldset>
       </form>
 
       <ExplainPanel service={view.name} />

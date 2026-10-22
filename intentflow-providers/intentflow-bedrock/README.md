@@ -4,7 +4,7 @@ Connects IntentFlow to models in Amazon Bedrock through the Converse API of the 
 Mistral, Amazon Nova and the other chat models in your AWS account, with IAM credentials.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-bedrock:0.3.5")
+implementation("io.github.serfom256:intentflow-bedrock:0.4.0")
 ```
 
 ```yaml

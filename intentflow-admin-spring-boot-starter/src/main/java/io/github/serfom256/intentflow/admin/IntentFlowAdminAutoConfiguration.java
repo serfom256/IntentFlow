@@ -69,9 +69,10 @@ public class IntentFlowAdminAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         AdminAccess intentFlowAdminAccess(IntentFlowAdminProperties properties) {
-            log.info("IntentFlow admin uses the application's Spring Security and requires one of {}",
-                    properties.security().authorities());
-            return new SecurityContextAdminAccess(properties.security().authorities());
+            IntentFlowAdminProperties.Security security = properties.security();
+            log.info("IntentFlow admin uses the application's Spring Security: editors need one of {}, "
+                    + "read-only users one of {}", security.authorities(), security.readOnlyAuthorities());
+            return new SecurityContextAdminAccess(security.authorities(), security.readOnlyAuthorities());
         }
     }
 
@@ -127,7 +128,8 @@ public class IntentFlowAdminAutoConfiguration {
         public void addInterceptors(InterceptorRegistry registry) {
             String path = properties.path();
             registry.addInterceptor(new AdminAccessInterceptor(access, path, properties.security().authorities(),
-                    properties.security().loginUrl())).addPathPatterns(path, path + "/**");
+                    properties.security().readOnlyAuthorities(), properties.security().loginUrl()))
+                    .addPathPatterns(path, path + "/**");
         }
 
         @Override

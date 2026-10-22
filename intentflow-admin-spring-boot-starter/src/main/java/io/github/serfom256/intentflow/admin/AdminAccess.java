@@ -19,18 +19,27 @@ public interface AdminAccess {
         FORBIDDEN
     }
 
-    record Decision(Outcome outcome, @Nullable String user, @Nullable String challenge) {
+    /**
+     * The result of a check. {@code editor} is {@code true} for a user who may save
+     * and reset overrides, and
+     * {@code false} for one who may only read the catalog and explain questions.
+     */
+    record Decision(Outcome outcome, @Nullable String user, @Nullable String challenge, boolean editor) {
 
         public static Decision allowed(@Nullable String user) {
-            return new Decision(Outcome.ALLOWED, user, null);
+            return new Decision(Outcome.ALLOWED, user, null, true);
+        }
+
+        public static Decision readOnly(@Nullable String user) {
+            return new Decision(Outcome.ALLOWED, user, null, false);
         }
 
         public static Decision unauthenticated(@Nullable String challenge) {
-            return new Decision(Outcome.UNAUTHENTICATED, null, challenge);
+            return new Decision(Outcome.UNAUTHENTICATED, null, challenge, false);
         }
 
         public static Decision forbidden(@Nullable String user) {
-            return new Decision(Outcome.FORBIDDEN, user, null);
+            return new Decision(Outcome.FORBIDDEN, user, null, false);
         }
     }
 

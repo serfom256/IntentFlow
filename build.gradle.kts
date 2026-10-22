@@ -1,7 +1,12 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import me.champeau.gradle.japicmp.JapicmpTask
+import org.cyclonedx.gradle.CyclonedxDirectTask
+import org.cyclonedx.model.Component
 
 plugins {
     alias(libs.plugins.maven.publish) apply false
+    alias(libs.plugins.cyclonedx) apply false
+    alias(libs.plugins.japicmp) apply false
 }
 
 allprojects {
@@ -57,6 +62,31 @@ subprojects {
 
     if (!projectDir.parentFile.name.equals("intentflow-examples")) {
         pluginManager.apply("com.vanniktech.maven.publish")
+        pluginManager.apply("org.cyclonedx.bom")
+        pluginManager.apply("me.champeau.gradle.japicmp")
+        val sbom = tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
+            includeConfigs.set(listOf("runtimeClasspath"))
+            projectType.set(Component.Type.LIBRARY)
+        }
+
+        val apiBaseline = providers.gradleProperty("apiBaseline")
+        if (apiBaseline.isPresent) {
+            val baseline = rootProject.configurations.detachedConfiguration(
+                rootProject.dependencies.create("io.github.serfom256:${project.name}:${apiBaseline.get()}@jar"))
+            val baselineJar = baseline.incoming.artifactView { lenient(true) }.files
+            val compatibility = tasks.register<JapicmpTask>("apiCompatibility") {
+                description = "Fails when the public API breaks binary compatibility with ${apiBaseline.get()}."
+                onlyIf { !baselineJar.isEmpty }
+                oldClasspath.from(baselineJar)
+                newClasspath.from(tasks.named("jar"))
+                onlyBinaryIncompatibleModified.set(true)
+                failOnModification.set(true)
+                ignoreMissingClasses.set(true)
+                packageExcludes.set(listOf("*.impl", "*.impl.*"))
+                txtOutputFile.set(layout.buildDirectory.file("reports/api-compatibility.txt"))
+            }
+            tasks.named("check") { dependsOn(compatibility) }
+        }
 
         pluginManager.withPlugin("java-test-fixtures") {
             val java = components["java"] as AdhocComponentWithVariants
@@ -112,6 +142,11 @@ subprojects {
             publications.withType<MavenPublication>().configureEach {
                 versionMapping {
                     allVariants { fromResolutionResult() }
+                }
+                artifact(sbom.flatMap { it.jsonOutput }) {
+                    classifier = "cyclonedx"
+                    extension = "json"
+                    builtBy(sbom)
                 }
             }
         }

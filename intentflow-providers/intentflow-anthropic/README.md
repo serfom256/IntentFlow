@@ -4,7 +4,7 @@ Connects IntentFlow to Claude through Anthropic's Messages API, using the offici
 SDK.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-anthropic:0.3.5")
+implementation("io.github.serfom256:intentflow-anthropic:0.4.0")
 ```
 
 ```yaml

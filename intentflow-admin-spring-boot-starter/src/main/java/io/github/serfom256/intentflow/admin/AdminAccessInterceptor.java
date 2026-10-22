@@ -8,20 +8,23 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 final class AdminAccessInterceptor implements HandlerInterceptor {
 
     static final String USER = AdminAccessInterceptor.class.getName() + ".user";
+    static final String EDITOR = AdminAccessInterceptor.class.getName() + ".editor";
 
     private final AdminAccess access;
     private final String path;
     private final List<String> authorities;
     private final @Nullable String loginUrl;
 
-    AdminAccessInterceptor(AdminAccess access, String path, List<String> authorities, @Nullable String loginUrl) {
+    AdminAccessInterceptor(AdminAccess access, String path, List<String> editors, List<String> viewers,
+            @Nullable String loginUrl) {
         this.access = access;
         this.path = path;
-        this.authorities = List.copyOf(authorities);
+        this.authorities = Stream.concat(editors.stream(), viewers.stream()).distinct().toList();
         this.loginUrl = loginUrl;
     }
 
@@ -36,7 +39,13 @@ final class AdminAccessInterceptor implements HandlerInterceptor {
         AdminAccess.Decision decision = access.check(request);
         switch (decision.outcome()) {
             case ALLOWED -> {
+                if (!decision.editor() && api && writes(request, uri)) {
+                    problem(response, 403, "read-only", decision.user() + " may read the catalog and explain "
+                            + "questions, but not change overrides", true);
+                    return false;
+                }
                 request.setAttribute(USER, decision.user());
+                request.setAttribute(EDITOR, decision.editor());
                 return true;
             }
             case UNAUTHENTICATED -> {
@@ -49,6 +58,12 @@ final class AdminAccessInterceptor implements HandlerInterceptor {
                     + authorities + "; " + decision.user() + " has none of them", api);
         }
         return false;
+    }
+
+    private boolean writes(HttpServletRequest request, String uri) {
+        String method = request.getMethod();
+        boolean reads = method.equals("GET") || method.equals("HEAD") || method.equals("OPTIONS");
+        return !reads && !(method.equals("POST") && uri.equals(path + "/api/explain"));
     }
 
     private void problem(HttpServletResponse response, int status, String kind, String detail, boolean api)

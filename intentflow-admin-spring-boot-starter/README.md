@@ -14,7 +14,7 @@ covers are skipped. Review a suggestion before applying it: a planner often pref
 ## Setup
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-admin-spring-boot-starter:0.3.5")
+implementation("io.github.serfom256:intentflow-admin-spring-boot-starter:0.4.0")
 ```
 
 That's all: the UI opens at `http://<host>:<port>/intentflow-admin/`. It is a static bundle inside the jar, served
@@ -35,7 +35,7 @@ application:
 
 | Your application              | Who gets in                                                                  |
 | ----------------------------- | ---------------------------------------------------------------------------- |
-| uses Spring Security          | users your security has authenticated, with one of `intentflow.admin.security.authorities` (default `ROLE_ADMIN`) |
+| uses Spring Security          | editors with one of `intentflow.admin.security.authorities` (default `ROLE_ADMIN`); read-only users with one of `read-only-authorities` |
 | does not use Spring Security  | HTTP Basic: user `admin`, password from `intentflow.admin.security.password`, or a generated one printed in the startup log |
 | defines an `AdminAccess` bean | whoever that bean allows                                                     |
 
@@ -55,6 +55,66 @@ intentflow:
 When nobody is signed in, the UI offers a link to `login-url` and a field for a bearer token, for applications that
 authenticate API calls with tokens. Changes are sent with your application's CSRF token, so CSRF protection can stay
 on.
+
+**Read-only users** with one of `read-only-authorities` see the catalog and explain questions, but cannot save or
+reset an override: the UI shows the form disabled and the API answers 403 `read-only`.
+
+**Single sign-on with OIDC** (Keycloak, Entra ID, Okta, Google Workspace) is Spring Security's OAuth2 login with
+`spring-boot-starter-oauth2-client`. Register the provider, map the role claim of the ID token to authorities, and
+point the admin at the login:
+
+```yaml
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          corporate-sso:
+            client-id: intentflow-admin
+            client-secret: ${OIDC_CLIENT_SECRET}
+            scope: openid, profile
+        provider:
+          corporate-sso:
+            issuer-uri: https://sso.example.com/realms/main
+intentflow:
+  admin:
+    security:
+      authorities: ROLE_intentflow-editor
+      read-only-authorities: ROLE_intentflow-viewer
+      login-url: /oauth2/authorization/corporate-sso
+```
+
+```java
+@Bean
+SecurityFilterChain security(HttpSecurity http) throws Exception {
+    return http.authorizeHttpRequests(auth -> auth.requestMatchers("/intentflow-admin/**").permitAll()
+                    .anyRequest().authenticated())
+            .oauth2Login(Customizer.withDefaults())
+            .build();
+}
+
+@Bean
+GrantedAuthoritiesMapper oidcRoles() {
+    return authorities -> {
+        Set<GrantedAuthority> mapped = new HashSet<>(authorities);
+        for (GrantedAuthority authority : authorities) {
+            if (authority instanceof OidcUserAuthority oidc) {
+                List<String> roles = oidc.getIdToken().getClaimAsStringList("roles");
+                if (roles != null) {
+                    roles.forEach(role -> mapped.add(new SimpleGrantedAuthority("ROLE_" + role)));
+                }
+            }
+        }
+        return mapped;
+    };
+}
+```
+
+The admin does its own checks, which is why the filter chain lets `/intentflow-admin/**` through. Which claim holds
+the roles depends on the provider: Entra ID app roles and Okta custom claims usually use `roles`, Keycloak puts realm
+roles under `realm_access.roles` unless a mapper flattens them, and groups arrive as `groups`. The user name shown in
+the UI and written to the audit log is the principal's name; set `user-name-attribute` on the provider (for example
+`preferred_username`) to show a login rather than the subject id.
 
 **Without Spring Security** the starter does not add it, because Spring Security would lock your whole application.
 Only the admin is protected, with HTTP Basic. Set a password for anything beyond development:
@@ -100,7 +160,8 @@ Outside Spring, `ServiceCatalogs.withOverrides(catalog, overrides)` applies over
 | intentflow.admin.refresh-interval       | 30s                         | How often an instance re-reads the table             |
 | intentflow.admin.index-advisor          | true                        | Show the query plan and index suggestions            |
 | intentflow.admin.security.enabled       | true                        | `false` opens the admin to everyone                  |
-| intentflow.admin.security.authorities   | ROLE_ADMIN                  | Authorities that grant access with Spring Security   |
+| intentflow.admin.security.authorities   | ROLE_ADMIN                  | Authorities of editors with Spring Security          |
+| intentflow.admin.security.read-only-authorities | empty               | Authorities of read-only users with Spring Security  |
 | intentflow.admin.security.login-url     | -                           | Login page the UI links to                           |
 | intentflow.admin.security.username      | admin                       | HTTP Basic user without Spring Security              |
 | intentflow.admin.security.password      | generated                   | HTTP Basic password without Spring Security          |
