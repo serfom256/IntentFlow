@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.1")
-    implementation("io.github.serfom256:intentflow-jdbc:0.4.1")
-    implementation("io.github.serfom256:intentflow-postgresql:0.4.1")
-    implementation("io.github.serfom256:intentflow-openai:0.4.1")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.3")
+    implementation("io.github.serfom256:intentflow-jdbc:0.4.3")
+    implementation("io.github.serfom256:intentflow-postgresql:0.4.3")
+    implementation("io.github.serfom256:intentflow-openai:0.4.3")
 }
 ```
 
@@ -157,9 +157,11 @@ IntentResponse<?> response = pipeline.resolve(IntentRequests.of("vip customers w
 | `aggregation()` | Rows of an aggregate query, otherwise `null`                                    |
 | `uri()`         | The `uri` template filled from the first item, e.g. `/products/12`, or `/products` |
 | `trace()`       | The DSL, whether it was cached, the SQL and its parameters                      |
+| `nextCursor()`  | With `IntentRequests.page(text, cursor)`: where the next page starts, `null` on the last |
 
-Only the question → DSL translation is cached; every call runs the query. On WebFlux, `ReactiveIntentPipeline`
-(`intentflow-reactive`) returns `Mono`s. Failures are unchecked exceptions with a stable `code()` and `details()`:
+Only the DSL is cached; every call runs the query. `ReactiveIntentPipeline` (`intentflow-reactive`) returns
+`Mono`s; the starter's `SpringIntentPipeline` also takes a `ParameterizedTypeReference<Event<Order>>`.
+Failures are unchecked exceptions with a stable `code()` and `details()`:
 
 | Exception                     | Raised when                                             | `code()`                                    | HTTP |
 | ----------------------------- | ------------------------------------------------------- | ------------------------------------------- | ---- |
@@ -359,6 +361,7 @@ unique), which gives plain, conservative SQL.
 | `exact-values`      | enums compare as `status = 'PAID'` instead of `LOWER(...)`                  |
 | `to-one-join`       | sorting by a to-one relation uses a `LEFT JOIN` instead of a subquery per row |
 | `key-projection`    | JPA and Jimmer get only the primary keys, then load the entities themselves |
+| `keyset-paging`     | next pages continue after the last row's sort values instead of an `OFFSET`, when the sort is on non-null columns ending in a key |
 
 **Restrictions.** A condition every row of a service must meet, such as a soft delete, is added to every query of
 that service, including counts and relation subqueries. It comes from Hibernate's `@SQLRestriction`, Jimmer's
@@ -387,10 +390,6 @@ returns. The caller comes from Spring Security, an `IntentContextProvider` bean,
 @Bean
 AccessPolicy accessPolicy() {
     return new AccessPolicy() {
-        public boolean canSee(ServiceDescriptor service, FieldMapping field, IntentContext caller) {
-            return !field.logical().value().equals("supplier_cost") || caller.hasRole("ROLE_BUYER");
-        }
-
         public List<RuntimeRestriction> restrictions(ServiceDescriptor service, IntentContext caller) {
             return service.name().value().equals("orders")
                     ? List.of(RuntimeRestriction.equalTo("customer_id", caller.attribute("customerId")))
@@ -472,7 +471,8 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.concurrency.max-calls, .max-wait | 0, 10s           | Most LLM calls in flight (0 for no limit) and how long a call waits for a slot |
 | intentflow.llm.circuit-breaker.failure-threshold, .open-for | 5, 30s | Failed calls in a row that open the circuit (0 turns it off) and how long it stays open. A Resilience4j `CircuitBreakerRegistry` bean supplies the `intentflow-llm` and `intentflow-llm-fallback` breakers instead |
 | intentflow.llm.fallback.model, .base-url, .api-key | none, primary's | Model to ask when the primary fails, and its endpoint and key |
-| intentflow.llm.rate-limit.questions, .period, .per | 0, 1m, principal | New questions (cache misses) a `principal` or `tenant` may ask per period; 0 for no limit. An `LlmRateLimiter` bean replaces it |
+| intentflow.llm.rate-limit.questions, .period, .per, .store | 0, 1m, principal, memory | New questions (cache misses) a `principal` or `tenant` may ask per period; 0 for no limit. `store: zookeeper` shares the limit across instances; see [intentflow-ratelimiters](intentflow-ratelimiters/README.md). An `LlmRateLimiter` bean replaces it |
+| intentflow.llm.rate-limit.zookeeper.connect, .path, .fail-open | -, /intentflow/rate-limit, true | ZooKeeper to keep the buckets in (or a `CuratorFramework` bean); `fail-open: false` refuses questions while it is unreachable |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |

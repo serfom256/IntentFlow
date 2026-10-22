@@ -4,7 +4,7 @@ Connects IntentFlow to an Azure OpenAI deployment through Azure's OpenAI v1 API.
 client and signs requests with an API key or with Entra ID.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-azure-openai:0.4.0")
+implementation("io.github.serfom256:intentflow-azure-openai:0.4.3")
 ```
 
 ```yaml

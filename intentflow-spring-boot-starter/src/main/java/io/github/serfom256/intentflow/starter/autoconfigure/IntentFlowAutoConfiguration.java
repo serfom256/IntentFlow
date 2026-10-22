@@ -52,6 +52,7 @@ import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -80,7 +81,7 @@ import java.util.function.Function;
         PipelineObservers.Observations.class, LlmHealthBoot4.class, LlmHealthBoot3.class,
         Resilience4jLlmClient.Wiring.class, OpenAiProviders.OpenAi.class, OpenAiProviders.AzureOpenAi.class,
         OpenAiProviders.GigaChat.class, AnthropicProvider.class, VertexProvider.class, BedrockProvider.class,
-        ReactivePipelineConfiguration.class,
+        ReactivePipelineConfiguration.class, ZooKeeperRateLimitConfiguration.class,
         TransactionalQueryExecutor.Wiring.class })
 public class IntentFlowAutoConfiguration {
 
@@ -173,6 +174,15 @@ public class IntentFlowAutoConfiguration {
     @ConditionalOnMissingBean
     LlmRateLimiter intentFlowLlmRateLimiter(IntentFlowProperties properties) {
         IntentFlowProperties.Llm.RateLimit limit = properties.llm().rateLimit();
+        if (limit.store() != IntentFlowProperties.Llm.RateLimit.Store.MEMORY) {
+            String module = switch (limit.store()) {
+                case ZOOKEEPER -> "intentflow-ratelimit-zookeeper";
+                case MEMORY -> throw new IllegalStateException();
+            };
+            throw new IllegalStateException("intentflow.llm.rate-limit.store="
+                    + limit.store().name().toLowerCase(Locale.ROOT) + " needs io.github.serfom256:" + module
+                    + " on the classpath; without it each instance would count on its own");
+        }
         if (limit.questions() <= 0) {
             return LlmRateLimiter.NONE;
         }
@@ -236,8 +246,8 @@ public class IntentFlowAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean
-    IntentPipeline intentFlowPipeline(TextNormalizer normalizer, DslCache cache, LlmClient llm,
+    @ConditionalOnMissingBean(IntentPipeline.class)
+    SpringIntentPipeline intentFlowPipeline(TextNormalizer normalizer, DslCache cache, LlmClient llm,
             DslParser parser, AstValidator validator, SqlBuilder sqlBuilder,
             ObjectProvider<QueryExecutor> executor, UriBuilder uriBuilder,
             ServiceCatalog catalog, IntentFlowProperties properties, ObjectProvider<AccessPolicy> policy,
@@ -257,7 +267,7 @@ public class IntentFlowAutoConfiguration {
         }
         IntentContextProvider caller = callers.getIfAvailable(() -> IntentContexts::anonymous);
         List<PipelineListener> observers = listeners.orderedStream().toList();
-        return IntentPipelines.builder()
+        return SpringIntentPipeline.of(IntentPipelines.builder()
                 .llm(llm)
                 .sqlBuilder(sqlBuilder)
                 .executor(queryExecutor)
@@ -276,7 +286,7 @@ public class IntentFlowAutoConfiguration {
                 .audit(audit)
                 .logValues(properties.logging().values())
                 .visibleFieldsOnly(properties.results().visibleFieldsOnly())
-                .build();
+                .build());
     }
 
 }

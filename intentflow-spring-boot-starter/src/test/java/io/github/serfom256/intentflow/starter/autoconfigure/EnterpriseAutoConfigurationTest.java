@@ -1,6 +1,8 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
 import io.github.serfom256.intentflow.core.api.IntentContext;
+import io.github.serfom256.intentflow.core.api.IntentRequest;
+import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.TokenUsage;
 import io.github.serfom256.intentflow.core.api.factories.IntentContexts;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -181,5 +184,40 @@ class EnterpriseAutoConfigurationTest {
                     assertThat(ctx.getBean(MeterRegistry.class).get("intentflow.requests").tag("outcome", "limited")
                             .timer().count()).isEqualTo(1);
                 });
+    }
+
+    @Test
+    void thePipelineTakesASpringTypeReference() {
+        runner.run(ctx -> {
+            SpringIntentPipeline pipeline = ctx.getBean(SpringIntentPipeline.class);
+
+            IntentResponse<Book> response = pipeline.resolve(IntentRequests.of("books"),
+                    new ParameterizedTypeReference<Book>() {
+                    });
+
+            assertThat(response.type()).isEqualTo(Book.class);
+            assertThat(SpringIntentPipeline.rawType(new ParameterizedTypeReference<List<Book>>() {
+            })).isEqualTo(List.class);
+        });
+    }
+
+    @Test
+    void anIntentPipelineBeanReplacesTheStarterPipeline() {
+        IntentPipeline own = new IntentPipeline() {
+            @Override
+            public IntentResponse<?> resolve(IntentRequest request) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public <T> IntentResponse<T> resolve(IntentRequest request, Class<T> resultType) {
+                throw new UnsupportedOperationException();
+            }
+        };
+
+        runner.withBean(IntentPipeline.class, () -> own).run(ctx -> {
+            assertThat(ctx).hasSingleBean(IntentPipeline.class).doesNotHaveBean(SpringIntentPipeline.class);
+            assertThat(SpringIntentPipeline.of(own)).isNotSameAs(own);
+        });
     }
 }

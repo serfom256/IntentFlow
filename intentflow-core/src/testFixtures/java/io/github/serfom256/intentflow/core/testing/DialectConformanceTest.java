@@ -1,5 +1,7 @@
 package io.github.serfom256.intentflow.core.testing;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
+import io.github.serfom256.intentflow.core.IntentFlowException;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -31,12 +33,14 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
 
@@ -71,6 +75,11 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
 
     @IntentService(value = "events", table = "conf_event", uri = "/events/{{id}}", defaultSort = "id")
     public record Event(@IntentField long id, @IntentField OffsetDateTime at) {
+    }
+
+    @IntentService(value = "items", table = "conf_page", uri = "/items/{{id}}", maxTake = 100, defaultSort = "id")
+    public record Item(@IntentField long id, @IntentField String name, @IntentField BigDecimal price,
+            @IntentField String note) {
     }
 
     @Override
@@ -215,5 +224,93 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         assertThat(ids("orders | top 1 per customer_id by total desc", Order.class)).containsExactly(10L, 12L, 14L);
         assertThat(ids("orders | filter customer.country == \"DE\" | top 1 per customer_id by total", Order.class))
                 .containsExactly(11L, 12L);
+    }
+
+    private IntentPipeline paging(String dsl) {
+        TestDatabase.Endpoint endpoint = database().endpoint();
+        try (Connection c = DriverManager.getConnection(endpoint.url(), endpoint.user(), endpoint.password());
+                Statement s = c.createStatement()) {
+            s.execute("DROP TABLE IF EXISTS conf_page");
+            s.execute("CREATE TABLE conf_page (id BIGINT PRIMARY KEY, name VARCHAR(20) NOT NULL, "
+                    + "price DECIMAL(10, 2) NOT NULL, note VARCHAR(20))");
+            StringBuilder rows = new StringBuilder();
+            for (int id = 1; id <= 23; id++) {
+                rows.append(id == 1 ? "" : ", ").append("(").append(id).append(", 'item ").append(100 - id)
+                        .append("', ").append((id * 7) % 5 * 10).append(".50, ")
+                        .append(id % 4 == 0 ? "NULL" : "'n" + (id % 3) + "'").append(")");
+            }
+            s.execute("INSERT INTO conf_page VALUES " + rows);
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+        Map<String, TableFacts> facts = new HashMap<>();
+        try {
+            facts.putAll(
+                    JdbcSchemaIntrospector.introspect(new DriverManagerDataSource(endpoint), List.of("conf_page")));
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+        return IntentPipelines.builder()
+                .llm((text, scope) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, Map.of())))
+                .executor(new PlainJdbcExecutor(endpoint))
+                .catalog(ServiceCatalogs.fromAnnotated(Item.class))
+                .build();
+    }
+
+    private static List<Long> allPages(IntentPipeline pipeline, List<String> optimizations) {
+        List<Long> ids = new ArrayList<>();
+        String cursor = null;
+        for (int page = 0; page < 50; page++) {
+            IntentResponse<Item> response = pipeline.resolve(IntentRequests.page("q", cursor), Item.class);
+            response.items().forEach(item -> ids.add(item.id()));
+            if (page > 0) {
+                optimizations.addAll(response.trace().optimizations());
+            }
+            cursor = response.nextCursor();
+            if (cursor == null) {
+                return ids;
+            }
+        }
+        throw new AssertionError("paging did not end");
+    }
+
+    @Test
+    void keysetPagesWalkTheWholeResultInOrder() {
+        String dsl = "items | sort price desc | take 5";
+        List<Long> expected = paging("items | sort price desc | take 100").resolve(IntentRequests.of("q"), Item.class)
+                .items().stream().map(Item::id).toList();
+        List<String> optimizations = new ArrayList<>();
+
+        List<Long> paged = allPages(paging(dsl), optimizations);
+
+        assertThat(paged).hasSize(23).containsExactlyElementsOf(expected);
+        assertThat(optimizations).contains("keyset-paging");
+    }
+
+    @Test
+    void aNullableSortPagesByOffsetAndStillCoversEveryRow() {
+        List<String> optimizations = new ArrayList<>();
+
+        List<Long> paged = allPages(paging("items | sort note | take 4"), optimizations);
+
+        assertThat(paged).hasSize(23).doesNotHaveDuplicates();
+        assertThat(optimizations).doesNotContain("keyset-paging");
+    }
+
+    @Test
+    void theLastPageHasNoCursorAndACursorOfAnotherQuestionIsRejected() {
+        IntentResponse<Item> first = paging("items | sort price | take 20").resolve(IntentRequests.page("q", null),
+                Item.class);
+        IntentResponse<Item> last = paging("items | sort price | take 20")
+                .resolve(IntentRequests.page("q", first.nextCursor()), Item.class);
+
+        assertThat(first.nextCursor()).isNotNull();
+        assertThat(last.items()).hasSize(3);
+        assertThat(last.nextCursor()).isNull();
+        assertThatThrownBy(() -> paging("items | sort name | take 20")
+                .resolve(IntentRequests.page("q", first.nextCursor()), Item.class))
+                .isInstanceOfSatisfying(IntentFlowException.class,
+                        e -> assertThat(e.code()).isEqualTo(ErrorCode.INVALID_CURSOR));
     }
 }

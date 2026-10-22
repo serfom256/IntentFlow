@@ -46,6 +46,14 @@ providers.forEach {
     project(":$it").projectDir = file("intentflow-providers/$it")
 }
 
+val rateLimiters = listOf(
+    "intentflow-ratelimit-zookeeper",
+)
+rateLimiters.forEach {
+    include(it)
+    project(":$it").projectDir = file("intentflow-ratelimiters/$it")
+}
+
 val examples = listOf(
     "intentflow-shop-domain",
     "intentflow-shop-openmapper",

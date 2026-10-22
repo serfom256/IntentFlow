@@ -1,6 +1,7 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
 import io.github.serfom256.intentflow.core.api.IntentContext;
+import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 
@@ -84,6 +86,17 @@ class ReactivePipelineAutoConfigurationTest {
             ctx.getBean(ReactiveIntentPipeline.class).resolve(IntentRequests.of("books"), Book.class).block();
 
             assertThat(seen.get().principal()).isNull();
+        });
+    }
+
+    @Test
+    void theReactivePipelineTakesASpringTypeReference() {
+        runner.run(ctx -> {
+            IntentResponse<Book> response = ctx.getBean(SpringReactiveIntentPipeline.class)
+                    .resolve(IntentRequests.of("books"), new ParameterizedTypeReference<Book>() {
+                    }).block();
+
+            assertThat(response.type()).isEqualTo(Book.class);
         });
     }
 }

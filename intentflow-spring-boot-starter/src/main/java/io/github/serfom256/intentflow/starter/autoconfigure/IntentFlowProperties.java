@@ -87,10 +87,21 @@ public record IntentFlowProperties(
         public record RateLimit(
                 @DefaultValue("0") int questions,
                 @DefaultValue("1m") Duration period,
-                @DefaultValue("principal") Per per) {
+                @DefaultValue("principal") Per per,
+                @DefaultValue("memory") Store store,
+                @DefaultValue ZooKeeper zookeeper) {
 
             public enum Per {
                 PRINCIPAL, TENANT
+            }
+
+            public enum Store {
+                MEMORY, ZOOKEEPER
+            }
+
+            public record ZooKeeper(@Nullable String connect,
+                    @DefaultValue("/intentflow/rate-limit") String path,
+                    @DefaultValue("true") boolean failOpen) {
             }
         }
     }

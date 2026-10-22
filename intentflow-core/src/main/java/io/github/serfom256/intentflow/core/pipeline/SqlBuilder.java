@@ -26,6 +26,25 @@ public interface SqlBuilder {
     }
 
     /**
+     * Whether {@link #buildAfter} can continue {@code query} after a row: its sort
+     * must be a total order of
+     * non-null columns. When it cannot, paged requests page by offset.
+     */
+    default boolean supportsKeyset(ValidatedQuery query) {
+        return false;
+    }
+
+    /**
+     * Builds {@code query} for the rows after the one whose sort keys
+     * ({@code ValidatedQuery.effectiveSort()}, in
+     * order) had the values {@code after}, instead of skipping rows by offset.
+     */
+    default BoundQuery buildAfter(ValidatedQuery query, ResultShape shape,
+            Function<Class<?>, List<RuntimeRestriction>> restrictions, List<Object> after) {
+        throw new UnsupportedOperationException(getClass().getSimpleName() + " does not support keyset paging");
+    }
+
+    /**
      * Statements selecting all rows of {@code target} whose {@code column} is one
      * of {@code keys}, with the
      * target's restrictions, split to stay within the database's limits.

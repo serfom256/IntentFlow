@@ -16,7 +16,8 @@ public enum ErrorCode {
     SCAN_LIMIT("intentflow.scan-limit"),
     LLM_FAILED("intentflow.llm-failed"),
     LLM_UNAVAILABLE("intentflow.llm-unavailable"),
-    URI_BUILD("intentflow.uri-build");
+    URI_BUILD("intentflow.uri-build"),
+    INVALID_CURSOR("intentflow.invalid-cursor");
 
     private final String value;
 

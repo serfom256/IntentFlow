@@ -6,6 +6,7 @@ import io.github.serfom256.intentflow.core.api.UserText;
 import io.github.serfom256.intentflow.core.api.impl.DefaultIntentRequest;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class IntentRequests {
@@ -24,5 +25,17 @@ public final class IntentRequests {
 
     public static IntentRequest of(String text, IntentContext context) {
         return of(UserTexts.of(text), context);
+    }
+
+    public static IntentRequest page(String text, @Nullable String cursor) {
+        return new DefaultIntentRequest(UserTexts.of(text), null, true, cursor);
+    }
+
+    public static IntentRequest page(String text, IntentContext context, @Nullable String cursor) {
+        return new DefaultIntentRequest(UserTexts.of(text), context, true, cursor);
+    }
+
+    public static IntentRequest withContext(IntentRequest request, IntentContext context) {
+        return new DefaultIntentRequest(request.text(), context, request.paged(), request.cursor());
     }
 }

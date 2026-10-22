@@ -18,11 +18,11 @@ import reactor.core.scheduler.Schedulers;
 class ReactivePipelineConfiguration {
 
     @Bean
-    @ConditionalOnMissingBean
-    ReactiveIntentPipeline intentFlowReactivePipeline(IntentPipeline pipeline,
+    @ConditionalOnMissingBean(ReactiveIntentPipeline.class)
+    SpringReactiveIntentPipeline intentFlowReactivePipeline(IntentPipeline pipeline,
             ObjectProvider<ReactiveIntentContextProvider> callers) {
-        return ReactiveIntentPipelines.of(pipeline, Schedulers.boundedElastic(),
-                callers.getIfAvailable(() -> ReactiveIntentContextProvider.NONE));
+        return SpringReactiveIntentPipeline.of(ReactiveIntentPipelines.of(pipeline, Schedulers.boundedElastic(),
+                callers.getIfAvailable(() -> ReactiveIntentContextProvider.NONE)));
     }
 
     @Configuration(proxyBeanMethods = false)

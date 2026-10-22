@@ -26,6 +26,11 @@ public final class IntentResponses {
         return new DefaultIntentResponse<>(service, type, items, uri, aggregation, trace);
     }
 
+    public static <T> IntentResponse<T> of(ServiceName service, Class<T> type, List<T> items, MicroFrontendUri uri,
+            @Nullable Aggregation aggregation, IntentTrace trace, @Nullable String nextCursor) {
+        return new DefaultIntentResponse<>(service, type, items, uri, aggregation, trace, nextCursor);
+    }
+
     public static IntentTrace trace(String dsl, boolean cached, String query, List<Object> parameters) {
         return new DefaultIntentTrace(dsl, cached, query, parameters);
     }

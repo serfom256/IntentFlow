@@ -40,4 +40,15 @@ public interface IntentResponse<T> {
      * when nothing matched.
      */
     MicroFrontendUri uri();
+
+    /**
+     * Where the next page starts, for a {@link IntentRequest#paged() paged} request
+     * whose query found more rows;
+     * {@code null} on the last page and for requests that are not paged. Opaque:
+     * pass it back with the same
+     * question.
+     */
+    default @Nullable String nextCursor() {
+        return null;
+    }
 }

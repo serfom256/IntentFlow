@@ -4,7 +4,7 @@ Connects IntentFlow to Gemini through Google's Gen AI SDK (`com.google.genai:goo
 Google Cloud project, or on the Gemini Developer API with an API key.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-vertex:0.4.0")
+implementation("io.github.serfom256:intentflow-vertex:0.4.3")
 ```
 
 ```yaml

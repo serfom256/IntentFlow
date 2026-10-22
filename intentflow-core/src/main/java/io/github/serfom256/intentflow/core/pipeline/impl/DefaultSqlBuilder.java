@@ -65,6 +65,22 @@ public final class DefaultSqlBuilder implements SqlBuilder {
     }
 
     @Override
+    public boolean supportsKeyset(ValidatedQuery query) {
+        return QueryPlanner.keysetEligible(query, new PlanContext(facts, optimizations, ResultShape.ROWS, dialect, zone,
+                type -> List.of()));
+    }
+
+    @Override
+    public BoundQuery buildAfter(ValidatedQuery query, ResultShape shape,
+            Function<Class<?>, List<RuntimeRestriction>> restrictions, List<Object> after) {
+        PlanContext context = new PlanContext(facts, optimizations, shape, dialect, zone, restrictions);
+        if (!QueryPlanner.keysetEligible(query, context)) {
+            throw new IllegalArgumentException("keyset paging needs a sort on non-null columns that ends in a key");
+        }
+        return renderer.render(QueryPlanner.plan(query, context, after), context.applied());
+    }
+
+    @Override
     public List<BoundQuery> buildRelated(ServiceDescriptor target, String column, List<?> keys,
             Function<Class<?>, List<RuntimeRestriction>> restrictions) {
         int chunk = Math.min(RELATED_CHUNK, dialect.capabilities().maxInListSize());

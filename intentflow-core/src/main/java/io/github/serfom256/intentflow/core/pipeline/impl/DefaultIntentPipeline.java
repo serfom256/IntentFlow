@@ -15,6 +15,9 @@ import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.Expressions;
+import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
+import io.github.serfom256.intentflow.core.ast.factories.Skips;
+import io.github.serfom256.intentflow.core.ast.factories.Takes;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
@@ -128,8 +131,11 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             Function<Class<?>, List<RuntimeRestriction>> restrictions) {
     }
 
+    private record Paging(int size, int offset, String fingerprint) {
+    }
+
     private record Compiled(UserText question, DslSource dsl, boolean cached, ValidatedQuery validated,
-            BoundQuery query, long startNanos, int repairs, TokenUsage tokens) {
+            BoundQuery query, long startNanos, int repairs, TokenUsage tokens, @Nullable Paging paging) {
 
         IntentTrace trace() {
             return IntentResponses.trace(dsl.value(), cached, query.sql(), new ArrayList<>(query.values()),
@@ -323,11 +329,36 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             cache.put(key, dsl);
         }
         ValidatedQuery valid = validated;
-        BoundQuery query = traced(Stage.BUILD, valid.service().name(),
-                () -> sqlBuilder.build(valid, executor.shape(valid.service().resultType()), caller.restrictions()));
+        AstQuery ast = valid.ast();
+        Paging paging = null;
+        List<Object> after = null;
+        ValidatedQuery planned = valid;
+        if (request.paged() && ast.aggregate() == null && ast.top() == null) {
+            int size = ast.take() != null ? ast.take().value() : valid.service().maxTake().value();
+            String fingerprint = PageCursor.fingerprint(valid.service().name().value(), dsl.value());
+            int offset = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
+            if (request.cursor() != null) {
+                PageCursor cursor = PageCursor.decode(request.cursor());
+                if (!cursor.fingerprint().equals(fingerprint)
+                        || (cursor.after() != null && !sqlBuilder.supportsKeyset(valid))) {
+                    throw PageCursor.invalid();
+                }
+                offset = cursor.offset();
+                after = cursor.after();
+            }
+            paging = new Paging(size, offset, fingerprint);
+            planned = ValidatedQueries.of(valid.service(), AstQueries.of(ast.service(), ast.filter(), ast.sort(),
+                    after != null || offset == 0 ? null : Skips.of(offset), Takes.of(size + 1)), valid.related());
+        }
+        ValidatedQuery page = planned;
+        List<Object> continueAfter = after;
+        BoundQuery query = traced(Stage.BUILD, valid.service().name(), () -> continueAfter != null
+                ? sqlBuilder.buildAfter(page, executor.shape(page.service().resultType()), caller.restrictions(),
+                        continueAfter)
+                : sqlBuilder.build(page, executor.shape(page.service().resultType()), caller.restrictions()));
         trail.query = query;
         log.debug("Query: {} binds={}", query.sql(), LogValues.values(logValues, query.values()));
-        return new Compiled(normalized, dsl, cached, validated, query, start, repairs, tokens);
+        return new Compiled(normalized, dsl, cached, validated, query, start, repairs, tokens, paging);
     }
 
     private DslSource askLlm(boolean repair, @Nullable ServiceName service, Supplier<DslSource> call) {
@@ -380,6 +411,15 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             span.end(validated.service().name(), "error", e);
             throw e;
         }
+        String nextCursor = null;
+        Paging paging = compiled.paging();
+        if (paging != null && items.size() > paging.size()) {
+            items = new ArrayList<>(items.subList(0, paging.size()));
+            List<Object> last = sqlBuilder.supportsKeyset(validated)
+                    ? PageCursor.values(items.getLast(), validated.effectiveSort(), validated.service())
+                    : null;
+            nextCursor = new PageCursor(paging.fingerprint(), paging.offset() + paging.size(), last).encode();
+        }
         int rows = aggregation == null ? items.size() : aggregation.rows().size();
         trail.rows = rows;
         listener.query(validated.service().name(), aggregate != null, since(start), rows, false);
@@ -390,7 +430,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         }
         log.debug("Resolved '{}' to {} with {} {} in {} ms", text(compiled.question().value()), uri.value(), rows,
                 aggregation == null ? type.getSimpleName() : "groups", millisSince(compiled.startNanos()));
-        return IntentResponses.of(validated.service().name(), type, items, uri, aggregation, compiled.trace());
+        return IntentResponses.of(validated.service().name(), type, items, uri, aggregation, compiled.trace(),
+                nextCursor);
     }
 
     private static Aggregation aggregation(Aggregate aggregate, List<List<@Nullable Object>> rows) {

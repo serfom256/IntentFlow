@@ -3,10 +3,12 @@ package io.github.serfom256.intentflow.core.pipeline.impl;
 import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
+import io.github.serfom256.intentflow.core.ast.ExprSortKey;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
+import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
@@ -16,6 +18,7 @@ import io.github.serfom256.intentflow.core.sql.plan.SqlExpr;
 import io.github.serfom256.intentflow.core.sql.plan.SqlPredicate;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +30,27 @@ final class QueryPlanner {
     }
 
     static Select plan(ValidatedQuery query, PlanContext context) {
+        return plan(query, context, null);
+    }
+
+    static boolean keysetEligible(ValidatedQuery query, PlanContext context) {
+        AstQuery ast = query.ast();
+        if (!context.enabled(Optimization.KEYSET_PAGING) || ast.aggregate() != null || ast.top() != null) {
+            return false;
+        }
+        SqlScope scope = SqlScope.outer(context, query.service(), query.related(), false);
+        List<String> columns = new ArrayList<>();
+        for (SortKey key : query.effectiveSort()) {
+            if (key instanceof ExprSortKey || RelationPaths.prefix(key.field()) != null || !scope.notNull(key.field())
+                    || !scope.ordinals(key.field()).isEmpty()) {
+                return false;
+            }
+            columns.add(scope.field(key.field()).column().value());
+        }
+        return !columns.isEmpty() && scope.unique(columns);
+    }
+
+    static Select plan(ValidatedQuery query, PlanContext context, @Nullable List<Object> after) {
         AstQuery ast = query.ast();
         Aggregate aggregate = ast.aggregate();
         SqlScope scope = SqlScope.outer(context, query.service(), query.related(), false);
@@ -35,7 +59,12 @@ final class QueryPlanner {
         }
 
         FilterExpr filter = filter(ast.filter(), scope);
-        List<SqlPredicate> where = scope.where(filter == null ? List.of() : List.of(FilterPlanner.plan(filter, scope)));
+        List<SqlPredicate> where = new ArrayList<>(
+                scope.where(filter == null ? List.of() : List.of(FilterPlanner.plan(filter, scope))));
+        if (after != null) {
+            where.add(after(query.effectiveSort(), after, scope));
+            context.applied(Optimization.KEYSET_PAGING);
+        }
         List<Select.Order> order = OrderPlanner.plan(query.effectiveSort(), aggregate, scope);
 
         Select select;
@@ -48,8 +77,27 @@ final class QueryPlanner {
             select = select.withGroupBy(AggregatePlanner.groupBy(aggregate, scope));
         }
         int limit = ast.take() != null ? ast.take().value() : query.service().maxTake().value();
-        int offset = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
+        int offset = after != null || ast.skip() == null ? 0 : Math.max(0, ast.skip().value());
         return select.withOrderBy(order).withPaging(new Select.Paging(limit, offset));
+    }
+
+    private static SqlPredicate after(List<SortKey> keys, List<Object> values, SqlScope scope) {
+        if (keys.size() != values.size()) {
+            throw new IllegalArgumentException("keyset paging needs one value per sort key, got " + values.size()
+                    + " for " + keys.size());
+        }
+        List<SqlPredicate> alternatives = new ArrayList<>();
+        for (int i = 0; i < keys.size(); i++) {
+            List<SqlPredicate> parts = new ArrayList<>();
+            for (int j = 0; j < i; j++) {
+                parts.add(new SqlPredicate.Compare(scope.column(keys.get(j).field()), "=",
+                        new SqlExpr.Value(values.get(j))));
+            }
+            parts.add(new SqlPredicate.Compare(scope.column(keys.get(i).field()),
+                    keys.get(i).direction() == SortKey.Direction.DESC ? "<" : ">", new SqlExpr.Value(values.get(i))));
+            alternatives.add(parts.size() == 1 ? parts.getFirst() : new SqlPredicate.And(parts));
+        }
+        return alternatives.size() == 1 ? alternatives.getFirst() : new SqlPredicate.Or(alternatives);
     }
 
     private static @Nullable FilterExpr filter(@Nullable FilterExpr filter, SqlScope scope) {

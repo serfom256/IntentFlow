@@ -14,4 +14,22 @@ public interface IntentRequest {
     default @Nullable IntentContext context() {
         return null;
     }
+
+    /**
+     * Whether the response should say where the next page starts
+     * ({@link IntentResponse#nextCursor()}). Set by
+     * {@code IntentRequests.page}.
+     */
+    default boolean paged() {
+        return false;
+    }
+
+    /**
+     * The {@link IntentResponse#nextCursor()} of the previous page, or {@code null}
+     * for the first page. The same
+     * question must be asked again with it.
+     */
+    default @Nullable String cursor() {
+        return null;
+    }
 }

@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -124,6 +125,10 @@ final class SqlScope {
 
     List<String> primaryKey() {
         return facts.primaryKey();
+    }
+
+    boolean unique(Collection<String> columns) {
+        return facts.isUnique(columns);
     }
 
     String table() {

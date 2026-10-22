@@ -16,12 +16,19 @@ public final class LlmRateLimiters {
     private static final String ANONYMOUS = "anonymous";
 
     public static LlmRateLimiter perPrincipal(int questions, Duration period) {
-        return of(questions, period, LlmRateLimiters::principal, Clock.systemUTC());
+        return of(questions, period, byPrincipal(), Clock.systemUTC());
     }
 
     public static LlmRateLimiter perTenant(int questions, Duration period) {
-        return of(questions, period, caller -> caller.tenant() != null ? caller.tenant() : principal(caller),
-                Clock.systemUTC());
+        return of(questions, period, byTenant(), Clock.systemUTC());
+    }
+
+    public static Function<IntentContext, String> byPrincipal() {
+        return LlmRateLimiters::principal;
+    }
+
+    public static Function<IntentContext, String> byTenant() {
+        return caller -> caller.tenant() != null ? caller.tenant() : principal(caller);
     }
 
     public static LlmRateLimiter of(int questions, Duration period, Function<IntentContext, String> key,
