@@ -236,7 +236,7 @@ class IntentFlowAutoConfigurationTest {
         runner.run(ctx -> {
             IntentFlowProperties p = ctx.getBean(IntentFlowProperties.class);
             assertThat(p.enabled()).isTrue();
-            assertThat(p.llm().baseUrl()).hasToString("http://localhost:1234/v1");
+            assertThat(p.llm().baseUrl()).isNull();
             assertThat(p.llm().apiKey()).isEmpty();
             assertThat(p.llm().timeout()).isEqualTo(Duration.ofSeconds(60));
             assertThat(p.cache().ttl()).isEqualTo(Duration.ofMinutes(10));

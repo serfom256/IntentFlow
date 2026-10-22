@@ -8,6 +8,10 @@ jimmer = "0.12.3"
 jspecify = "1.0.0"
 junit = "5.11.4"
 lombok = "1.18.42"
+anthropicJava = "2.68.0"
+awsSdk = "2.55.10"
+googleGenai = "1.75.0"
+azureIdentity = "1.18.6"
 resilience4j = "2.4.0"
 openmapper = "2.1.0"
 slf4j = "2.0.17"
@@ -55,6 +59,11 @@ spring-boot-actuator = { module = "org.springframework.boot:spring-boot-actuator
 spring-boot-sql = { module = "org.springframework.boot:spring-boot-sql" }
 spring-boot-liquibase = { module = "org.springframework.boot:spring-boot-liquibase" }
 liquibase-core = { module = "org.liquibase:liquibase-core" }
+anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropicJava" }
+aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "awsSdk" }
+aws-bedrockruntime = { module = "software.amazon.awssdk:bedrockruntime" }
+google-genai = { module = "com.google.genai:google-genai", version.ref = "googleGenai" }
+azure-identity = { module = "com.azure:azure-identity", version.ref = "azureIdentity" }
 resilience4j-circuitbreaker = { module = "io.github.resilience4j:resilience4j-circuitbreaker", version.ref = "resilience4j" }
 jakarta-servlet-api = { module = "jakarta.servlet:jakarta.servlet-api" }
 spring-orm = { module = "org.springframework:spring-orm" }

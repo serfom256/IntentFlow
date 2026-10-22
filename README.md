@@ -55,18 +55,19 @@ validate, it is shown the error and asked for a corrected one, up to `intentflow
 
 Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (OpenAI, LM Studio, Ollama, ...).
 
-**1. Add the starter, one executor and one dialect:**
+**1. Add the starter, one executor, one dialect and one LLM provider:**
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.3.1")
-    implementation("io.github.serfom256:intentflow-jdbc:0.3.1")
-    implementation("io.github.serfom256:intentflow-postgresql:0.3.1")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.0")
+    implementation("io.github.serfom256:intentflow-jdbc:0.4.0")
+    implementation("io.github.serfom256:intentflow-postgresql:0.4.0")
+    implementation("io.github.serfom256:intentflow-openai:0.4.0")
 }
 ```
 
-The executor maps rows onto entities, the dialect writes engine-specific SQL; see [Modules](#modules). IntentFlow
-brings no Spring, ORM or driver of its own and uses the versions your application has.
+The executor maps rows onto entities, the dialect writes engine-specific SQL, the provider talks to the LLM; see
+[Modules](#modules). IntentFlow brings no Spring, ORM or driver of its own and uses the versions your application has.
 
 **2. Point it at an LLM:**
 
@@ -320,6 +321,10 @@ overrides it.
 | `intentflow-h2`         | H2 2.x, with or without `DATABASE_TO_LOWER` |
 | `intentflow-cassandra`  | Cassandra 5       |
 
+**LLM providers** connect to a model: `intentflow-openai` for every OpenAI-compatible API (OpenAI, Mistral, DeepSeek,
+Qwen, Ollama, vLLM, ...), and Azure OpenAI, Anthropic, Bedrock, Vertex AI and GigaChat; see
+[intentflow-providers](intentflow-providers/README.md).
+
 The build is tested against Spring Boot 3.2, 3.5 and 4.0. Spring Boot 3.0 and 3.1 are not supported, because the
 JDBC executors need `JdbcClient` (Spring Framework 6.1).
 
@@ -448,7 +453,9 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | Property                              | Default                     | Description                                         |
 | ------------------------------------- | --------------------------- | --------------------------------------------------- |
 | intentflow.enabled                    | true                        | Turns the auto-configuration on or off              |
-| intentflow.llm.base-url               | http://localhost:1234/v1    | OpenAI-compatible API                               |
+| intentflow.llm.provider               | the one on the classpath    | `openai`, `azure-openai`, `anthropic`, `bedrock`, `vertex` or `gigachat`; settings of each in [intentflow-providers](intentflow-providers/README.md) |
+| intentflow.llm.base-url               | the provider's              | Endpoint, e.g. `http://localhost:1234/v1` for LM Studio |
+| intentflow.llm.max-tokens             | 16000                       | Most tokens one answer may use (Anthropic, Bedrock, Vertex) |
 | intentflow.llm.model                  | -                           | Model id; required unless you define an `LlmClient` |
 | intentflow.llm.api-key                | empty                       | API key; empty for local servers                    |
 | intentflow.llm.api-key-header         | Authorization               | Header for the key: `Authorization` sends `Bearer <key>`, any other name the key as is |
@@ -458,16 +465,10 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.max-retries            | 2                           | Retries after a 429 or 5xx answer                   |
 | intentflow.llm.retry-backoff          | 500ms                       | First wait between retries; doubles each time       |
 | intentflow.llm.health-interval        | 30s                         | How long the `intentflowLlm` health result is reused |
-| intentflow.llm.concurrency.max-calls  | 0                           | Most LLM calls in flight; 0 for no limit            |
-| intentflow.llm.concurrency.max-wait   | 10s                         | How long a call waits for a free slot               |
-| intentflow.llm.circuit-breaker.failure-threshold | 5                | Failed calls in a row that open the circuit; 0 turns it off. With a Resilience4j `CircuitBreakerRegistry` bean, its `intentflow-llm` and `intentflow-llm-fallback` breakers are used instead |
-| intentflow.llm.circuit-breaker.open-for | 30s                       | How long an open circuit fails calls before trying again |
-| intentflow.llm.fallback.model         | none                        | Model to ask when the primary fails                 |
-| intentflow.llm.fallback.base-url      | intentflow.llm.base-url     | Endpoint of the fallback model                      |
-| intentflow.llm.fallback.api-key       | intentflow.llm.api-key      | API key for the fallback endpoint                   |
-| intentflow.llm.rate-limit.questions   | 0                           | New questions (cache misses) a caller may ask per period; 0 for no limit. An `LlmRateLimiter` bean replaces it |
-| intentflow.llm.rate-limit.period      | 1m                          | The period of the rate limit                        |
-| intentflow.llm.rate-limit.per         | principal                   | `principal` or `tenant`                             |
+| intentflow.llm.concurrency.max-calls, .max-wait | 0, 10s           | Most LLM calls in flight (0 for no limit) and how long a call waits for a slot |
+| intentflow.llm.circuit-breaker.failure-threshold, .open-for | 5, 30s | Failed calls in a row that open the circuit (0 turns it off) and how long it stays open. A Resilience4j `CircuitBreakerRegistry` bean supplies the `intentflow-llm` and `intentflow-llm-fallback` breakers instead |
+| intentflow.llm.fallback.model, .base-url, .api-key | none, primary's | Model to ask when the primary fails, and its endpoint and key |
+| intentflow.llm.rate-limit.questions, .period, .per | 0, 1m, principal | New questions (cache misses) a `principal` or `tenant` may ask per period; 0 for no limit. An `LlmRateLimiter` bean replaces it |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |

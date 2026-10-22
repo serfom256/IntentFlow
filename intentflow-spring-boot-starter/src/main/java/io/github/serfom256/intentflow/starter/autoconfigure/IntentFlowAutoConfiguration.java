@@ -14,7 +14,6 @@ import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslParser;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.LlmClient;
-import io.github.serfom256.intentflow.core.pipeline.LlmHttpOptions;
 import io.github.serfom256.intentflow.core.pipeline.LlmRateLimiter;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener;
 import io.github.serfom256.intentflow.core.pipeline.PipelineTracer;
@@ -50,9 +49,6 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
 import javax.sql.DataSource;
-import java.net.InetSocketAddress;
-import java.net.ProxySelector;
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -82,7 +78,8 @@ import java.util.function.Function;
         QueryExecutorConfigurations.Cassandra.class, QueryExecutorConfigurations.Jdbc.class,
         PipelineObservers.SpringSecurity.class, PipelineObservers.Micrometer.class,
         PipelineObservers.Observations.class, LlmHealthBoot4.class, LlmHealthBoot3.class,
-        Resilience4jLlmClient.Wiring.class,
+        Resilience4jLlmClient.Wiring.class, OpenAiProviders.OpenAi.class, OpenAiProviders.AzureOpenAi.class,
+        OpenAiProviders.GigaChat.class, AnthropicProvider.class, VertexProvider.class, BedrockProvider.class,
         TransactionalQueryExecutor.Wiring.class })
 public class IntentFlowAutoConfiguration {
 
@@ -120,28 +117,33 @@ public class IntentFlowAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    LlmClient intentFlowLlmClient(IntentFlowProperties properties, ObjectProvider<Clock> clock,
+    LlmClient intentFlowLlmClient(IntentFlowProperties properties, ObjectProvider<LlmClientFactory> factories,
             ObjectProvider<LlmCircuitBreaker> breakers) {
         IntentFlowProperties.Llm llm = properties.llm();
         if (!StringUtils.hasText(llm.model())) {
             throw new IllegalStateException(
                     "Set intentflow.llm.model (and intentflow.llm.base-url) or define an LlmClient bean.");
         }
-        ProxySelector proxy = llm.proxy() == null ? null
-                : ProxySelector.of(new InetSocketAddress(llm.proxy().getHost(), llm.proxy().getPort()));
-        LlmHttpOptions options = new LlmHttpOptions(llm.apiKeyHeader(), llm.headers(), proxy, llm.maxRetries(),
-                llm.retryBackoff(), properties.logging().values());
-        Clock today = clock.getIfAvailable(Clock::systemDefaultZone);
+        LlmClientFactory factory = factories.getIfAvailable();
+        if (factory == null) {
+            List<String> present = LlmProviders.present(getClass().getClassLoader());
+            if (!StringUtils.hasText(llm.provider()) && present.size() > 1) {
+                throw new IllegalStateException("Several LLM provider modules are on the classpath " + present
+                        + ": set intentflow.llm.provider to one of them.");
+            }
+            throw new IllegalStateException("No LLM provider for intentflow.llm.provider="
+                    + (StringUtils.hasText(llm.provider()) ? llm.provider() : "openai") + ": add a module from "
+                    + "intentflow-providers (intentflow-openai for OpenAI-compatible APIs) or define an LlmClient bean.");
+        }
         LlmCircuitBreaker breaker = breakers.getIfAvailable(() -> (client, name) -> builtInBreaker(client, llm));
-        LlmClient primary = guarded(LlmClients.openAiCompatible(llm.baseUrl(), llm.model(), llm.apiKey(),
-                llm.timeout(), today, options), llm, breaker, "intentflow-llm");
+        LlmClient primary = guarded(factory.create(llm.baseUrl(), llm.model(), llm.apiKey()), llm, breaker,
+                "intentflow-llm");
         IntentFlowProperties.Llm.Fallback fallback = llm.fallback();
         if (!StringUtils.hasText(fallback.model())) {
             return primary;
         }
-        LlmClient secondary = LlmClients.openAiCompatible(
-                fallback.baseUrl() != null ? fallback.baseUrl() : llm.baseUrl(), fallback.model(),
-                fallback.apiKey() != null ? fallback.apiKey() : llm.apiKey(), llm.timeout(), today, options);
+        LlmClient secondary = factory.create(fallback.baseUrl() != null ? fallback.baseUrl() : llm.baseUrl(),
+                fallback.model(), fallback.apiKey() != null ? fallback.apiKey() : llm.apiKey());
         return LlmClients.withFallback(primary, guarded(secondary, llm, breaker, "intentflow-llm-fallback"));
     }
 

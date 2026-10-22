@@ -1,4 +1,4 @@
-package io.github.serfom256.intentflow.core.pipeline;
+package io.github.serfom256.intentflow.llm.openai;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
@@ -22,7 +22,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
 import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
-import io.github.serfom256.intentflow.core.pipeline.factories.LlmClients;
+import io.github.serfom256.intentflow.core.pipeline.LlmClient;
+import io.github.serfom256.intentflow.core.pipeline.LlmException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -130,7 +131,7 @@ class OpenAiCompatibleLlmClientTest {
 
     private LlmClient client(String apiKey, LlmHttpOptions options) {
         URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
-        return LlmClients.openAiCompatible(base, "test-model", apiKey, Duration.ofSeconds(5),
+        return OpenAiLlmClients.of(base, "test-model", apiKey, Duration.ofSeconds(5),
                 Clock.systemDefaultZone(), options);
     }
 
@@ -192,7 +193,7 @@ class OpenAiCompatibleLlmClientTest {
         Clock clock = Clock.fixed(Instant.parse("2026-10-11T12:00:00Z"), ZoneOffset.UTC);
         URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
 
-        LlmClients.openAiCompatible(base, "m", "", Duration.ofSeconds(5), clock)
+        OpenAiLlmClients.of(base, "m", "", Duration.ofSeconds(5), clock)
                 .generateDsl(UserTexts.of("x"), ServiceCatalogs.of(typed));
 
         assertThat(lastRequest.get())

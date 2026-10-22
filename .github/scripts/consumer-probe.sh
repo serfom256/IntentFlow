@@ -35,7 +35,7 @@ intentflow_dep() {
 echo "== Probe A: the starter alone must not pull in any executor, dialect or database driver =="
 emit_pom "$PROBE/a" "" ""
 mvn -B -q -f "$PROBE/a/pom.xml" dependency:tree -DoutputFile="$PROBE/a/tree.txt"
-leaked="$(grep -E "intentflow-(jdbc|jpa|jimmer|openmapper|spring-data|postgresql|mysql|h2|cassandra)|spring-jdbc|HikariCP|hibernate|java-driver-core|postgresql:|mysql-connector|$OPTIONAL" "$PROBE/a/tree.txt" || true)"
+leaked="$(grep -E "intentflow-(jdbc|jpa|jimmer|openmapper|openai|spring-data|postgresql|mysql|h2|cassandra)|spring-jdbc|HikariCP|hibernate|java-driver-core|postgresql:|mysql-connector|$OPTIONAL" "$PROBE/a/tree.txt" || true)"
 if [ -n "$leaked" ]; then
   echo "FAIL: the starter pulled in optional modules:"
   echo "$leaked"
@@ -48,7 +48,7 @@ echo
 echo "== Probe B: inside a Boot ${BOOT_VERSION} application, all Boot artifacts must be ${BOOT_VERSION} =="
 emit_pom "$PROBE/b" \
   "<parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>${BOOT_VERSION}</version><relativePath/></parent>" \
-  "$(intentflow_dep intentflow-jdbc)$(intentflow_dep intentflow-h2)<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency><dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>"
+  "$(intentflow_dep intentflow-jdbc)$(intentflow_dep intentflow-h2)$(intentflow_dep intentflow-openai)<dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency><dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>"
 mvn -B -f "$PROBE/b/pom.xml" dependency:tree > "$PROBE/b/tree.txt"
 offending="$(grep -oE "org\.springframework\.boot:[A-Za-z0-9._-]+:jar:[^:]+" "$PROBE/b/tree.txt" \
              | grep -v ":jar:${BOOT_VERSION}\$" || true)"

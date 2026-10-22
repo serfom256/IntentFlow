@@ -31,6 +31,12 @@ dependencies {
     compileOnly(projects.intentflowJpa)
     compileOnly(projects.intentflowJimmer)
     compileOnly(projects.intentflowOpenmapper)
+    compileOnly(projects.intentflowOpenai)
+    compileOnly(projects.intentflowAzureOpenai)
+    compileOnly(projects.intentflowGigachat)
+    compileOnly(projects.intentflowAnthropic)
+    compileOnly(projects.intentflowVertex)
+    compileOnly(projects.intentflowBedrock)
     compileOnly(projects.intentflowSpringDataCassandra)
 
     testImplementation(projects.intentflowJdbc)
@@ -38,6 +44,12 @@ dependencies {
     testImplementation(projects.intentflowJpa)
     testImplementation(projects.intentflowJimmer)
     testImplementation(projects.intentflowOpenmapper)
+    testImplementation(projects.intentflowOpenai)
+    testImplementation(projects.intentflowAzureOpenai)
+    testImplementation(projects.intentflowGigachat)
+    testImplementation(projects.intentflowAnthropic)
+    testImplementation(projects.intentflowVertex)
+    testImplementation(projects.intentflowBedrock)
     testImplementation(projects.intentflowSpringDataCassandra)
     testImplementation(projects.intentflowPostgresql)
     testImplementation(projects.intentflowMysql)
@@ -60,4 +72,8 @@ dependencies {
     testRuntimeOnly(libs.jackson3.databind)
     testImplementation(libs.h2)
     testRuntimeOnly(libs.mysql)
+}
+
+tasks.test {
+    systemProperty("intentflow.llm.provider", "openai")
 }

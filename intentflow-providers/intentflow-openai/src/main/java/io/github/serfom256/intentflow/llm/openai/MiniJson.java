@@ -1,4 +1,4 @@
-package io.github.serfom256.intentflow.core.pipeline.impl;
+package io.github.serfom256.intentflow.llm.openai;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

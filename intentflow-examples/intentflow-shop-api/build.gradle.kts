@@ -13,6 +13,7 @@ require(orm == null || orm in orms) { "-Porm must be openmapper or one of ${orms
 dependencies {
     implementation(projects.intentflowSpringBootStarter)
     implementation(projects.intentflowAdminSpringBootStarter)
+    implementation(projects.intentflowOpenai)
     implementation(projects.intentflowShopDomain)
     implementation(projects.intentflowShopOpenmapper)
     orm?.let { implementation(orms.getValue(it)) }

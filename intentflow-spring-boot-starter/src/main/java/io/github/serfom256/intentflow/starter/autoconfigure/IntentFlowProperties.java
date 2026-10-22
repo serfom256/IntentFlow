@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
@@ -33,10 +34,12 @@ public record IntentFlowProperties(
     }
 
     public record Llm(
-            @DefaultValue("http://localhost:1234/v1") URI baseUrl,
+            @Nullable String provider,
+            @Nullable URI baseUrl,
             @Nullable String model,
             @DefaultValue("") String apiKey,
             @DefaultValue("60s") Duration timeout,
+            @DefaultValue("16000") int maxTokens,
             @DefaultValue("1") int maxRepairs,
             @DefaultValue("Authorization") String apiKeyHeader,
             @DefaultValue Map<String, String> headers,
@@ -47,7 +50,26 @@ public record IntentFlowProperties(
             @DefaultValue Concurrency concurrency,
             @DefaultValue CircuitBreaker circuitBreaker,
             @DefaultValue Fallback fallback,
-            @DefaultValue RateLimit rateLimit) {
+            @DefaultValue RateLimit rateLimit,
+            @DefaultValue Anthropic anthropic,
+            @DefaultValue Vertex vertex,
+            @DefaultValue Bedrock bedrock,
+            @DefaultValue GigaChat gigachat) {
+
+        public record Anthropic(@Nullable String effort, @DefaultValue("true") boolean refusalFallback) {
+        }
+
+        public record Vertex(@Nullable String project, @DefaultValue("global") String location) {
+        }
+
+        public record Bedrock(@Nullable String region, @Nullable Float temperature,
+                @DefaultValue("false") boolean promptCaching) {
+        }
+
+        public record GigaChat(@Nullable URI oauthUrl, @DefaultValue("GIGACHAT_API_PERS") String scope,
+                @Nullable Path trustStore, @DefaultValue("") String trustStorePassword,
+                @DefaultValue("PKCS12") String trustStoreType) {
+        }
 
         public record Concurrency(
                 @DefaultValue("0") int maxCalls,

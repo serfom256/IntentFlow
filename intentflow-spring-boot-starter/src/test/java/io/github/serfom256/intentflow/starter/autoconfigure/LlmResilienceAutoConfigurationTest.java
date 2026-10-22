@@ -12,7 +12,7 @@ import io.github.serfom256.intentflow.core.pipeline.LlmUnavailableException;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.impl.CircuitBreakerLlmClient;
 import io.github.serfom256.intentflow.core.pipeline.impl.ConcurrencyLimitedLlmClient;
-import io.github.serfom256.intentflow.core.pipeline.impl.OpenAiCompatibleLlmClient;
+import io.github.serfom256.intentflow.llm.openai.OpenAiCompatibleLlmClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -120,6 +120,22 @@ class LlmResilienceAutoConfigurationTest {
     void withoutResilience4jTheBuiltInBreakerIsUsed() {
         runner.withClassLoader(new FilteredClassLoader(CircuitBreakerRegistry.class))
                 .run(ctx -> assertThat(ctx.getBean(LlmClient.class)).isInstanceOf(CircuitBreakerLlmClient.class));
+    }
+
+    @Test
+    void withoutAProviderModuleStartupNamesWhatToAdd() {
+        runner.withClassLoader(new FilteredClassLoader(OpenAiCompatibleLlmClient.class))
+                .run(ctx -> assertThat(ctx).hasFailed().getFailure()
+                        .hasRootCauseMessage("No LLM provider for intentflow.llm.provider=openai: add a module from "
+                                + "intentflow-providers (intentflow-openai for OpenAI-compatible APIs) or define an "
+                                + "LlmClient bean."));
+    }
+
+    @Test
+    void anUnknownProviderIsReported() {
+        runner.withPropertyValues("intentflow.llm.provider=watsonx")
+                .run(ctx -> assertThat(ctx).hasFailed().getFailure()
+                        .rootCause().hasMessageContaining("intentflow.llm.provider=watsonx"));
     }
 
     @Test

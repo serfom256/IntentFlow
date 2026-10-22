@@ -14,7 +14,7 @@ covers are skipped. Review a suggestion before applying it: a planner often pref
 ## Setup
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-admin-spring-boot-starter:0.3.1")
+implementation("io.github.serfom256:intentflow-admin-spring-boot-starter:0.3.5")
 ```
 
 That's all: the UI opens at `http://<host>:<port>/intentflow-admin/`. It is a static bundle inside the jar, served

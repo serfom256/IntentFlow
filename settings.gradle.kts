@@ -32,6 +32,19 @@ executors.forEach {
     project(":$it").projectDir = file("intentflow-executors/$it")
 }
 
+val providers = listOf(
+    "intentflow-openai",
+    "intentflow-azure-openai",
+    "intentflow-gigachat",
+    "intentflow-anthropic",
+    "intentflow-vertex",
+    "intentflow-bedrock",
+)
+providers.forEach {
+    include(it)
+    project(":$it").projectDir = file("intentflow-providers/$it")
+}
+
 val examples = listOf(
     "intentflow-shop-domain",
     "intentflow-shop-openmapper",
