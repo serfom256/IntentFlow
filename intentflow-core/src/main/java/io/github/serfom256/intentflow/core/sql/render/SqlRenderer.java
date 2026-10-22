@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.sql.render;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.BoolLiteral;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
@@ -14,6 +15,7 @@ import io.github.serfom256.intentflow.core.sql.plan.SqlPredicate;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 public final class SqlRenderer {
@@ -34,8 +36,10 @@ public final class SqlRenderer {
         BoundQuery query = sql.toBoundQuery(optimizations);
         int max = dialect.capabilities().maxParameters();
         if (query.parameters().size() > max) {
-            throw new ValidationException("the query needs " + query.parameters().size() + " parameters, more than "
-                    + dialect.name() + " accepts (" + max + ")");
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
+                    "the query needs " + query.parameters().size() + " parameters, more than "
+                            + dialect.name() + " accepts (" + max + ")",
+                    Map.of());
         }
         return query;
     }

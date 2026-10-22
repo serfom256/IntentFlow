@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.And;
 import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
@@ -95,8 +96,10 @@ final class FilterPlanner {
     private static void checkInList(int size, SqlScope scope) {
         int max = scope.context().capabilities().maxInListSize();
         if (size > max) {
-            throw new ValidationException("'in' takes at most " + max + " values on " + scope.context().dialectName()
-                    + ", got " + size);
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
+                    "'in' takes at most " + max + " values on " + scope.context().dialectName()
+                            + ", got " + size,
+                    Map.of("limit", max));
         }
     }
 

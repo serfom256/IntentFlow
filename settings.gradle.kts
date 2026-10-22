@@ -4,6 +4,7 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(
     "intentflow-core", 
+    "intentflow-reactive",
     "intentflow-spring-boot-starter",
     "intentflow-admin-spring-boot-starter"
 )

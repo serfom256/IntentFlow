@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.0")
-    implementation("io.github.serfom256:intentflow-jdbc:0.4.0")
-    implementation("io.github.serfom256:intentflow-postgresql:0.4.0")
-    implementation("io.github.serfom256:intentflow-openai:0.4.0")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.1")
+    implementation("io.github.serfom256:intentflow-jdbc:0.4.1")
+    implementation("io.github.serfom256:intentflow-postgresql:0.4.1")
+    implementation("io.github.serfom256:intentflow-openai:0.4.1")
 }
 ```
 
@@ -158,17 +158,22 @@ IntentResponse<?> response = pipeline.resolve(IntentRequests.of("vip customers w
 | `uri()`         | The `uri` template filled from the first item, e.g. `/products/12`, or `/products` |
 | `trace()`       | The DSL, whether it was cached, the SQL and its parameters                      |
 
-Only the question → DSL translation is cached; every call runs the query. Failures are unchecked exceptions:
+Only the question → DSL translation is cached; every call runs the query. On WebFlux, `ReactiveIntentPipeline`
+(`intentflow-reactive`) returns `Mono`s. Failures are unchecked exceptions with a stable `code()` and `details()`:
 
-| Exception                     | Raised when                                                  | Typical HTTP status |
-| ----------------------------- | ------------------------------------------------------------ | ------------------- |
-| `UnsupportedRequestException` | the LLM declined the question; `reason()` says why           | 422                 |
-| `ValidationException`         | the DSL uses an unknown field or the wrong type              | 422                 |
-| `DslParseException`           | the LLM's answer is not valid DSL                            | 422                 |
-| `ServiceNotFoundException`    | the DSL addresses an unknown or out-of-scope service         | 422                 |
-| `ScanLimitExceededException`  | a Cassandra query read too many rows                         | 422                 |
-| `LlmException`                | the LLM failed, timed out or returned nothing                | 503                 |
-| `RateLimitExceededException`  | the caller asked too many new questions; `retryAfter()`      | 429                 |
+| Exception                     | Raised when                                             | `code()`                                    | HTTP |
+| ----------------------------- | ------------------------------------------------------- | ------------------------------------------- | ---- |
+| `UnsupportedRequestException` | the LLM declined the question; `reason()` says why      | `intentflow.declined`                       | 422  |
+| `ValidationException`         | the DSL uses an unknown field, the wrong type, too much | `intentflow.unknown-field`, `.unknown-relation`, `.type-mismatch`, `.limit-exceeded`, `.unsupported`, `.invalid-query` | 422 |
+| `DslParseException`           | the LLM's answer is not valid DSL                       | `intentflow.parse`                          | 422  |
+| `ServiceNotFoundException`    | the DSL addresses an unknown or out-of-scope service    | `intentflow.service-not-found`              | 422  |
+| `ScanLimitExceededException`  | a Cassandra query read too many rows                    | `intentflow.scan-limit`                     | 422  |
+| `AccessDeniedException`       | the caller may not query the service                    | `intentflow.access-denied`                  | 403  |
+| `RateLimitExceededException`  | the caller asked too many new questions                 | `intentflow.rate-limited`                   | 429  |
+| `LlmException`                | the LLM failed, timed out, or is busy                   | `intentflow.llm-failed`, `.llm-unavailable` | 503  |
+
+`IntentFlowErrors.message(e, locale)` gives a message for users from the `intentflow/messages` bundle; add
+`intentflow/messages_<language>.properties` to your classpath to translate it.
 
 ## Query DSL
 
@@ -321,9 +326,8 @@ overrides it.
 | `intentflow-h2`         | H2 2.x, with or without `DATABASE_TO_LOWER` |
 | `intentflow-cassandra`  | Cassandra 5       |
 
-**LLM providers** connect to a model: `intentflow-openai` for every OpenAI-compatible API (OpenAI, Mistral, DeepSeek,
-Qwen, Ollama, vLLM, ...), and Azure OpenAI, Anthropic, Bedrock, Vertex AI and GigaChat; see
-[intentflow-providers](intentflow-providers/README.md).
+**LLM providers** connect to a model: `intentflow-openai` for OpenAI-compatible APIs, plus Azure OpenAI, Anthropic,
+Bedrock, Vertex AI and GigaChat; see [intentflow-providers](intentflow-providers/README.md).
 
 The build is tested against Spring Boot 3.2, 3.5 and 4.0. Spring Boot 3.0 and 3.1 are not supported, because the
 JDBC executors need `JdbcClient` (Spring Framework 6.1).

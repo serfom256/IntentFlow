@@ -54,6 +54,7 @@ spring-security-oauth2-client = { module = "org.springframework.security:spring-
 jackson2-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
 jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
 micrometer-core = { module = "io.micrometer:micrometer-core" }
+reactor-core = { module = "io.projectreactor:reactor-core" }
 micrometer-observation = { module = "io.micrometer:micrometer-observation" }
 spring-boot-health = { module = "org.springframework.boot:spring-boot-health" }
 spring-boot-actuator = { module = "org.springframework.boot:spring-boot-actuator" }

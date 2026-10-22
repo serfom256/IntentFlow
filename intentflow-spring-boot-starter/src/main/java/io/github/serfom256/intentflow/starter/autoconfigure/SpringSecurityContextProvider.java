@@ -2,6 +2,7 @@ package io.github.serfom256.intentflow.starter.autoconfigure;
 
 import io.github.serfom256.intentflow.core.api.IntentContext;
 import io.github.serfom256.intentflow.core.api.factories.IntentContexts;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -15,7 +16,10 @@ final class SpringSecurityContextProvider implements IntentContextProvider {
 
     @Override
     public IntentContext current() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return from(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    static IntentContext from(@Nullable Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
             return IntentContexts.anonymous();

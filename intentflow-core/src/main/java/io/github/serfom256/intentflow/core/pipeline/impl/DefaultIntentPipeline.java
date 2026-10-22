@@ -162,7 +162,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
 
     private ServiceDescriptor permitted(ServiceDescriptor service, Caller caller) {
         return caller.view().find(service.name()).orElseThrow(() -> new AccessDeniedException(
-                "The caller may not query " + service.name().value()));
+                "The caller may not query " + service.name().value(), Map.of("service", service.name().value())));
     }
 
     private <R> R observed(long start, @Nullable ServiceName service, IntentRequest request, Trail trail,

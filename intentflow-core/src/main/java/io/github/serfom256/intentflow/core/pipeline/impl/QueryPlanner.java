@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
@@ -85,8 +86,10 @@ final class QueryPlanner {
 
     private static Select topN(ValidatedQuery query, TopN top, List<SqlPredicate> where, SqlScope scope) {
         if (!scope.context().capabilities().windowFunctions()) {
-            throw new ValidationException("'top' needs window functions, which " + scope.context().dialectName()
-                    + " does not support; ask for a sorted list with 'take' instead");
+            throw new ValidationException(ErrorCode.UNSUPPORTED,
+                    "'top' needs window functions, which " + scope.context().dialectName()
+                            + " does not support; ask for a sorted list with 'take' instead",
+                    Map.of());
         }
         SqlExpr rank = new SqlExpr.RowNumber(top.partition().stream().map(p -> ValuePlanner.plan(p, scope)).toList(),
                 OrderPlanner.plan(query.topOrder(), null, scope));

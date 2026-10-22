@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AggregateFunction;
 import io.github.serfom256.intentflow.core.ast.And;
@@ -89,13 +90,16 @@ public final class DefaultAstValidator implements AstValidator {
             validateTop(ast, service, fields);
         }
         if (ast.skip() != null && ast.skip().value() > maxSkip) {
-            throw new ValidationException("skip value " + ast.skip().value() + " exceeds the maximum of " + maxSkip);
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
+                    "skip value " + ast.skip().value() + " exceeds the maximum of " + maxSkip,
+                    Map.of("limit", maxSkip));
         }
         if (ast.take() != null && ast.take().value() > service.maxTake().value()) {
-            throw new ValidationException(
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
                     "take value " + ast.take().value()
                             + " exceeds maxTake " + service.maxTake().value()
-                            + " for service '" + service.name().value() + "'");
+                            + " for service '" + service.name().value() + "'",
+                    Map.of("limit", service.maxTake().value()));
         }
 
         return ValidatedQueries.of(service, ast, fields.related);
@@ -104,10 +108,13 @@ public final class DefaultAstValidator implements AstValidator {
     private static void validateTop(AstQuery ast, ServiceDescriptor service, Fields fields) {
         TopN top = ast.top();
         if (ast.aggregate() != null) {
-            throw new ValidationException("'top' cannot be combined with group or count/sum/avg/min/max");
+            throw new ValidationException(ErrorCode.UNSUPPORTED,
+                    "'top' cannot be combined with group or count/sum/avg/min/max", Map.of());
         }
         if (top.count() > service.maxTake().value()) {
-            throw new ValidationException("top " + top.count() + " exceeds maxTake " + service.maxTake().value());
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
+                    "top " + top.count() + " exceeds maxTake " + service.maxTake().value(),
+                    Map.of("limit", service.maxTake().value()));
         }
         for (ValueExpr part : top.partition()) {
             if (part instanceof FieldRef f) {
@@ -140,16 +147,19 @@ public final class DefaultAstValidator implements AstValidator {
             boolean numeric = type == ExprTypes.Type.NUMBER || type == ExprTypes.Type.ANY;
             if ((aggregate.function() == AggregateFunction.SUM || aggregate.function() == AggregateFunction.AVG)
                     && !numeric) {
-                throw new ValidationException("field '" + Expressions.print(aggregate.argument()) + "' ("
-                        + ExprTypes.name(type) + "): " + aggregate.function().keyword() + " needs a number field");
+                throw new ValidationException(ErrorCode.TYPE_MISMATCH, "field '"
+                        + Expressions.print(aggregate.argument()) + "' (" + ExprTypes.name(type) + "): "
+                        + aggregate.function().keyword() + " needs a number field", Map.of());
             }
         }
         String value = ValidatedQuery.valueField(aggregate).value();
         List<String> groups = aggregate.groupNames();
         for (SortKey sk : sort) {
             if (!groups.contains(sk.field().value()) && !sk.field().value().equals(value)) {
-                throw new ValidationException("aggregate queries sort by '" + value + "' or a group field, not '"
-                        + sk.field().value() + "'");
+                throw new ValidationException(ErrorCode.UNSUPPORTED,
+                        "aggregate queries sort by '" + value + "' or a group field, not '"
+                                + sk.field().value() + "'",
+                        Map.of());
             }
         }
     }
@@ -171,8 +181,8 @@ public final class DefaultAstValidator implements AstValidator {
 
         FieldMapping own(LogicalFieldName name, String stage) {
             if (name.value().contains(".")) {
-                throw new ValidationException("'" + stage + "' only works on fields of '"
-                        + service.name().value() + "', not on related field '" + name.value() + "'");
+                throw new ValidationException(ErrorCode.UNSUPPORTED, "'" + stage + "' only works on fields of '"
+                        + service.name().value() + "', not on related field '" + name.value() + "'", Map.of());
             }
             return lookup(queryable, name.value(), name.value(), stage);
         }
@@ -186,8 +196,9 @@ public final class DefaultAstValidator implements AstValidator {
             ServiceRelation relation = service.relations().stream()
                     .filter(r -> r.name().equals(relationName))
                     .findFirst()
-                    .orElseThrow(() -> new ValidationException("'" + relationName + "' is not a relation of '"
-                            + service.name().value() + "' (referenced in '" + stage + "')"));
+                    .orElseThrow(() -> new ValidationException(ErrorCode.UNKNOWN_RELATION, "'" + relationName
+                            + "' is not a relation of '" + service.name().value() + "' (referenced in '" + stage
+                            + "')", Map.of("relation", relationName)));
             ServiceDescriptor target = catalog.find(relation.target()).orElseThrow(() -> new ValidationException(
                     "relation '" + relationName + "' targets unknown service '" + relation.target().value() + "'"));
             if (target.fields().stream().noneMatch(f -> f.logical().value().equals(relation.to().value()))) {
@@ -201,8 +212,9 @@ public final class DefaultAstValidator implements AstValidator {
         private static FieldMapping lookup(Map<String, FieldMapping> fields, String key, String shown, String stage) {
             FieldMapping fm = fields.get(key);
             if (fm == null) {
-                throw new ValidationException(
-                        "field '" + shown + "' is not declared or not queryable (referenced in '" + stage + "')");
+                throw new ValidationException(ErrorCode.UNKNOWN_FIELD,
+                        "field '" + shown + "' is not declared or not queryable (referenced in '" + stage + "')",
+                        Map.of("field", shown));
             }
             return fm;
         }
@@ -220,7 +232,8 @@ public final class DefaultAstValidator implements AstValidator {
 
     private void checkInSize(int size) {
         if (size > maxInValues) {
-            throw new ValidationException("'in' takes at most " + maxInValues + " values, got " + size);
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
+                    "'in' takes at most " + maxInValues + " values, got " + size, Map.of("limit", maxInValues));
         }
     }
 
@@ -268,16 +281,19 @@ public final class DefaultAstValidator implements AstValidator {
                 + Expressions.print(right);
         if (rightType == ExprTypes.Type.NULL) {
             if (op != ComparisonOp.EQ && op != ComparisonOp.NE) {
-                throw new ValidationException("null can only be compared with == or !=: " + where);
+                throw new ValidationException(ErrorCode.TYPE_MISMATCH,
+                        "null can only be compared with == or !=: " + where, Map.of());
             }
             return;
         }
         if (op == ComparisonOp.CONTAINS) {
             if (!(right instanceof LiteralExpr l && l.value() instanceof TextLiteral)) {
-                throw new ValidationException("'~' needs a \"text\" value on the right: " + where);
+                throw new ValidationException(ErrorCode.TYPE_MISMATCH,
+                        "'~' needs a \"text\" value on the right: " + where, Map.of());
             }
             if (!textual(left)) {
-                throw new ValidationException("'~' needs text on both sides: " + where);
+                throw new ValidationException(ErrorCode.TYPE_MISMATCH, "'~' needs text on both sides: " + where,
+                        Map.of());
             }
             return;
         }
@@ -286,11 +302,12 @@ public final class DefaultAstValidator implements AstValidator {
                 || (temporal && rightType == ExprTypes.Type.TEXT && ExprTypes.literalTimestamp(right))
                 || (temporal && (rightType == ExprTypes.Type.TIMESTAMP || rightType == ExprTypes.Type.DATE));
         if (!compatible) {
-            throw new ValidationException("cannot compare " + ExprTypes.name(left) + " with "
-                    + ExprTypes.name(rightType) + ": " + where);
+            throw new ValidationException(ErrorCode.TYPE_MISMATCH, "cannot compare " + ExprTypes.name(left) + " with "
+                    + ExprTypes.name(rightType) + ": " + where, Map.of());
         }
         if (left == ExprTypes.Type.BOOLEAN && op != ComparisonOp.EQ && op != ComparisonOp.NE) {
-            throw new ValidationException("booleans only support '==' and '!=': " + where);
+            throw new ValidationException(ErrorCode.TYPE_MISMATCH, "booleans only support '==' and '!=': " + where,
+                    Map.of());
         }
     }
 
@@ -356,7 +373,7 @@ public final class DefaultAstValidator implements AstValidator {
     }
 
     private static ValidationException mismatch(FieldMapping fm, String detail) {
-        return new ValidationException("field '" + fm.logical().value() + "' ("
-                + fm.type().name().toLowerCase(Locale.ROOT) + "): " + detail);
+        return new ValidationException(ErrorCode.TYPE_MISMATCH, "field '" + fm.logical().value() + "' ("
+                + fm.type().name().toLowerCase(Locale.ROOT) + "): " + detail, Map.of("field", fm.logical().value()));
     }
 }

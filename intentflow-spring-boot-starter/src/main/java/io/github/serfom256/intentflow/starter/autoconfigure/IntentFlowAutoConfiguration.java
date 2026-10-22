@@ -80,6 +80,7 @@ import java.util.function.Function;
         PipelineObservers.Observations.class, LlmHealthBoot4.class, LlmHealthBoot3.class,
         Resilience4jLlmClient.Wiring.class, OpenAiProviders.OpenAi.class, OpenAiProviders.AzureOpenAi.class,
         OpenAiProviders.GigaChat.class, AnthropicProvider.class, VertexProvider.class, BedrockProvider.class,
+        ReactivePipelineConfiguration.class,
         TransactionalQueryExecutor.Wiring.class })
 public class IntentFlowAutoConfiguration {
 

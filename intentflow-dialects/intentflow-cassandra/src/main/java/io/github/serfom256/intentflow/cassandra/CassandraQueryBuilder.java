@@ -5,6 +5,7 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.And;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
@@ -56,8 +57,10 @@ public final class CassandraQueryBuilder implements SqlBuilder {
         ServiceDescriptor service = query.service();
         AstQuery ast = query.ast();
         if (!query.related().isEmpty()) {
-            throw new ValidationException("Cassandra has no joins; filter on fields of '" + service.name().value()
-                    + "' only, not on " + query.related().keySet());
+            throw new ValidationException(ErrorCode.UNSUPPORTED,
+                    "Cassandra has no joins; filter on fields of '" + service.name().value()
+                            + "' only, not on " + query.related().keySet(),
+                    Map.of());
         }
         Fields fields = Fields.of(service);
         Pushdown pushdown = pushdown(table(service.table().value()), ast.filter(), fields);

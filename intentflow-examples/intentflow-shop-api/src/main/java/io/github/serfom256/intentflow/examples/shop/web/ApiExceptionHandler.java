@@ -1,5 +1,7 @@
 package io.github.serfom256.intentflow.examples.shop.web;
 
+import io.github.serfom256.intentflow.core.IntentFlowErrors;
+import io.github.serfom256.intentflow.core.IntentFlowException;
 import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import io.github.serfom256.intentflow.core.pipeline.LlmException;
@@ -10,6 +12,7 @@ import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.examples.shop.service.NotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -45,38 +48,38 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(UnsupportedRequestException.class)
     ProblemDetail unsupported(UnsupportedRequestException e) {
-        ProblemDetail pd = problem(HttpStatus.UNPROCESSABLE_CONTENT, "Can't answer that", e.reason());
+        ProblemDetail pd = coded(problem(HttpStatus.UNPROCESSABLE_CONTENT, "Can't answer that", e.reason()), e);
         pd.setProperty("kind", "unsupported");
         return pd;
     }
 
     @ExceptionHandler({ DslParseException.class, ValidationException.class, ServiceNotFoundException.class })
-    ProblemDetail untranslatable(RuntimeException e) {
+    ProblemDetail untranslatable(IntentFlowException e) {
         log.warn("search translation rejected: {}", e.getMessage());
-        return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Couldn't understand the question",
-                "Try rephrasing it. (" + e.getMessage() + ")");
+        return coded(problem(HttpStatus.UNPROCESSABLE_CONTENT, "Couldn't understand the question",
+                "Try rephrasing it. (" + e.getMessage() + ")"), e);
     }
 
     @ExceptionHandler(ScanLimitExceededException.class)
     ProblemDetail tooBroad(ScanLimitExceededException e) {
         log.warn("search too broad: {}", e.getMessage());
-        return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Question too broad",
-                "Answering it would read too many rows. Add a condition and try again.");
+        return coded(problem(HttpStatus.UNPROCESSABLE_CONTENT, "Question too broad",
+                "Answering it would read too many rows. Add a condition and try again."), e);
     }
 
     @ExceptionHandler(RateLimitExceededException.class)
     ResponseEntity<ProblemDetail> tooManyQuestions(RateLimitExceededException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(Math.max(1, e.retryAfter().toSeconds())))
-                .body(problem(HttpStatus.TOO_MANY_REQUESTS, "Too many questions",
-                        "You asked too many new questions. Try again in a moment."));
+                .body(coded(problem(HttpStatus.TOO_MANY_REQUESTS, "Too many questions",
+                        "You asked too many new questions. Try again in a moment."), e));
     }
 
     @ExceptionHandler(LlmException.class)
     ProblemDetail llmDown(LlmException e) {
         log.error("LLM call failed", e);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Search assistant unavailable",
-                "The language model did not respond. Check that it is running and try again.");
+        return coded(problem(HttpStatus.SERVICE_UNAVAILABLE, "Search assistant unavailable",
+                "The language model did not respond. Check that it is running and try again."), e);
     }
 
     @Override
@@ -100,6 +103,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                         .map(err -> err.getDefaultMessage())
                         .findFirst().orElse("Invalid parameters."));
         return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
+    }
+
+    private static ProblemDetail coded(ProblemDetail problem, IntentFlowException e) {
+        problem.setProperty("code", e.code().value());
+        problem.setProperty("message", IntentFlowErrors.message(e, LocaleContextHolder.getLocale()));
+        return problem;
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

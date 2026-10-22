@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.Arith;
 import io.github.serfom256.intentflow.core.ast.BoolLiteral;
 import io.github.serfom256.intentflow.core.ast.Call;
@@ -40,7 +41,8 @@ final class ExprTypes {
         this(name -> {
             FieldMapping fm = fields.get(name);
             if (fm == null) {
-                throw new ValidationException("field '" + name + "' is not declared or not queryable");
+                throw new ValidationException(ErrorCode.UNKNOWN_FIELD,
+                        "field '" + name + "' is not declared or not queryable", Map.of("field", name));
             }
             return fm;
         });
@@ -48,7 +50,8 @@ final class ExprTypes {
 
     Type check(ValueExpr expr) {
         if (size(expr) > MAX_NODES) {
-            throw new ValidationException("expression is too large: " + Expressions.print(expr));
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
+                    "expression is too large: " + Expressions.print(expr), Map.of("limit", MAX_NODES));
         }
         return type(expr);
     }
@@ -57,8 +60,8 @@ final class ExprTypes {
         return switch (expr) {
             case FieldRef f -> {
                 if (f.field().value().contains(".")) {
-                    throw new ValidationException("related field '" + f.field().value()
-                            + "' cannot be used inside an expression");
+                    throw new ValidationException(ErrorCode.UNSUPPORTED, "related field '" + f.field().value()
+                            + "' cannot be used inside an expression", Map.of());
                 }
                 yield of(fields.apply(f.field().value()));
             }
@@ -82,8 +85,8 @@ final class ExprTypes {
                     case TIMESTAMP, DATE -> is(source, Type.TEXT, Type.TIMESTAMP, Type.DATE);
                 };
                 if (!ok) {
-                    throw new ValidationException("cannot cast " + name(source) + " to " + c.type().keyword()
-                            + " in " + Expressions.print(c));
+                    throw new ValidationException(ErrorCode.TYPE_MISMATCH, "cannot cast " + name(source) + " to "
+                            + c.type().keyword() + " in " + Expressions.print(c), Map.of());
                 }
                 if (c.value() instanceof LiteralExpr l && l.value() instanceof TextLiteral t
                         && (c.type() == CastType.TIMESTAMP
@@ -169,7 +172,8 @@ final class ExprTypes {
             return a;
         if ((a == Type.TIMESTAMP || a == Type.DATE) && b == Type.TEXT && literalTimestamp(arg))
             return a;
-        throw new ValidationException("coalesce mixes " + name(a) + " and " + name(b) + " in " + Expressions.print(c));
+        throw new ValidationException(ErrorCode.TYPE_MISMATCH,
+                "coalesce mixes " + name(a) + " and " + name(b) + " in " + Expressions.print(c), Map.of());
     }
 
     static boolean literalTimestamp(ValueExpr e) {
@@ -181,8 +185,8 @@ final class ExprTypes {
         if (actual == Type.ANY || actual == wanted || Set.of(alternatives).contains(actual)) {
             return;
         }
-        throw new ValidationException(where + " needs a " + name(wanted) + ", got " + name(actual) + " in "
-                + Expressions.print(arg));
+        throw new ValidationException(ErrorCode.TYPE_MISMATCH, where + " needs a " + name(wanted) + ", got "
+                + name(actual) + " in " + Expressions.print(arg), Map.of());
     }
 
     private static void exactly(Call c, int n) {
