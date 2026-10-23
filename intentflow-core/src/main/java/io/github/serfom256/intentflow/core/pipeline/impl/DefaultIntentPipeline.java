@@ -1,5 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.api.AggregateRow;
 import io.github.serfom256.intentflow.core.api.Aggregation;
 import io.github.serfom256.intentflow.core.api.IntentContext;
@@ -16,6 +17,7 @@ import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.Expressions;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
+import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
 import io.github.serfom256.intentflow.core.ast.factories.Takes;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
@@ -81,6 +83,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private final UriBuilder uriBuilder;
     private final ServiceCatalog catalog;
     private final int maxRepairs;
+    private final int maxQuestionLength;
     private final AccessPolicy policy;
     private final Supplier<IntentContext> defaultCaller;
     private final PipelineListener listener;
@@ -89,6 +92,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     private final AuditLog audit;
     private final boolean logValues;
     private final boolean visibleFieldsOnly;
+    private final byte[] cursorKey;
 
     @Override
     public IntentResponse<?> resolve(IntentRequest request) {
@@ -131,7 +135,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             Function<Class<?>, List<RuntimeRestriction>> restrictions) {
     }
 
-    private record Paging(int size, int offset, String fingerprint) {
+    private record Paging(int size, int offset, String question) {
     }
 
     private record Compiled(UserText question, DslSource dsl, boolean cached, ValidatedQuery validated,
@@ -271,18 +275,35 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         long start = System.nanoTime();
         ServiceName expectedName = expected == null ? null : expected.name();
         UserText normalized = normalizer.normalize(request.text());
+        int length = normalized.value().codePointCount(0, normalized.value().length());
+        if (length > maxQuestionLength) {
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED, "The question has " + length
+                    + " characters, more than the " + maxQuestionLength + " allowed",
+                    Map.of("limit", maxQuestionLength));
+        }
+        String question = PageCursor.question(normalized.value());
+        PageCursor cursor = request.paged() && request.cursor() != null
+                ? PageCursor.decode(request.cursor(), cursorKey)
+                : null;
+        if (cursor != null && !cursor.question().equals(question)) {
+            throw PageCursor.invalid();
+        }
+        boolean fromCursor = cursor != null && cursor.signed();
         DslCacheKey key = new DslCacheKey(normalized, expectedName, caller.view().version());
 
-        Optional<DslSource> hit = cache.get(key);
+        Optional<DslSource> hit = fromCursor ? Optional.of(DslSources.of(cursor.dsl())) : cache.get(key);
         boolean cached = hit.isPresent();
         trail.cached = cached;
-        listener.cache(cached);
+        if (!fromCursor) {
+            listener.cache(cached);
+        }
         DslSource dsl;
         TokenUsage tokens = TokenUsage.NONE;
         if (cached) {
             dsl = hit.get();
             trail.dsl = dsl.value();
-            log.debug("DSL cache hit for '{}': {}", text(normalized.value()), dsl(dsl.value()));
+            log.debug(fromCursor ? "DSL from the page cursor for '{}': {}" : "DSL cache hit for '{}': {}",
+                    text(normalized.value()), dsl(dsl.value()));
         } else {
             rateLimiter.acquire(caller.context());
             long llmStart = System.nanoTime();
@@ -310,6 +331,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             } catch (DslParseException | ValidationException | ServiceNotFoundException rejected) {
                 log.debug("Rejected DSL for '{}': {} ({})", text(normalized.value()), dsl(dsl.value()),
                         text(rejected.getMessage()));
+                if (fromCursor) {
+                    throw PageCursor.invalid();
+                }
                 if (cached || repairs >= maxRepairs) {
                     throw rejected;
                 }
@@ -335,18 +359,20 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         ValidatedQuery planned = valid;
         if (request.paged() && ast.aggregate() == null && ast.top() == null) {
             int size = ast.take() != null ? ast.take().value() : valid.service().maxTake().value();
-            String fingerprint = PageCursor.fingerprint(valid.service().name().value(), dsl.value());
             int offset = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
-            if (request.cursor() != null) {
-                PageCursor cursor = PageCursor.decode(request.cursor());
-                if (!cursor.fingerprint().equals(fingerprint)
+            if (cursor != null) {
+                if (!cursor.dsl().equals(dsl.value())
                         || (cursor.after() != null && !sqlBuilder.supportsKeyset(valid))) {
                     throw PageCursor.invalid();
                 }
                 offset = cursor.offset();
                 after = cursor.after();
             }
-            paging = new Paging(size, offset, fingerprint);
+            paging = new Paging(size, offset, question);
+            if (after == null && offset > 0) {
+                validator.validate(AstQueries.of(ast.service(), ast.filter(), ast.sort(), Skips.of(offset),
+                        Takes.of(size)), caller.view());
+            }
             planned = ValidatedQueries.of(valid.service(), AstQueries.of(ast.service(), ast.filter(), ast.sort(),
                     after != null || offset == 0 ? null : Skips.of(offset), Takes.of(size + 1)), valid.related());
         }
@@ -418,7 +444,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             List<Object> last = sqlBuilder.supportsKeyset(validated)
                     ? PageCursor.values(items.getLast(), validated.effectiveSort(), validated.service())
                     : null;
-            nextCursor = new PageCursor(paging.fingerprint(), paging.offset() + paging.size(), last).encode();
+            nextCursor = new PageCursor(paging.question(), compiled.dsl().value(), paging.offset() + paging.size(),
+                    last,
+                    true).encode(cursorKey);
         }
         int rows = aggregation == null ? items.size() : aggregation.rows().size();
         trail.rows = rows;

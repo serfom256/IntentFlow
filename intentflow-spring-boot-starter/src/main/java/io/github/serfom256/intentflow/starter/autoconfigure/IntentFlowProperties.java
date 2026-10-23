@@ -18,6 +18,7 @@ public record IntentFlowProperties(
         @Nullable String dialect,
         @DefaultValue("10000") int maxSkip,
         @DefaultValue("1000") int maxInValues,
+        @DefaultValue("2000") int maxQuestionLength,
         @Nullable String timeZone,
         @DefaultValue Llm llm,
         @DefaultValue Cache cache,
@@ -27,7 +28,8 @@ public record IntentFlowProperties(
         @DefaultValue Cassandra cassandra,
         @DefaultValue Audit audit,
         @DefaultValue Logging logging,
-        @DefaultValue Results results) {
+        @DefaultValue Results results,
+        @DefaultValue Paging paging) {
 
     public ZoneId zone() {
         return timeZone == null || timeZone.isBlank() ? ZoneId.systemDefault() : ZoneId.of(timeZone.strip());
@@ -133,5 +135,8 @@ public record IntentFlowProperties(
     }
 
     public record Results(@DefaultValue("false") boolean visibleFieldsOnly) {
+    }
+
+    public record Paging(@Nullable String cursorKey) {
     }
 }

@@ -7,9 +7,12 @@ import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import org.jspecify.annotations.Nullable;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.DateTimeException;
@@ -20,55 +23,66 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-record PageCursor(String fingerprint, int offset, @Nullable List<Object> after) {
+record PageCursor(String question, String dsl, int offset, @Nullable List<Object> after, boolean signed) {
 
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
+    private static final String MAC = "HmacSHA256";
+    private static final int MAC_BYTES = 16;
 
-    static String fingerprint(String service, String dsl) {
+    static String question(String normalized) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest((service + "\n" + dsl).getBytes(StandardCharsets.UTF_8));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(normalized.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest, 0, 8);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    String encode() {
-        StringBuilder text = new StringBuilder(VERSION).append('|').append(fingerprint).append('|').append(offset);
+    String encode(byte[] key) {
+        StringBuilder text = new StringBuilder(VERSION).append('|').append(question).append('|').append(base64(dsl))
+                .append('|').append(offset);
         if (after != null) {
             text.append('|');
             for (int i = 0; i < after.size(); i++) {
                 text.append(i == 0 ? "" : ";").append(value(after.get(i)));
             }
         }
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(text.toString().getBytes(StandardCharsets.UTF_8));
+        String payload = base64(text.toString());
+        return payload + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(mac(key, payload));
     }
 
-    static PageCursor decode(String cursor) {
+    static PageCursor decode(String cursor, byte[] key) {
         try {
-            String[] parts = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8).split("\\|", -1);
-            if (parts.length < 3 || parts.length > 4 || !parts[0].equals(VERSION)) {
+            int dot = cursor.lastIndexOf('.');
+            if (dot < 0) {
                 throw invalid();
             }
-            int offset = Integer.parseInt(parts[2]);
+            String payload = cursor.substring(0, dot);
+            boolean signed = MessageDigest.isEqual(mac(key, payload),
+                    Base64.getUrlDecoder().decode(cursor.substring(dot + 1)));
+            String[] parts = text(payload).split("\\|", -1);
+            if (parts.length < 4 || parts.length > 5 || !parts[0].equals(VERSION)) {
+                throw invalid();
+            }
+            int offset = Integer.parseInt(parts[3]);
             if (offset < 0) {
                 throw invalid();
             }
             List<Object> after = null;
-            if (parts.length == 4) {
+            if (parts.length == 5) {
                 after = new ArrayList<>();
-                for (String value : parts[3].split(";", -1)) {
+                for (String value : parts[4].split(";", -1)) {
                     after.add(parse(value));
                 }
             }
-            return new PageCursor(parts[1], offset, after);
+            return new PageCursor(parts[1], text(parts[2]), offset, after, signed);
         } catch (IllegalArgumentException | DateTimeException e) {
             throw invalid();
         }
@@ -77,6 +91,24 @@ record PageCursor(String fingerprint, int offset, @Nullable List<Object> after) 
     static ValidationException invalid() {
         return new ValidationException(ErrorCode.INVALID_CURSOR, "The cursor does not belong to this question",
                 Map.of());
+    }
+
+    private static byte[] mac(byte[] key, String payload) {
+        try {
+            Mac mac = Mac.getInstance(MAC);
+            mac.init(new SecretKeySpec(key, MAC));
+            return Arrays.copyOf(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)), MAC_BYTES);
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static String base64(String text) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(text.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String text(String base64) {
+        return new String(Base64.getUrlDecoder().decode(base64), StandardCharsets.UTF_8);
     }
 
     static @Nullable List<Object> values(Object entity, List<SortKey> keys, ServiceDescriptor service) {
@@ -121,8 +153,7 @@ record PageCursor(String fingerprint, int offset, @Nullable List<Object> after) 
             case Instant i -> i.atOffset(ZoneOffset.UTC).toString();
             default -> value.toString();
         };
-        return tag(value) + ":" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(text.getBytes(StandardCharsets.UTF_8));
+        return tag(value) + ":" + base64(text);
     }
 
     private static Object parse(String value) {
@@ -130,7 +161,7 @@ record PageCursor(String fingerprint, int offset, @Nullable List<Object> after) 
         if (colon < 0) {
             throw invalid();
         }
-        String text = new String(Base64.getUrlDecoder().decode(value.substring(colon + 1)), StandardCharsets.UTF_8);
+        String text = text(value.substring(colon + 1));
         return switch (value.substring(0, colon)) {
             case "s" -> text;
             case "l" -> Long.parseLong(text);

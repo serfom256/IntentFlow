@@ -4,7 +4,7 @@ Connects IntentFlow to Sber's GigaChat. It exchanges the authorization key for a
 endpoint, renews the token before it expires, and sends chat requests through the `intentflow-openai` client.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-gigachat:0.4.3")
+implementation("io.github.serfom256:intentflow-gigachat:0.4.4")
 ```
 
 ```yaml

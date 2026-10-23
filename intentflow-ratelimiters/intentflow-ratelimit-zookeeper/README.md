@@ -5,7 +5,7 @@ Each caller has one znode named by the SHA-256 of the caller key, so principals 
 text. Instances update it with a versioned compare-and-set, so concurrent questions never exceed the limit.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-ratelimit-zookeeper:0.4.3")
+implementation("io.github.serfom256:intentflow-ratelimit-zookeeper:0.4.4")
 ```
 
 ```yaml

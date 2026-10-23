@@ -66,6 +66,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public final class DefaultParser implements Parser {
 
@@ -99,8 +100,13 @@ public final class DefaultParser implements Parser {
     @RequiredArgsConstructor
     private static final class ParseState {
 
+        private static final int MAX_DEPTH = 64;
+        private static final int MAX_OPERATORS = 200;
+
         private final List<Token> tokens;
         private int pos;
+        private int depth;
+        private int operators;
 
         AstQuery parseQuery() {
             if (peekKeyword(Keyword.UNSUPPORTED)) {
@@ -259,19 +265,21 @@ public final class DefaultParser implements Parser {
         }
 
         FilterExpr parseOrExpr() {
-            FilterExpr left = parseAndExpr();
-            while (peekKeyword(Keyword.OR)) {
-                advance();
-                FilterExpr right = parseAndExpr();
-                left = new Or(left, right);
-            }
-            return left;
+            return nested(() -> {
+                FilterExpr left = parseAndExpr();
+                while (peekKeyword(Keyword.OR)) {
+                    operator();
+                    FilterExpr right = parseAndExpr();
+                    left = new Or(left, right);
+                }
+                return left;
+            });
         }
 
         FilterExpr parseAndExpr() {
             FilterExpr left = parseNotExpr();
             while (peekKeyword(Keyword.AND)) {
-                advance();
+                operator();
                 FilterExpr right = parseNotExpr();
                 left = new And(left, right);
             }
@@ -279,11 +287,32 @@ public final class DefaultParser implements Parser {
         }
 
         FilterExpr parseNotExpr() {
-            if (peekKeyword(Keyword.NOT)) {
-                advance();
-                return new Not(parseNotExpr());
+            return nested(() -> {
+                if (peekKeyword(Keyword.NOT)) {
+                    operator();
+                    return new Not(parseNotExpr());
+                }
+                return parsePrimary();
+            });
+        }
+
+        private <T> T nested(Supplier<T> parse) {
+            if (depth >= MAX_DEPTH) {
+                throw error("the expression is nested too deeply", peek());
             }
-            return parsePrimary();
+            depth++;
+            try {
+                return parse.get();
+            } finally {
+                depth--;
+            }
+        }
+
+        private void operator() {
+            if (++operators > MAX_OPERATORS) {
+                throw error("the expression has more than " + MAX_OPERATORS + " operators", peek());
+            }
+            advance();
         }
 
         FilterExpr parsePrimary() {
@@ -342,36 +371,41 @@ public final class DefaultParser implements Parser {
         }
 
         ValueExpr parseValueExpr() {
-            ValueExpr left = parseTerm();
-            while (peekPunct(Punctuation.PLUS) || peekPunct(Punctuation.MINUS)) {
-                ArithOp op = peekPunct(Punctuation.PLUS) ? ArithOp.ADD : ArithOp.SUBTRACT;
-                advance();
-                left = new Arith(op, left, parseTerm());
-            }
-            return left;
+            return nested(() -> {
+                ValueExpr left = parseTerm();
+                while (peekPunct(Punctuation.PLUS) || peekPunct(Punctuation.MINUS)) {
+                    ArithOp op = peekPunct(Punctuation.PLUS) ? ArithOp.ADD : ArithOp.SUBTRACT;
+                    operator();
+                    left = new Arith(op, left, parseTerm());
+                }
+                return left;
+            });
         }
 
         ValueExpr parseTerm() {
             ValueExpr left = parseUnary();
             while (peekPunct(Punctuation.STAR) || peekPunct(Punctuation.SLASH)) {
                 ArithOp op = peekPunct(Punctuation.STAR) ? ArithOp.MULTIPLY : ArithOp.DIVIDE;
-                advance();
+                operator();
                 left = new Arith(op, left, parseUnary());
             }
             return left;
         }
 
         ValueExpr parseUnary() {
-            if (peekPunct(Punctuation.MINUS)) {
-                advance();
-                return new Arith(ArithOp.SUBTRACT, new LiteralExpr(new NumberLiteral(BigDecimal.ZERO)), parseUnary());
-            }
-            ValueExpr value = parseValuePrimary();
-            while (peekPunct(Punctuation.DOUBLE_COLON)) {
-                advance();
-                value = new CastExpr(value, parseCastType());
-            }
-            return value;
+            return nested(() -> {
+                if (peekPunct(Punctuation.MINUS)) {
+                    operator();
+                    return new Arith(ArithOp.SUBTRACT, new LiteralExpr(new NumberLiteral(BigDecimal.ZERO)),
+                            parseUnary());
+                }
+                ValueExpr value = parseValuePrimary();
+                while (peekPunct(Punctuation.DOUBLE_COLON)) {
+                    operator();
+                    value = new CastExpr(value, parseCastType());
+                }
+                return value;
+            });
         }
 
         ValueExpr parseValuePrimary() {

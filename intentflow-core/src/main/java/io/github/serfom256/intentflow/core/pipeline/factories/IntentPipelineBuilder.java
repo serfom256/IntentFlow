@@ -21,9 +21,12 @@ import io.github.serfom256.intentflow.core.pipeline.impl.DefaultIntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.impl.VisibleEntities;
 import org.jspecify.annotations.Nullable;
 
+import java.security.SecureRandom;
 import java.util.function.Supplier;
 
 public final class IntentPipelineBuilder {
+
+    public static final int DEFAULT_MAX_QUESTION_LENGTH = 2000;
 
     private @Nullable LlmClient llm;
     private @Nullable SqlBuilder sqlBuilder;
@@ -35,6 +38,7 @@ public final class IntentPipelineBuilder {
     private AstValidator validator = AstValidators.create();
     private UriBuilder uriBuilder = UriBuilders.create();
     private int maxRepairs = 1;
+    private int maxQuestionLength = DEFAULT_MAX_QUESTION_LENGTH;
     private AccessPolicy accessPolicy = AccessPolicy.ALLOW_ALL;
     private Supplier<IntentContext> defaultCaller = IntentContexts::anonymous;
     private PipelineListener listener = PipelineListener.NONE;
@@ -43,6 +47,7 @@ public final class IntentPipelineBuilder {
     private AuditLog audit = AuditLog.NONE;
     private boolean logValues;
     private boolean visibleFieldsOnly;
+    private byte[] cursorKey = randomKey();
 
     IntentPipelineBuilder() {
     }
@@ -89,6 +94,22 @@ public final class IntentPipelineBuilder {
 
     public IntentPipelineBuilder uriBuilder(UriBuilder uriBuilder) {
         this.uriBuilder = uriBuilder;
+        return this;
+    }
+
+    public IntentPipelineBuilder cursorKey(byte[] cursorKey) {
+        if (cursorKey.length < 32) {
+            throw new IllegalArgumentException("cursorKey must have at least 32 bytes, got " + cursorKey.length);
+        }
+        this.cursorKey = cursorKey.clone();
+        return this;
+    }
+
+    public IntentPipelineBuilder maxQuestionLength(int maxQuestionLength) {
+        if (maxQuestionLength < 1) {
+            throw new IllegalArgumentException("maxQuestionLength must be positive: " + maxQuestionLength);
+        }
+        this.maxQuestionLength = maxQuestionLength;
         return this;
     }
 
@@ -149,8 +170,15 @@ public final class IntentPipelineBuilder {
             VisibleEntities.check(services);
         }
         return new DefaultIntentPipeline(normalizer, cache != null ? cache : DslCaches.create(), client, parser,
-                validator, sql, queries, uriBuilder, services, maxRepairs, accessPolicy, defaultCaller, listener,
-                tracer, rateLimiter, audit, logValues, visibleFieldsOnly);
+                validator, sql, queries, uriBuilder, services, maxRepairs, maxQuestionLength, accessPolicy,
+                defaultCaller, listener,
+                tracer, rateLimiter, audit, logValues, visibleFieldsOnly, cursorKey.clone());
+    }
+
+    private static byte[] randomKey() {
+        byte[] key = new byte[32];
+        new SecureRandom().nextBytes(key);
+        return key;
     }
 
     private static <T> T require(@Nullable T value, String name) {

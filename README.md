@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.3")
-    implementation("io.github.serfom256:intentflow-jdbc:0.4.3")
-    implementation("io.github.serfom256:intentflow-postgresql:0.4.3")
-    implementation("io.github.serfom256:intentflow-openai:0.4.3")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.4")
+    implementation("io.github.serfom256:intentflow-jdbc:0.4.4")
+    implementation("io.github.serfom256:intentflow-postgresql:0.4.4")
+    implementation("io.github.serfom256:intentflow-openai:0.4.4")
 }
 ```
 
@@ -383,8 +383,8 @@ session-dependent conditions through `QueryExecutor.restrictions`.
 
 ## Access control
 
-An `AccessPolicy` bean decides, per caller, which services and fields the LLM sees and which rows every query
-returns. The caller comes from Spring Security, an `IntentContextProvider` bean, or `IntentRequests.of(text, context)`.
+An `AccessPolicy` bean decides per caller which services and fields the LLM sees and which rows a query returns
+([security model](docs/security.md)); the caller is from Spring Security, an `IntentContextProvider` or the request.
 
 ```java
 @Bean
@@ -401,9 +401,11 @@ AccessPolicy accessPolicy() {
 
 ## Operations
 
+Timeouts, threads, sizing, the cache and running several instances: see the [operations guide](docs/operations.md).
+
 | Meter                   | Type        | Tags                                                                          |
 | ----------------------- | ----------- | ----------------------------------------------------------------------------- |
-| `intentflow.requests`   | timer       | `service`, `outcome` (`answered`, `declined`, `rejected`, `denied`, `failed`) |
+| `intentflow.requests`   | timer       | `service`, `outcome` (`answered`, `declined`, `rejected`, `denied`, `limited`, `failed`) |
 | `intentflow.llm`        | timer       | `kind` (`generate`, `repair`), `outcome`                                      |
 | `intentflow.llm.tokens` | counter     | `model`, `kind`, `type` (`prompt`, `completion`); also in `trace().tokens()`  |
 | `intentflow.cache`      | counter     | `result` (`hit`, `miss`)                                                      |
@@ -448,8 +450,7 @@ generated SQL shows up as a readable diff.
 
 ## Releasing
 
-The version lives only in `gradle.properties`. After changing it, `./gradlew syncVersion` writes it into the READMEs
-and the UI packages; `./gradlew build` fails while they are out of date.
+The version lives in `gradle.properties`; `./gradlew syncVersion` copies it to the READMEs and UI packages (or `build` fails).
 
 ## Configuration
 
@@ -474,13 +475,12 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.rate-limit.questions, .period, .per, .store | 0, 1m, principal, memory | New questions (cache misses) a `principal` or `tenant` may ask per period; 0 for no limit. `store: zookeeper` shares the limit across instances; see [intentflow-ratelimiters](intentflow-ratelimiters/README.md). An `LlmRateLimiter` bean replaces it |
 | intentflow.llm.rate-limit.zookeeper.connect, .path, .fail-open | -, /intentflow/rate-limit, true | ZooKeeper to keep the buckets in (or a `CuratorFramework` bean); `fail-open: false` refuses questions while it is unreachable |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
-| intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
-| intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
+| intentflow.cache.ttl, .max-size       | 10m, 10000                  | How long a translation is cached, and how many      |
+| intentflow.paging.cursor-key          | random per instance         | Secret of at least 32 bytes that signs page cursors; the same on every instance, so next pages skip the LLM anywhere |
 | intentflow.catalog.packages           | your application's packages | Where `@IntentService` classes are scanned          |
 | intentflow.executor                   | first available             | `openmapper`, `jpa`, `jimmer`, `spring-data-jdbc`, `cassandra` or `jdbc` |
 | intentflow.dialect                    | detected                    | `postgresql`, `mysql` or `h2`                       |
-| intentflow.max-skip                   | 10000                       | Largest `skip` a query may use                      |
-| intentflow.max-in-values              | 1000                        | Most values in one `in (...)`                       |
+| intentflow.max-skip, .max-in-values, .max-question-length | 10000, 1000, 2000 | Largest `skip` (also for page cursors), most values in one `in (...)`, longest question in characters |
 | intentflow.time-zone                  | the JVM's zone              | Zone for dates without an offset, e.g. `Europe/Berlin` |
 | intentflow.schema.introspect          | true                        | Read keys and NOT NULL columns from the database    |
 | intentflow.sql.disabled-optimizations | empty                       | Optimizations to switch off                         |

@@ -26,6 +26,7 @@ import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.AuditLogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
+import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelineBuilder;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.LlmClients;
 import io.github.serfom256.intentflow.core.pipeline.factories.LlmRateLimiters;
@@ -49,6 +50,7 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
 import javax.sql.DataSource;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -267,7 +269,7 @@ public class IntentFlowAutoConfiguration {
         }
         IntentContextProvider caller = callers.getIfAvailable(() -> IntentContexts::anonymous);
         List<PipelineListener> observers = listeners.orderedStream().toList();
-        return SpringIntentPipeline.of(IntentPipelines.builder()
+        IntentPipelineBuilder builder = IntentPipelines.builder()
                 .llm(llm)
                 .sqlBuilder(sqlBuilder)
                 .executor(queryExecutor)
@@ -278,6 +280,7 @@ public class IntentFlowAutoConfiguration {
                 .validator(validator)
                 .uriBuilder(uriBuilder)
                 .maxRepairs(properties.llm().maxRepairs())
+                .maxQuestionLength(properties.maxQuestionLength())
                 .accessPolicy(policy.getIfAvailable(() -> AccessPolicy.ALLOW_ALL))
                 .defaultCaller(caller::current)
                 .listener(new CompositeListener(observers))
@@ -285,8 +288,12 @@ public class IntentFlowAutoConfiguration {
                 .rateLimiter(rateLimiter)
                 .audit(audit)
                 .logValues(properties.logging().values())
-                .visibleFieldsOnly(properties.results().visibleFieldsOnly())
-                .build());
+                .visibleFieldsOnly(properties.results().visibleFieldsOnly());
+        String cursorKey = properties.paging().cursorKey();
+        if (StringUtils.hasText(cursorKey)) {
+            builder.cursorKey(cursorKey.getBytes(StandardCharsets.UTF_8));
+        }
+        return SpringIntentPipeline.of(builder.build());
     }
 
 }
