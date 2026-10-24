@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.5.0")
-    implementation("io.github.serfom256:intentflow-jdbc:0.5.0")
-    implementation("io.github.serfom256:intentflow-postgresql:0.5.0")
-    implementation("io.github.serfom256:intentflow-openai:0.5.0")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.5.2")
+    implementation("io.github.serfom256:intentflow-jdbc:0.5.2")
+    implementation("io.github.serfom256:intentflow-postgresql:0.5.2")
+    implementation("io.github.serfom256:intentflow-openai:0.5.2")
 }
 ```
 
@@ -480,7 +480,9 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.concurrency.max-calls, .max-wait | 0, 10s           | Most LLM calls in flight (0 for no limit) and how long a call waits for a slot |
 | intentflow.llm.circuit-breaker.failure-threshold, .open-for | 5, 30s | Failed calls in a row that open the circuit (0 turns it off) and how long it stays open. A Resilience4j `CircuitBreakerRegistry` bean supplies the `intentflow-llm` and `intentflow-llm-fallback` breakers instead |
 | intentflow.llm.fallback.model, .base-url, .api-key | none, primary's | Model to ask when the primary fails, and its endpoint and key |
-| intentflow.llm.rate-limit.questions, .period, .per, .store | 0, 1m, principal, memory | New questions (cache misses) a `principal` or `tenant` may ask per period; 0 for no limit. `store: zookeeper` shares the limit across instances; see [intentflow-ratelimiters](intentflow-ratelimiters/README.md). An `LlmRateLimiter` bean replaces it |
+| intentflow.llm.rate-limit.questions, .period, .per, .store | 0, 1m, principal, memory | New questions (cache misses) a `principal` or `tenant` may ask per period; 0 for no limit. `store: redis`, `jdbc` or `zookeeper` shares the limit across instances; see [intentflow-ratelimiters](intentflow-ratelimiters/README.md). An `LlmRateLimiter` bean replaces it |
+| intentflow.llm.rate-limit.redis.prefix, .fail-open | intentflow:rate-limit:, true | Key prefix of the buckets in Redis or Valkey (the `spring.data.redis.*` connection); `fail-open: false` refuses questions while it is unreachable |
+| intentflow.llm.rate-limit.jdbc.table, .create-table, .fail-open | intentflow_rate_limit, true, true | Table of the buckets in the application's database; with Liquibase include `db/intentflow/intentflow-ratelimit.changelog.yaml` and set `create-table: false` |
 | intentflow.llm.rate-limit.zookeeper.connect, .path, .fail-open | -, /intentflow/rate-limit, true | ZooKeeper to keep the buckets in (or a `CuratorFramework` bean); `fail-open: false` refuses questions while it is unreachable |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |

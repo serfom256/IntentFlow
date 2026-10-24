@@ -4,7 +4,7 @@ Connects IntentFlow to any API that speaks OpenAI's Chat Completions format. It 
 no other dependency.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-openai:0.5.0")
+implementation("io.github.serfom256:intentflow-openai:0.5.2")
 ```
 
 ```yaml

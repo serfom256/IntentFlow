@@ -84,6 +84,7 @@ import java.util.function.Function;
         Resilience4jLlmClient.Wiring.class, OpenAiProviders.OpenAi.class, OpenAiProviders.AzureOpenAi.class,
         OpenAiProviders.GigaChat.class, AnthropicProvider.class, VertexProvider.class, BedrockProvider.class,
         ReactivePipelineConfiguration.class, ZooKeeperRateLimitConfiguration.class,
+        RedisRateLimitConfiguration.class, JdbcRateLimitConfiguration.class,
         TransactionalQueryExecutor.Wiring.class })
 public class IntentFlowAutoConfiguration {
 
@@ -176,11 +177,8 @@ public class IntentFlowAutoConfiguration {
     @ConditionalOnMissingBean
     LlmRateLimiter intentFlowLlmRateLimiter(IntentFlowProperties properties) {
         IntentFlowProperties.Llm.RateLimit limit = properties.llm().rateLimit();
-        if (limit.store() != IntentFlowProperties.Llm.RateLimit.Store.MEMORY) {
-            String module = switch (limit.store()) {
-                case ZOOKEEPER -> "intentflow-ratelimit-zookeeper";
-                case MEMORY -> throw new IllegalStateException();
-            };
+        String module = limit.store().module();
+        if (module != null) {
             throw new IllegalStateException("intentflow.llm.rate-limit.store="
                     + limit.store().name().toLowerCase(Locale.ROOT) + " needs io.github.serfom256:" + module
                     + " on the classpath; without it each instance would count on its own");

@@ -1,7 +1,6 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
 import io.github.serfom256.intentflow.core.pipeline.LlmRateLimiter;
-import io.github.serfom256.intentflow.core.pipeline.factories.LlmRateLimiters;
 import io.github.serfom256.intentflow.ratelimit.zookeeper.ZooKeeperRateLimiter;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -41,8 +40,6 @@ class ZooKeeperRateLimitConfiguration {
             return LlmRateLimiter.NONE;
         }
         return new ZooKeeperRateLimiter(client, limit.zookeeper().path(), limit.questions(), limit.period(),
-                limit.per() == IntentFlowProperties.Llm.RateLimit.Per.TENANT ? LlmRateLimiters.byTenant()
-                        : LlmRateLimiters.byPrincipal(),
-                limit.zookeeper().failOpen(), Clock.systemUTC());
+                limit.key(), limit.zookeeper().failOpen(), Clock.systemUTC());
     }
 }

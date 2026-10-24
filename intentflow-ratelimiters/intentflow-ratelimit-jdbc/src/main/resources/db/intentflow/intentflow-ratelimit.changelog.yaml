@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - property:
+      name: intentflow.rate-limit.table
+      value: intentflow_rate_limit
+  - changeSet:
+      id: intentflow-ratelimit-1-bucket
+      author: intentflow
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: ${intentflow.rate-limit.table}
+      changes:
+        - createTable:
+            tableName: ${intentflow.rate-limit.table}
+            columns:
+              - column: { name: bucket, type: VARCHAR(64), constraints: { primaryKey: true, nullable: false } }
+              - column: { name: tokens, type: DOUBLE PRECISION, constraints: { nullable: false } }
+              - column: { name: refilled_at, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: revision, type: BIGINT, constraints: { nullable: false } }

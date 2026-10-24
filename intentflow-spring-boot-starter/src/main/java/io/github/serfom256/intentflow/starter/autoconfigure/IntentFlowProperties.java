@@ -1,5 +1,7 @@
 package io.github.serfom256.intentflow.starter.autoconfigure;
 
+import io.github.serfom256.intentflow.core.api.IntentContext;
+import io.github.serfom256.intentflow.core.pipeline.factories.LlmRateLimiters;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -10,6 +12,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 @ConfigurationProperties("intentflow")
 public record IntentFlowProperties(
@@ -91,19 +94,45 @@ public record IntentFlowProperties(
                 @DefaultValue("1m") Duration period,
                 @DefaultValue("principal") Per per,
                 @DefaultValue("memory") Store store,
-                @DefaultValue ZooKeeper zookeeper) {
+                @DefaultValue ZooKeeper zookeeper,
+                @DefaultValue Redis redis,
+                @DefaultValue Jdbc jdbc) {
 
             public enum Per {
                 PRINCIPAL, TENANT
             }
 
             public enum Store {
-                MEMORY, ZOOKEEPER
+                MEMORY(null), ZOOKEEPER("intentflow-ratelimit-zookeeper"), REDIS("intentflow-ratelimit-redis"),
+                JDBC("intentflow-ratelimit-jdbc");
+
+                private final @Nullable String module;
+
+                Store(@Nullable String module) {
+                    this.module = module;
+                }
+
+                public @Nullable String module() {
+                    return module;
+                }
             }
 
             public record ZooKeeper(@Nullable String connect,
                     @DefaultValue("/intentflow/rate-limit") String path,
                     @DefaultValue("true") boolean failOpen) {
+            }
+
+            public record Redis(@DefaultValue("intentflow:rate-limit:") String prefix,
+                    @DefaultValue("true") boolean failOpen) {
+            }
+
+            public record Jdbc(@DefaultValue("intentflow_rate_limit") String table,
+                    @DefaultValue("true") boolean createTable,
+                    @DefaultValue("true") boolean failOpen) {
+            }
+
+            Function<IntentContext, String> key() {
+                return per == Per.TENANT ? LlmRateLimiters.byTenant() : LlmRateLimiters.byPrincipal();
             }
         }
     }

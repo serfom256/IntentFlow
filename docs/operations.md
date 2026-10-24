@@ -69,7 +69,7 @@ questions points to a short `ttl` or a full cache.
 | Concern            | Behaviour                                                                        |
 | ------------------ | -------------------------------------------------------------------------------- |
 | DSL cache          | Per instance. Each instance pays the first translation of a question once        |
-| Rate limits        | Per instance with the default store, so N instances allow N times the limit. Use a shared store (`intentflow.llm.rate-limit.store`, see [intentflow-ratelimiters](../intentflow-ratelimiters/README.md)) |
+| Rate limits        | Per instance with the default store, so N instances allow N times the limit. Use a shared store, Redis, JDBC or ZooKeeper (`intentflow.llm.rate-limit.store`, see [intentflow-ratelimiters](../intentflow-ratelimiters/README.md)) |
 | Concurrency limit  | Per instance; divide the provider's limit by the number of instances             |
 | Circuit breaker    | Per instance; each opens on its own failures                                     |
 | Admin overrides    | Stored in the `intentflow_catalog_override` table; every instance re-reads it every `intentflow.admin.refresh-interval` (30s), so a change reaches all instances within that time |

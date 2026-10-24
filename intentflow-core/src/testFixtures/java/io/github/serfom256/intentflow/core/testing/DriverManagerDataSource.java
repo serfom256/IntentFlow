@@ -8,11 +8,11 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.logging.Logger;
 
-final class DriverManagerDataSource implements DataSource {
+public final class DriverManagerDataSource implements DataSource {
 
     private final TestDatabase.Endpoint endpoint;
 
-    DriverManagerDataSource(TestDatabase.Endpoint endpoint) {
+    public DriverManagerDataSource(TestDatabase.Endpoint endpoint) {
         this.endpoint = endpoint;
     }
 

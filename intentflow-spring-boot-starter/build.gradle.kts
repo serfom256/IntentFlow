@@ -33,6 +33,13 @@ dependencies {
     compileOnly(projects.intentflowOpenmapper)
     compileOnly(projects.intentflowReactive)
     compileOnly(projects.intentflowRatelimitZookeeper)
+    compileOnly(projects.intentflowRatelimitRedis)
+    compileOnly(projects.intentflowRatelimitJdbc)
+    compileOnly(libs.spring.data.redis)
+    compileOnly(libs.spring.boot.sql) {
+        version { strictly(libs.versions.springBoot.get()) }
+        isTransitive = false
+    }
     compileOnly(libs.reactor.core)
     compileOnly(projects.intentflowOpenai)
     compileOnly(projects.intentflowAzureOpenai)
@@ -49,6 +56,11 @@ dependencies {
     testImplementation(projects.intentflowOpenmapper)
     testImplementation(projects.intentflowReactive)
     testImplementation(projects.intentflowRatelimitZookeeper)
+    testImplementation(projects.intentflowRatelimitRedis)
+    testImplementation(projects.intentflowRatelimitJdbc)
+    testImplementation(libs.spring.data.redis)
+    testImplementation(libs.lettuce)
+    testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.curator.test)
     testImplementation(libs.reactor.core)
     testImplementation(projects.intentflowOpenai)

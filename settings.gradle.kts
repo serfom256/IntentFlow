@@ -50,6 +50,8 @@ providers.forEach {
 
 val rateLimiters = listOf(
     "intentflow-ratelimit-zookeeper",
+    "intentflow-ratelimit-redis",
+    "intentflow-ratelimit-jdbc",
 )
 rateLimiters.forEach {
     include(it)
