@@ -2,6 +2,7 @@ package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Function;
@@ -42,6 +43,14 @@ public interface SqlBuilder {
     default BoundQuery buildAfter(ValidatedQuery query, ResultShape shape,
             Function<Class<?>, List<RuntimeRestriction>> restrictions, List<Object> after) {
         throw new UnsupportedOperationException(getClass().getSimpleName() + " does not support keyset paging");
+    }
+
+    /**
+     * A value read from a row of an aggregate query, in a standard JDBC type; see
+     * {@code SqlDialect.read}.
+     */
+    default @Nullable Object read(@Nullable Object value) {
+        return value;
     }
 
     /**

@@ -25,7 +25,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslCaches;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -108,7 +108,7 @@ class IntentPipelineTest {
     private IntentPipeline pipeline(LlmClient llm) {
         return IntentPipelines.builder()
                 .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(executor)
                 .catalog(CATALOG)
                 .cache(DslCaches.create(Duration.ofMinutes(5), 100))
@@ -244,7 +244,7 @@ class IntentPipelineTest {
         };
         IntentPipeline pipe = IntentPipelines.builder()
                 .llm((text, catalog) -> DslSources.of("books"))
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(broken)
                 .catalog(CATALOG)
                 .build();

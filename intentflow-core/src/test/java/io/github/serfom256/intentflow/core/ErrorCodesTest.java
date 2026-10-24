@@ -11,7 +11,7 @@ import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.RateLimitExceededException;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -31,7 +31,7 @@ class ErrorCodesTest {
     private static IntentPipeline answering(String dsl) {
         return IntentPipelines.builder()
                 .llm((text, catalog) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {

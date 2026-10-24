@@ -15,7 +15,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelineBuilder;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -82,7 +82,7 @@ class VisibleFieldsTest {
     private static IntentPipelineBuilder pipeline(ServiceCatalog catalog, String dsl, List<?> rows) {
         return IntentPipelines.builder()
                 .llm((text, scope) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(new QueryExecutor() {
                     @Override
                     @SuppressWarnings("unchecked")

@@ -8,7 +8,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -26,7 +26,7 @@ class RelatedRowsTest {
     private static final ServiceDescriptor ORDERS = ServiceDescriptors.fromAnnotated(Order.class);
 
     private static List<BoundQuery> related(List<Long> keys, SchemaFacts facts) {
-        return SqlBuilders.create(new PostgresDialect(), facts).buildRelated(ORDERS, "customer_id", keys,
+        return SqlBuilders.create(new TestDialect(), facts).buildRelated(ORDERS, "customer_id", keys,
                 type -> List.of());
     }
 

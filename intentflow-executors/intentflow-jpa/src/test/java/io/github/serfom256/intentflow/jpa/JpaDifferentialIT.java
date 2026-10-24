@@ -6,6 +6,8 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.testing.ExecutorDifferentialTest;
 import io.github.serfom256.intentflow.core.testing.GadgetKind;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManagerFactory;
@@ -54,6 +56,11 @@ class JpaDifferentialIT extends ExecutorDifferentialTest {
     @Override
     protected List<NameResolver> nameResolvers() {
         return List.of(new JpaNameResolver());
+    }
+
+    @Override
+    protected TestDatabase database() {
+        return PostgresDatabase.POSTGRES;
     }
 
     @Override

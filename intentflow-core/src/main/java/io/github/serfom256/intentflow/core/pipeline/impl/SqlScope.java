@@ -115,6 +115,10 @@ final class SqlScope {
         return facts.isZoned(field(name).column().value());
     }
 
+    boolean integer(LogicalFieldName name) {
+        return facts.isInteger(field(name).column().value());
+    }
+
     boolean notNull(LogicalFieldName name) {
         return facts.isNotNull(field(name).column().value());
     }
@@ -128,7 +132,7 @@ final class SqlScope {
     }
 
     boolean unique(Collection<String> columns) {
-        return facts.isUnique(columns);
+        return context.capabilities().enforcedKeys() && facts.isUnique(columns);
     }
 
     String table() {
@@ -189,7 +193,8 @@ final class SqlScope {
         TableFacts targetFacts = context.facts(target.table().value());
         String toColumn = target.fields().stream().filter(f -> f.logical().equals(relation.to())).findFirst()
                 .map(f -> f.column().value()).orElse(relation.to().value());
-        return isOuter() && !restricted(service) && !restricted(target) && targetFacts.isUnique(toColumn);
+        return isOuter() && !restricted(service) && !restricted(target) && context.capabilities().enforcedKeys()
+                && targetFacts.isUnique(toColumn);
     }
 
     SqlScope join(String relationName) {

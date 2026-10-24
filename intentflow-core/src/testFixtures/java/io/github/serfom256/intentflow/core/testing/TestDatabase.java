@@ -30,4 +30,13 @@ public interface TestDatabase {
      * and {@code created_at} timestamp without time zone.
      */
     String createGadgetTable();
+
+    /**
+     * A {@code CREATE TABLE} written with the types PostgreSQL, MySQL and H2
+     * share, such as {@code BIGINT}, in this database's types. The default
+     * returns it unchanged.
+     */
+    default String ddl(String createTable) {
+        return createTable;
+    }
 }

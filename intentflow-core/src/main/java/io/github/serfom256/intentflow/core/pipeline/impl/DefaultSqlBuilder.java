@@ -11,6 +11,7 @@ import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.sql.Optimization;
 import io.github.serfom256.intentflow.core.sql.plan.Select;
 import io.github.serfom256.intentflow.core.sql.render.SqlRenderer;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -62,6 +63,11 @@ public final class DefaultSqlBuilder implements SqlBuilder {
         PlanContext context = new PlanContext(facts, optimizations, shape, dialect, zone, restrictions);
         Select select = QueryPlanner.plan(query, context);
         return renderer.render(select, context.applied());
+    }
+
+    @Override
+    public @Nullable Object read(@Nullable Object value) {
+        return dialect.read(value);
     }
 
     @Override

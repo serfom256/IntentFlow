@@ -15,8 +15,10 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
-import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.RelationTables;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.mysql.MySqlDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import io.github.serfom256.intentflow.openmapper.OpenMapperNameResolver;
 import io.github.serfom256.intentflow.openmapper.OpenMapperQueryExecutor;
 import io.github.serfom256.procedures.Procedures;
@@ -24,7 +26,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -33,7 +35,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +45,10 @@ import static org.assertj.core.api.Assertions.tuple;
 @Testcontainers(disabledWithoutDocker = true)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OpenMapperRelationsIT {
+
+    static List<TestDatabase> databases() {
+        return List.of(PostgresDatabase.POSTGRES, MySqlDatabase.MYSQL);
+    }
 
     @Model(primaryKey = "id")
     @IntentService(value = "customers", table = "rel_customer", uri = "/customers/{{id}}", defaultSort = "id")
@@ -90,12 +96,11 @@ class OpenMapperRelationsIT {
             ServiceDescriptors.fromAnnotated(Customer.class, List.of(new OpenMapperNameResolver())),
             ServiceDescriptors.fromAnnotated(Order.class, List.of(new OpenMapperNameResolver())));
 
-    private final Map<DifferentialDatabase, ConfigurableApplicationContext> contexts = new EnumMap<>(
-            DifferentialDatabase.class);
+    private final Map<TestDatabase, ConfigurableApplicationContext> contexts = new HashMap<>();
 
-    private OpenMapperQueryExecutor executor(DifferentialDatabase db) {
+    private OpenMapperQueryExecutor executor(TestDatabase db) {
         ConfigurableApplicationContext context = contexts.computeIfAbsent(db, d -> {
-            DifferentialDatabase.Endpoint e = RelationTables.prepare(d);
+            TestDatabase.Endpoint e = RelationTables.prepare(d);
             return new SpringApplicationBuilder(App.class)
                     .web(WebApplicationType.NONE)
                     .properties("spring.datasource.url=" + e.url(), "spring.datasource.username=" + e.user(),
@@ -112,10 +117,10 @@ class OpenMapperRelationsIT {
     }
 
     private <T> List<T> resolve(String dsl, Class<T> type) {
-        return resolve(DifferentialDatabase.POSTGRES, SchemaFacts.none(), dsl, type);
+        return resolve(PostgresDatabase.POSTGRES, SchemaFacts.none(), dsl, type);
     }
 
-    private <T> List<T> resolve(DifferentialDatabase db, SchemaFacts facts, String dsl, Class<T> type) {
+    private <T> List<T> resolve(TestDatabase db, SchemaFacts facts, String dsl, Class<T> type) {
         return IntentPipelines.builder()
                 .llm((t, c) -> DslSources.of(dsl))
                 .sqlBuilder(SqlBuilders.create(db.dialect(), facts))
@@ -129,8 +134,8 @@ class OpenMapperRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void joinedCollectionsAreLoadedWithOneQueryPerAssociation(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void joinedCollectionsAreLoadedWithOneQueryPerAssociation(TestDatabase db) {
         List<Customer> customers = resolve(db, SchemaFacts.none(), "customers", Customer.class);
 
         assertThat(customers).extracting(c -> c.id, OpenMapperRelationsIT::orderIds).containsExactly(
@@ -140,16 +145,16 @@ class OpenMapperRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void joinedSingleValuesAreLoaded(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void joinedSingleValuesAreLoaded(TestDatabase db) {
         assertThat(resolve(db, SchemaFacts.none(), "orders | filter status == \"paid\"", Order.class))
                 .extracting(o -> o.id, o -> o.customer.name)
                 .containsExactly(tuple(11L, "Ann"), tuple(12L, "Bob"), tuple(14L, "Cid"));
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void loadedChildrenRespectTheTargetsRestriction(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void loadedChildrenRespectTheTargetsRestriction(TestDatabase db) {
         SchemaFacts facts = SchemaFacts.of(Map.of(), Map.of(ServiceNames.of("orders"), "status <> 'CANCELLED'"));
 
         assertThat(resolve(db, facts, "customers | filter id == 3", Customer.class))

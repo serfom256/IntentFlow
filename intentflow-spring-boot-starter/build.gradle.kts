@@ -60,6 +60,8 @@ dependencies {
     testImplementation(projects.intentflowSpringDataCassandra)
     testImplementation(projects.intentflowPostgresql)
     testImplementation(projects.intentflowMysql)
+    testImplementation(projects.intentflowOracle)
+    testImplementation(projects.intentflowClickhouse)
     testImplementation(projects.intentflowH2)
     testImplementation(libs.spring.boot.starter.jdbc)
     testImplementation(libs.spring.boot.starter.data.jdbc)
@@ -79,6 +81,7 @@ dependencies {
     testRuntimeOnly(libs.jackson3.databind)
     testImplementation(libs.h2)
     testRuntimeOnly(libs.mysql)
+    testRuntimeOnly(libs.oracle)
 }
 
 tasks.test {

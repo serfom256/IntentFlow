@@ -9,10 +9,17 @@ import java.util.Map;
 import java.util.Set;
 
 public record TableFacts(List<String> primaryKey, List<List<String>> uniqueKeys, Set<String> notNull,
-        Map<String, List<String>> exactValues, Set<String> zonedTimestamps, Map<String, List<String>> ordinalValues) {
+        Map<String, List<String>> exactValues, Set<String> zonedTimestamps, Map<String, List<String>> ordinalValues,
+        Set<String> integers) {
 
     public static final TableFacts UNKNOWN = new TableFacts(List.of(), List.of(), Set.of(), Map.of(), Set.of(),
-            Map.of());
+            Map.of(), Set.of());
+
+    public TableFacts(List<String> primaryKey, List<List<String>> uniqueKeys, Set<String> notNull,
+            Map<String, List<String>> exactValues, Set<String> zonedTimestamps,
+            Map<String, List<String>> ordinalValues) {
+        this(primaryKey, uniqueKeys, notNull, exactValues, zonedTimestamps, ordinalValues, Set.of());
+    }
 
     public TableFacts(List<String> primaryKey, List<List<String>> uniqueKeys, Set<String> notNull,
             Map<String, List<String>> exactValues) {
@@ -31,6 +38,7 @@ public record TableFacts(List<String> primaryKey, List<List<String>> uniqueKeys,
         exactValues = Map.copyOf(exactValues);
         zonedTimestamps = Set.copyOf(zonedTimestamps);
         ordinalValues = Map.copyOf(ordinalValues);
+        integers = Set.copyOf(integers);
     }
 
     public static TableFacts primaryKey(List<String> columns) {
@@ -43,6 +51,10 @@ public record TableFacts(List<String> primaryKey, List<List<String>> uniqueKeys,
 
     public boolean isZoned(String column) {
         return contains(zonedTimestamps, column);
+    }
+
+    public boolean isInteger(String column) {
+        return contains(integers, column);
     }
 
     public boolean isUnique(String column) {
@@ -71,8 +83,10 @@ public record TableFacts(List<String> primaryKey, List<List<String>> uniqueKeys,
         other.notNull.stream().filter(c -> !contains(columns, c)).forEach(columns::add);
         Set<String> zoned = new LinkedHashSet<>(zonedTimestamps);
         other.zonedTimestamps.stream().filter(c -> !contains(zoned, c)).forEach(zoned::add);
+        Set<String> whole = new LinkedHashSet<>(integers);
+        other.integers.stream().filter(c -> !contains(whole, c)).forEach(whole::add);
         return new TableFacts(primaryKey.isEmpty() ? other.primaryKey : primaryKey, keys, columns,
-                merge(exactValues, other.exactValues), zoned, merge(ordinalValues, other.ordinalValues));
+                merge(exactValues, other.exactValues), zoned, merge(ordinalValues, other.ordinalValues), whole);
     }
 
     private static Map<String, List<String>> merge(Map<String, List<String>> own, Map<String, List<String>> other) {

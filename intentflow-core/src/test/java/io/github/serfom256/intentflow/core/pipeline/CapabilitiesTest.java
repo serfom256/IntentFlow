@@ -14,7 +14,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -33,7 +33,7 @@ class CapabilitiesTest {
 
     private static final class LimitedDialect implements SqlDialect {
 
-        private final PostgresDialect delegate = new PostgresDialect();
+        private final TestDialect delegate = new TestDialect();
 
         @Override
         public String name() {
@@ -42,7 +42,7 @@ class CapabilitiesTest {
 
         @Override
         public SqlCapabilities capabilities() {
-            return new SqlCapabilities(false, false, 3, 5);
+            return new SqlCapabilities(false, false, true, true, true, 3, 5);
         }
 
         @Override

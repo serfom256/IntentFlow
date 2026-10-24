@@ -9,7 +9,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelineBuilder;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -26,7 +26,7 @@ class IntentPipelineBuilderTest {
     private static IntentPipelineBuilder complete() {
         return IntentPipelines.builder()
                 .llm((text, catalog) -> DslSources.of("books"))
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
@@ -49,7 +49,7 @@ class IntentPipelineBuilderTest {
         assertThatThrownBy(() -> IntentPipelines.builder().build()).isInstanceOf(IllegalStateException.class)
                 .hasMessage("IntentPipeline requires llm(...) before build()");
         assertThatThrownBy(() -> IntentPipelines.builder().llm((text, catalog) -> DslSources.of("books"))
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect())).build())
+                .sqlBuilder(SqlBuilders.create(new TestDialect())).build())
                 .hasMessage("IntentPipeline requires executor(...) before build()");
     }
 

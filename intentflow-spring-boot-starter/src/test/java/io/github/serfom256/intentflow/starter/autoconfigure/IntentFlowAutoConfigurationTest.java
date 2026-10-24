@@ -278,6 +278,10 @@ class IntentFlowAutoConfigurationTest {
         runner.withPropertyValues("spring.datasource.url=jdbc:mariadb://localhost:3306/shop",
                 "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver")
                 .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("mysql"));
+        runner.withPropertyValues("spring.datasource.url=jdbc:oracle:thin:@//localhost:1521/FREEPDB1")
+                .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("oracle"));
+        assertThat(SqlDialectConfigurations.Jdbc.dialectOf("jdbc:clickhouse://localhost:8123/default",
+                getClass().getClassLoader()).name()).isEqualTo("clickhouse");
     }
 
     @Test
@@ -298,10 +302,10 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void unknownDialectPropertyFailsStartup() {
-        runner.withPropertyValues("intentflow.dialect=oracle")
+        runner.withPropertyValues("intentflow.dialect=sqlserver")
                 .run(ctx -> assertThat(ctx).getFailure().rootCause()
-                        .hasMessageContaining("Unknown SQL dialect 'oracle'")
-                        .hasMessageContaining("intentflow-oracle"));
+                        .hasMessageContaining("Unknown SQL dialect 'sqlserver'")
+                        .hasMessageContaining("intentflow-sqlserver"));
     }
 
     @Test

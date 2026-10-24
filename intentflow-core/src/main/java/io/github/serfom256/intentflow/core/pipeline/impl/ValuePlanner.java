@@ -62,8 +62,14 @@ final class ValuePlanner {
         return switch (c.function()) {
             case COALESCE -> {
                 ExprTypes.Type type = scope.types().type(c);
+                boolean decimal = type == ExprTypes.Type.NUMBER && args.stream()
+                        .anyMatch(arg -> arg instanceof LiteralExpr l && l.value() instanceof NumberLiteral);
                 List<SqlExpr> planned = new ArrayList<>();
-                args.forEach(arg -> planned.add(typed(arg, type, scope)));
+                for (ValueExpr arg : args) {
+                    SqlExpr value = typed(arg, type, scope);
+                    planned.add(decimal && !(arg instanceof LiteralExpr) ? new SqlExpr.Cast(CastType.NUMBER, value)
+                            : value);
+                }
                 yield new SqlExpr.Call("COALESCE", planned);
             }
             case YEAR, MONTH, DAY, HOUR -> new SqlExpr.Extract(c.function(), local(args.getFirst(), scope));

@@ -7,6 +7,7 @@ import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Function;
@@ -37,6 +38,22 @@ final class LazySqlBuilder implements SqlBuilder {
     public BoundQuery build(ValidatedQuery query, ResultShape shape,
             Function<Class<?>, List<RuntimeRestriction>> restrictions) {
         return delegate().build(query, shape, restrictions);
+    }
+
+    @Override
+    public boolean supportsKeyset(ValidatedQuery query) {
+        return delegate().supportsKeyset(query);
+    }
+
+    @Override
+    public BoundQuery buildAfter(ValidatedQuery query, ResultShape shape,
+            Function<Class<?>, List<RuntimeRestriction>> restrictions, List<Object> after) {
+        return delegate().buildAfter(query, shape, restrictions, after);
+    }
+
+    @Override
+    public @Nullable Object read(@Nullable Object value) {
+        return delegate().read(value);
     }
 
     @Override

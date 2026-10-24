@@ -12,8 +12,7 @@ import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
 import io.github.serfom256.intentflow.core.sql.Optimization;
-import io.github.serfom256.intentflow.dialect.mysql.MySqlDialect;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -45,7 +44,7 @@ class TimeZoneTest {
 
     @Test
     void wholeDaysOfAZonedColumnStartAtMidnightInTheConfiguredZone() {
-        BoundQuery query = sql(new PostgresDialect(), "happened_at == \"2026-10-10\"");
+        BoundQuery query = sql(new TestDialect(), "happened_at == \"2026-10-10\"");
 
         assertThat(query.sql()).contains("(\"happened_at\" >= ? AND \"happened_at\" < ?)");
         assertThat(query.values()).containsExactly(OffsetDateTime.parse("2026-10-10T00:00+02:00"),
@@ -54,19 +53,17 @@ class TimeZoneTest {
 
     @Test
     void aLocalColumnIsComparedWithTheWallClockTime() {
-        assertThat(sql(new PostgresDialect(), "local_at >= \"2026-01-15\"").values())
+        assertThat(sql(new TestDialect(), "local_at >= \"2026-01-15\"").values())
                 .containsExactly(LocalDateTime.parse("2026-01-15T00:00"));
-        assertThat(sql(new PostgresDialect(), "local_at < \"2026-07-01T12:00:00+05:00\"").values())
+        assertThat(sql(new TestDialect(), "local_at < \"2026-07-01T12:00:00+05:00\"").values())
                 .containsExactly(LocalDateTime.parse("2026-07-01T09:00"));
     }
 
     @Test
     void calendarPartsOfAZonedColumnAreTakenInTheConfiguredZone() {
-        assertThat(sql(new PostgresDialect(), "hour(happened_at) == 9").sql())
+        assertThat(sql(new TestDialect(), "hour(happened_at) == 9").sql())
                 .contains("EXTRACT(HOUR FROM (\"happened_at\" AT TIME ZONE 'Europe/Berlin')) = ?");
-        assertThat(sql(new PostgresDialect(), "hour(local_at) == 9").sql())
+        assertThat(sql(new TestDialect(), "hour(local_at) == 9").sql())
                 .contains("EXTRACT(HOUR FROM \"local_at\") = ?");
-        assertThat(sql(new MySqlDialect(), "hour(happened_at) == 9").sql())
-                .contains("EXTRACT(HOUR FROM `happened_at`)");
     }
 }

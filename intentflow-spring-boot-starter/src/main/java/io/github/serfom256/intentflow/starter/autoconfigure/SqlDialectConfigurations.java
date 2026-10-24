@@ -43,7 +43,7 @@ final class SqlDialectConfigurations {
             return available.getFirst();
         }
         throw new IllegalStateException(available.isEmpty()
-                ? "No SQL dialect on the classpath: add intentflow-postgresql, intentflow-mysql, intentflow-h2 or another dialect"
+                ? "No SQL dialect on the classpath: add intentflow-postgresql, intentflow-mysql, intentflow-oracle, intentflow-clickhouse, intentflow-h2 or another dialect"
                 : "Several SQL dialects on the classpath " + available.stream().map(SqlDialect::name).toList()
                         + " and no DataSource to choose from: set intentflow.dialect");
     }
@@ -82,7 +82,7 @@ final class SqlDialectConfigurations {
                 dialect = dialectOf(product, classLoader);
                 if (dialect == null) {
                     throw new IllegalStateException("IntentFlow has no SQL dialect for " + product
-                            + "; supported: PostgreSQL, MySQL, MariaDB, H2. Set intentflow.dialect "
+                            + "; supported: PostgreSQL, MySQL, MariaDB, Oracle, ClickHouse, H2. Set intentflow.dialect "
                             + "or define a SqlDialect bean.");
                 }
             }
@@ -119,6 +119,12 @@ final class SqlDialectConfigurations {
             if (value.startsWith("jdbc:mysql:") || value.startsWith("jdbc:mariadb:")
                     || value.equals("mysql") || value.equals("mariadb")) {
                 return SqlDialects.named("mysql", classLoader);
+            }
+            if (value.startsWith("jdbc:oracle:") || value.equals("oracle")) {
+                return SqlDialects.named("oracle", classLoader);
+            }
+            if (value.startsWith("jdbc:clickhouse:") || value.startsWith("jdbc:ch:") || value.equals("clickhouse")) {
+                return SqlDialects.named("clickhouse", classLoader);
             }
             return null;
         }

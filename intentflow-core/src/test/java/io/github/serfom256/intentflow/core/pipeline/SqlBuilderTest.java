@@ -40,7 +40,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
 import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -51,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SqlBuilderTest {
 
-    private final SqlBuilder sqlBuilder = SqlBuilders.create(new PostgresDialect());
+    private final SqlBuilder sqlBuilder = SqlBuilders.create(new TestDialect());
 
     private static final ServiceName BOOKS = ServiceNames.of("books");
     private static final LogicalFieldName ID = LogicalFieldNames.of("id");

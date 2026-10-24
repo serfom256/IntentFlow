@@ -13,6 +13,8 @@ val dialects = listOf(
     "intentflow-postgresql", 
     "intentflow-mysql", 
     "intentflow-h2",
+    "intentflow-oracle",
+    "intentflow-clickhouse",
     "intentflow-cassandra"
 )
 val executors = listOf(

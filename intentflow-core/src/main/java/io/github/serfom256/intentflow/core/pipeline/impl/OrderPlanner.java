@@ -1,15 +1,18 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
+import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.ExprSortKey;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
+import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.sql.Optimization;
 import io.github.serfom256.intentflow.core.sql.plan.Select;
 import io.github.serfom256.intentflow.core.sql.plan.SqlExpr;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 
 final class OrderPlanner {
 
@@ -56,6 +59,11 @@ final class OrderPlanner {
         if (outer.context().enabled(Optimization.TO_ONE_JOIN) && outer.canJoin(relation)) {
             outer.context().applied(Optimization.TO_ONE_JOIN);
             return outer.join(relation).value(RelationPaths.strip(key.field(), relation));
+        }
+        if (!outer.context().capabilities().sortBySubquery()) {
+            throw new ValidationException(ErrorCode.UNSUPPORTED, "sorting by '" + key.field().value()
+                    + "' needs a correlated subquery in ORDER BY, which " + outer.context().dialectName()
+                    + " does not support; sort by a field of the service itself", Map.of());
         }
         SqlScope inner = outer.inner(relation);
         SqlExpr value = new SqlExpr.Call(key.direction() == SortKey.Direction.DESC ? "MAX" : "MIN",

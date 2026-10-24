@@ -21,7 +21,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.PipelineListener.Outcome;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -127,7 +127,7 @@ class AccessPolicyTest {
         };
         return IntentPipelines.builder()
                 .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(executor)
                 .catalog(CATALOG)
                 .maxRepairs(0)

@@ -1,11 +1,12 @@
 package io.github.serfom256.intentflow.jdbc;
 
-import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.mysql.MySqlDatabase;
 
 class JdbcMySqlDifferentialIT extends JdbcDifferentialIT {
 
     @Override
-    protected DifferentialDatabase database() {
-        return DifferentialDatabase.MYSQL;
+    protected TestDatabase database() {
+        return MySqlDatabase.MYSQL;
     }
 }

@@ -14,7 +14,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -48,7 +48,7 @@ class TopNTest {
     }
 
     private static BoundQuery sql(String dsl) {
-        return SqlBuilders.create(new PostgresDialect()).build(validate(dsl));
+        return SqlBuilders.create(new TestDialect()).build(validate(dsl));
     }
 
     @Test

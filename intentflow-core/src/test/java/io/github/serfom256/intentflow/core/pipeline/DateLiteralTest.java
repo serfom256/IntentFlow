@@ -11,7 +11,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -30,7 +30,7 @@ class DateLiteralTest {
 
     private static BoundQuery sql(String filter) {
         AstQuery ast = DslParsers.create().parse(DslSources.of("orders | filter " + filter));
-        return SqlBuilders.create(new PostgresDialect()).build(AstValidators.create().validate(ast, CATALOG));
+        return SqlBuilders.create(new TestDialect()).build(AstValidators.create().validate(ast, CATALOG));
     }
 
     @ParameterizedTest

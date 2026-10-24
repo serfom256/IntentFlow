@@ -12,7 +12,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayDeque;
@@ -44,7 +44,7 @@ class CachingAndLimitsTest {
                     calls.incrementAndGet();
                     return DslSources.of(answers.size() > 1 ? answers.poll() : answers.peek());
                 })
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(executor)
                 .catalog(CATALOG)
                 .validator(validator)
@@ -68,7 +68,7 @@ class CachingAndLimitsTest {
                     calls.incrementAndGet();
                     return DslSources.of("books | filter title == \"Dune\"");
                 })
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(counting)
                 .catalog(CATALOG)
                 .build();

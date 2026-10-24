@@ -7,7 +7,7 @@ and goes through the same circuit breaker, concurrency limit, fallback model, ra
 Add one provider next to the starter:
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-openai:0.4.4")
+implementation("io.github.serfom256:intentflow-openai:0.5.0")
 ```
 
 | Module                    | Models                                                                              |

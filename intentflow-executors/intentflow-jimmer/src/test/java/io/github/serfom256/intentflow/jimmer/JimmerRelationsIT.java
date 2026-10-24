@@ -11,8 +11,10 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.RelationTables;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.mysql.MySqlDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import org.babyfish.jimmer.sql.JSqlClient;
 import org.babyfish.jimmer.sql.dialect.MySqlDialect;
 import org.babyfish.jimmer.sql.dialect.PostgresDialect;
@@ -20,12 +22,12 @@ import org.babyfish.jimmer.sql.runtime.ConnectionManager;
 import org.babyfish.jimmer.sql.runtime.DefaultDatabaseNamingStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,20 +38,23 @@ import static org.assertj.core.api.Assertions.tuple;
 @Testcontainers(disabledWithoutDocker = true)
 class JimmerRelationsIT {
 
+    static List<TestDatabase> databases() {
+        return List.of(PostgresDatabase.POSTGRES, MySqlDatabase.MYSQL);
+    }
+
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
             ServiceDescriptors.fromAnnotated(JCustomer.class, List.of(new JimmerNameResolver())),
             ServiceDescriptors.fromAnnotated(JOrder.class, List.of(new JimmerNameResolver())));
 
-    private static final Map<DifferentialDatabase, JimmerQueryExecutor> EXECUTORS = new EnumMap<>(
-            DifferentialDatabase.class);
+    private static final Map<TestDatabase, JimmerQueryExecutor> EXECUTORS = new HashMap<>();
 
-    private static synchronized JimmerQueryExecutor executor(DifferentialDatabase db) {
+    private static synchronized JimmerQueryExecutor executor(TestDatabase db) {
         return EXECUTORS.computeIfAbsent(db, d -> {
-            DifferentialDatabase.Endpoint e = RelationTables.prepare(d);
+            TestDatabase.Endpoint e = RelationTables.prepare(d);
             JSqlClient sqlClient = JSqlClient.newBuilder()
                     .setConnectionManager(ConnectionManager.simpleConnectionManager(
                             new DriverManagerDataSource(e.url(), e.user(), e.password())))
-                    .setDialect(d == DifferentialDatabase.MYSQL ? new MySqlDialect() : new PostgresDialect())
+                    .setDialect(d == MySqlDatabase.MYSQL ? new MySqlDialect() : new PostgresDialect())
                     .setDatabaseNamingStrategy(DefaultDatabaseNamingStrategy.LOWER_CASE)
                     .build();
             return new JimmerQueryExecutor(sqlClient, List.of(
@@ -57,7 +62,7 @@ class JimmerRelationsIT {
         });
     }
 
-    private static IntentPipeline answering(DifferentialDatabase db, String dsl) {
+    private static IntentPipeline answering(TestDatabase db, String dsl) {
         return IntentPipelines.builder()
                 .llm((t, c) -> DslSources.of(dsl))
                 .sqlBuilder(SqlBuilders.create(db.dialect()))
@@ -77,8 +82,8 @@ class JimmerRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void fetcherLoadsTheAssociationWithTheResults(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void fetcherLoadsTheAssociationWithTheResults(TestDatabase db) {
         List<JOrder> orders = answering(db, "orders | filter customer.vip == true and status == \"paid\"")
                 .resolve(IntentRequests.of("q"), JOrder.class).items();
 
@@ -88,7 +93,7 @@ class JimmerRelationsIT {
 
     @Test
     void theStatementTimeoutCancelsASlowQuery() {
-        DifferentialDatabase.Endpoint e = RelationTables.prepare(DifferentialDatabase.POSTGRES);
+        TestDatabase.Endpoint e = RelationTables.prepare(PostgresDatabase.POSTGRES);
         JSqlClient sqlClient = JSqlClient.newBuilder()
                 .setConnectionManager(ConnectionManager.simpleConnectionManager(
                         new DriverManagerDataSource(e.url(), e.user(), e.password())))
@@ -104,8 +109,8 @@ class JimmerRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void filtersThroughOneToMany(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void filtersThroughOneToMany(TestDatabase db) {
         assertThat(answering(db, "customers | filter orders.total > 100 and orders.status == \"PAID\"")
                 .resolve(IntentRequests.of("q"), JCustomer.class).items())
                 .extracting(JCustomer::id).containsExactly(2L, 3L);

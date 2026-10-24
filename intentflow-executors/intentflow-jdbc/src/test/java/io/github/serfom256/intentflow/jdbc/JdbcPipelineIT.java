@@ -20,28 +20,25 @@ import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers(disabledWithoutDocker = true)
 class JdbcPipelineIT {
 
     record Book(long id, String title, String authorName, BigDecimal price, boolean inStock) {
     }
 
-    @Container
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.4");
+    private static final TestDatabase.Endpoint POSTGRES = PostgresDatabase.POSTGRES.endpoint();
 
     private static final ServiceName BOOKS = ServiceNames.of("books");
 
@@ -65,7 +62,8 @@ class JdbcPipelineIT {
     @BeforeAll
     static void seed() {
         jdbc = JdbcClient.create(new DriverManagerDataSource(
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+                POSTGRES.url(), POSTGRES.user(), POSTGRES.password()));
+        jdbc.sql("DROP TABLE IF EXISTS book").update();
         jdbc.sql("""
                 CREATE TABLE book (
                     id INTEGER PRIMARY KEY,

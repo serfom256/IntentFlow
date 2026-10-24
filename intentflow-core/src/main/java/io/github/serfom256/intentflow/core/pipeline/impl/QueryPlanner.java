@@ -65,7 +65,7 @@ final class QueryPlanner {
             where.add(after(query.effectiveSort(), after, scope));
             context.applied(Optimization.KEYSET_PAGING);
         }
-        List<Select.Order> order = OrderPlanner.plan(query.effectiveSort(), aggregate, scope);
+        List<Select.Order> order = new ArrayList<>(OrderPlanner.plan(query.effectiveSort(), aggregate, scope));
 
         Select select;
         if (ast.top() != null) {
@@ -75,6 +75,9 @@ final class QueryPlanner {
         }
         if (aggregate != null) {
             select = select.withGroupBy(AggregatePlanner.groupBy(aggregate, scope));
+            if (!context.capabilities().groupByAlias() && AggregatePlanner.computed(aggregate, scope)) {
+                select = AggregatePlanner.derived(select, aggregate, order, scope);
+            }
         }
         int limit = ast.take() != null ? ast.take().value() : query.service().maxTake().value();
         int offset = after != null || ast.skip() == null ? 0 : Math.max(0, ast.skip().value());

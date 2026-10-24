@@ -16,10 +16,13 @@ import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.Expressions;
+import io.github.serfom256.intentflow.core.ast.FieldRef;
+import io.github.serfom256.intentflow.core.ast.ValueExpr;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
 import io.github.serfom256.intentflow.core.ast.factories.Takes;
+import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
@@ -57,6 +60,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -431,7 +435,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                     ? executor.execute(query, type, (t, relation, keys) -> related(t, relation, keys,
                             caller.restrictions()))
                     : List.of();
-            aggregation = aggregate == null ? null : aggregation(aggregate, executor.rows(query));
+            aggregation = aggregate == null ? null
+                    : aggregation(aggregate, validated.service(), executor.rows(query));
         } catch (RuntimeException e) {
             listener.query(validated.service().name(), aggregate != null, since(start), 0, true);
             span.end(validated.service().name(), "error", e);
@@ -462,8 +467,14 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 nextCursor);
     }
 
-    private static Aggregation aggregation(Aggregate aggregate, List<List<@Nullable Object>> rows) {
+    private Aggregation aggregation(Aggregate aggregate, ServiceDescriptor service,
+            List<List<@Nullable Object>> rows) {
         int groups = aggregate.groupBy().size();
+        List<Boolean> booleans = new ArrayList<>(groups);
+        for (ValueExpr group : aggregate.groupBy()) {
+            booleans.add(group instanceof FieldRef ref && service.fields().stream()
+                    .anyMatch(f -> f.logical().equals(ref.field()) && f.type() == FieldType.BOOLEAN));
+        }
         List<AggregateRow> out = new ArrayList<>(rows.size());
         for (List<@Nullable Object> row : rows) {
             if (row.size() != groups + 1) {
@@ -472,9 +483,10 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             }
             List<@Nullable Object> group = new ArrayList<>(groups);
             for (int i = 0; i < groups; i++) {
-                group.add(AggregateValues.normalize(row.get(i)));
+                Object value = AggregateValues.normalize(sqlBuilder.read(row.get(i)));
+                group.add(booleans.get(i) && value instanceof BigDecimal number ? number.signum() != 0 : value);
             }
-            out.add(new AggregateRow(group, AggregateValues.normalize(row.get(groups))));
+            out.add(new AggregateRow(group, AggregateValues.normalize(sqlBuilder.read(row.get(groups)))));
         }
         return new Aggregation(aggregate.function().keyword(),
                 aggregate.argument() == null ? null : Expressions.print(aggregate.argument()),

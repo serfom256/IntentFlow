@@ -3,7 +3,9 @@ package io.github.serfom256.intentflow.core.pipeline;
 import io.github.serfom256.intentflow.core.ast.CastType;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.ExprFunction;
+import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 
@@ -35,6 +37,34 @@ public interface SqlDialect {
     void contains(SqlWriter sql, String column, String text);
 
     /**
+     * Case-insensitive "value contains text" for an expression, such as
+     * {@code lower(name)} or the name of an enum stored as a number;
+     * {@code value} writes it. The default uses {@code LIKE} with {@code '!'} as
+     * the escape character.
+     */
+    default void contains(SqlWriter sql, Runnable value, String text) {
+        StringBuilder pattern = new StringBuilder(text.length() + 2).append('%');
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '!' || c == '%' || c == '_') {
+                pattern.append('!');
+            }
+            pattern.append(c);
+        }
+        sql.text("LOWER(");
+        value.run();
+        sql.text(") LIKE LOWER(").param(new TextLiteral(pattern.append('%').toString())).text(") ESCAPE '!'");
+    }
+
+    /**
+     * The name of a SQL function, such as {@code LOWER} or {@code SUM}, in this
+     * database. The default returns it unchanged.
+     */
+    default String function(String name) {
+        return name;
+    }
+
+    /**
      * A literal bound as a parameter. The default binds it as is. A database that
      * types a parameter after the other operand, like H2, which would turn
      * {@code 0.5} next to an integer column into {@code 1}, writes a cast that
@@ -46,6 +76,16 @@ public interface SqlDialect {
 
     /** A bound text literal compared against a timestamp column. */
     void timestamp(SqlWriter sql, DslLiteral value);
+
+    /**
+     * A timestamp the planner already converted to a Java value, such as the
+     * bounds of a whole day: a {@code LocalDateTime}, or an
+     * {@code OffsetDateTime} for a column that stores an instant. The default
+     * binds it as is.
+     */
+    default void timestamp(SqlWriter sql, DslLiteral value, Object bound) {
+        sql.param(value, bound);
+    }
 
     /**
      * One ORDER BY item, NULLs last; {@code value} writes the column or expression
@@ -102,13 +142,26 @@ public interface SqlDialect {
      * What the database supports. The planner checks it before building SQL, so a
      * query the database cannot run
      * fails with a clear {@code ValidationException} instead of an SQL error:
-     * {@code top} needs window functions,
+     * {@code top} needs window functions, sorting by a field of a related service
+     * needs a correlated subquery in {@code ORDER BY}, grouping by a computed
+     * value goes through a derived table when {@code GROUP BY} cannot name a
+     * select-list alias, keyset paging and joins for sorting trust primary and
+     * unique keys only where the database enforces them,
      * {@code in (...)} lists and the number of bound parameters are capped, and
      * without native booleans boolean
      * values are bound as 1 and 0.
      */
     default SqlCapabilities capabilities() {
         return SqlCapabilities.STANDARD;
+    }
+
+    /**
+     * A value the executor read from a result row, as a standard JDBC type. The
+     * default returns it unchanged; a driver with types of its own, like Oracle's
+     * {@code oracle.sql.TIMESTAMP}, converts them here.
+     */
+    default @Nullable Object read(@Nullable Object value) {
+        return value;
     }
 
     /** Row limit and offset; {@code offset} is 0 when there is nothing to skip. */

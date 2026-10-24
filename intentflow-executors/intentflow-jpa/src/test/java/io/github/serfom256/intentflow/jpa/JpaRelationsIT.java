@@ -15,8 +15,10 @@ import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
-import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.RelationTables;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.mysql.MySqlDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -32,11 +34,11 @@ import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.SQLRestriction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,6 +47,10 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @Testcontainers(disabledWithoutDocker = true)
 class JpaRelationsIT {
+
+    static List<TestDatabase> databases() {
+        return List.of(PostgresDatabase.POSTGRES, MySqlDatabase.MYSQL);
+    }
 
     @Entity
     @Table(name = "rel_customer")
@@ -99,7 +105,7 @@ class JpaRelationsIT {
         BigDecimal total;
     }
 
-    private static final Map<DifferentialDatabase, EntityManager> MANAGERS = new EnumMap<>(DifferentialDatabase.class);
+    private static final Map<TestDatabase, EntityManager> MANAGERS = new HashMap<>();
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
             ServiceDescriptors.fromAnnotated(Customer.class, List.of(new JpaNameResolver())),
@@ -112,20 +118,20 @@ class JpaRelationsIT {
             Map.of(ServiceNames.of("active_orders"), ServiceDescriptors
                     .restrictionOf(ActiveOrder.class, List.of(new JpaNameResolver())).orElseThrow()));
 
-    private static synchronized EntityManager manager(DifferentialDatabase db) {
+    private static synchronized EntityManager manager(TestDatabase db) {
         return MANAGERS.computeIfAbsent(db, d -> {
-            DifferentialDatabase.Endpoint e = RelationTables.prepare(d);
+            TestDatabase.Endpoint e = RelationTables.prepare(d);
             EntityManagerFactory emf = TestEntityManagers.create(e.url(), e.user(), e.password(), Customer.class,
                     Order.class, ActiveOrder.class);
             return emf.createEntityManager();
         });
     }
 
-    private static IntentPipeline answering(DifferentialDatabase db, String dsl) {
+    private static IntentPipeline answering(TestDatabase db, String dsl) {
         return answering(db, dsl, false);
     }
 
-    private static IntentPipeline answering(DifferentialDatabase db, String dsl, boolean visibleFieldsOnly) {
+    private static IntentPipeline answering(TestDatabase db, String dsl, boolean visibleFieldsOnly) {
         manager(db).clear();
         return IntentPipelines.builder()
                 .llm((t, c) -> DslSources.of(dsl))
@@ -149,8 +155,8 @@ class JpaRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void filtersThroughManyToOneAndTheOrmLoadsTheAssociation(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void filtersThroughManyToOneAndTheOrmLoadsTheAssociation(TestDatabase db) {
         List<Order> orders = answering(db, "orders | filter customer.vip == true and status == \"paid\"")
                 .resolve(IntentRequests.of("q"), Order.class).items();
 
@@ -162,8 +168,8 @@ class JpaRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void filtersThroughOneToManyMappedBy(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void filtersThroughOneToManyMappedBy(TestDatabase db) {
         List<Customer> customers = answering(db, "customers | filter orders.total > 100 and orders.status == \"PAID\"")
                 .resolve(IntentRequests.of("q"), Customer.class).items();
 
@@ -171,8 +177,8 @@ class JpaRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void hibernateRestrictionsApplyToListsCountsAndKeys(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void hibernateRestrictionsApplyToListsCountsAndKeys(TestDatabase db) {
         IntentResponse<ActiveOrder> active = answering(db, "active_orders | filter total < 100")
                 .resolve(IntentRequests.of("q"), ActiveOrder.class);
         IntentResponse<Order> all = answering(db, "orders | filter total < 100")
@@ -187,8 +193,8 @@ class JpaRelationsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void visibleFieldsOnlyReturnsDetachedCopiesWithLoadedRelations(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void visibleFieldsOnlyReturnsDetachedCopiesWithLoadedRelations(TestDatabase db) {
         List<Order> orders = answering(db, "orders | filter customer.vip == true and status == \"paid\"", true)
                 .resolve(IntentRequests.of("q"), Order.class).items();
         List<Customer> customers = answering(db, "customers | filter id == 2", true)

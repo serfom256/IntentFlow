@@ -18,7 +18,7 @@ import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +47,7 @@ class RelationsAndAggregatesTest {
 
     private static BoundQuery sql(String dsl) {
         AstQuery ast = DslParsers.create().parse(DslSources.of(dsl));
-        return SqlBuilders.create(new PostgresDialect()).build(AstValidators.create().validate(ast, CATALOG));
+        return SqlBuilders.create(new TestDialect()).build(AstValidators.create().validate(ast, CATALOG));
     }
 
     private static AstQuery parse(String dsl) {
@@ -152,7 +152,7 @@ class RelationsAndAggregatesTest {
                     seen.addAll(catalog.names().stream().map(n -> n.value()).sorted().toList());
                     return DslSources.of(text.value().equals("count") ? "orders | group status | count" : "customers");
                 })
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(executor)
                 .catalog(CATALOG)
                 .build();

@@ -5,7 +5,7 @@ period. The built-in limiter counts in memory, so each instance keeps its own bu
 the limit. A module here keeps the buckets in a shared store, so all instances enforce one limit together.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-ratelimit-zookeeper:0.4.4")
+implementation("io.github.serfom256:intentflow-ratelimit-zookeeper:0.5.0")
 ```
 
 | Module                    | Store                                                                               |

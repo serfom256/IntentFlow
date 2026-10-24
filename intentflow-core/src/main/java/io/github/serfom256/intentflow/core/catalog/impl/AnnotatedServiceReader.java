@@ -52,6 +52,8 @@ public final class AnnotatedServiceReader {
             byte.class, short.class, int.class, long.class, float.class, double.class,
             Byte.class, Short.class, Integer.class, Long.class, Float.class, Double.class,
             BigDecimal.class, BigInteger.class);
+    private static final Set<Class<?>> INTEGER_TYPES = Set.of(byte.class, short.class, int.class, long.class,
+            Byte.class, Short.class, Integer.class, Long.class, BigInteger.class);
 
     private static final Set<Class<?>> TIMESTAMP_TYPES = Set.of(
             Instant.class, LocalDate.class, LocalDateTime.class, OffsetDateTime.class,
@@ -183,6 +185,7 @@ public final class AnnotatedServiceReader {
     public static TableFacts facts(Class<?> type, List<NameResolver> resolvers) {
         Set<String> notNull = new HashSet<>();
         Set<String> zoned = new HashSet<>();
+        Set<String> integers = new HashSet<>();
         Map<String, List<String>> exactValues = new LinkedHashMap<>();
         for (FieldMapping fm : declaredMappings(type, resolvers)) {
             Class<?> javaType = javaType(type, fm.property());
@@ -195,12 +198,15 @@ public final class AnnotatedServiceReader {
             if (javaType == Instant.class || javaType == OffsetDateTime.class || javaType == ZonedDateTime.class) {
                 zoned.add(fm.column().value());
             }
+            if (INTEGER_TYPES.contains(javaType)) {
+                integers.add(fm.column().value());
+            }
             IntentField meta = annotation(type, fm.property());
             if (javaType.isEnum() && meta != null && meta.values().length == 0) {
                 exactValues.put(fm.column().value(), enumNames(javaType));
             }
         }
-        TableFacts facts = new TableFacts(List.of(), List.of(), notNull, exactValues, zoned);
+        TableFacts facts = new TableFacts(List.of(), List.of(), notNull, exactValues, zoned, Map.of(), integers);
         for (NameResolver resolver : resolvers) {
             facts = facts.merge(resolver.facts(type));
         }

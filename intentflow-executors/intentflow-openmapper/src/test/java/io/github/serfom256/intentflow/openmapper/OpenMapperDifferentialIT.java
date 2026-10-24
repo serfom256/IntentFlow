@@ -8,6 +8,8 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.testing.ExecutorDifferentialTest;
 import io.github.serfom256.intentflow.core.testing.GadgetKind;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import io.github.serfom256.procedures.Procedures;
 import org.junit.jupiter.api.AfterAll;
 import org.springframework.boot.SpringBootConfiguration;
@@ -66,6 +68,11 @@ class OpenMapperDifferentialIT extends ExecutorDifferentialTest {
     }
 
     private ConfigurableApplicationContext context;
+
+    @Override
+    protected TestDatabase database() {
+        return PostgresDatabase.POSTGRES;
+    }
 
     @Override
     protected QueryExecutor createExecutor(String jdbcUrl, String user, String password) {

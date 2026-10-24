@@ -12,7 +12,7 @@ import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -48,7 +48,7 @@ class CatalogOverridesTest {
                     promptedDescriptions.add(scope.get(BOOKS).fields().get(1).description());
                     return DslSources.of("books | take 1");
                 })
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                .sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(executor)
                 .catalog(catalog)
                 .build();

@@ -5,7 +5,9 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import io.github.serfom256.intentflow.core.testing.ExecutorDifferentialTest;
 import io.github.serfom256.intentflow.core.testing.GadgetKind;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,7 +31,12 @@ class JdbcDifferentialIT extends ExecutorDifferentialTest {
     }
 
     @Override
+    protected TestDatabase database() {
+        return PostgresDatabase.POSTGRES;
+    }
+
+    @Override
     protected QueryExecutor createExecutor(String jdbcUrl, String user, String password) {
-        return JdbcQueryExecutor.of(new DriverManagerDataSource(jdbcUrl, user, password));
+        return JdbcQueryExecutor.of(new SingleConnectionDataSource(jdbcUrl, user, password, true));
     }
 }

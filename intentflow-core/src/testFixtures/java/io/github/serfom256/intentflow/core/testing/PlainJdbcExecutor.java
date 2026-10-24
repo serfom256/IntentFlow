@@ -13,8 +13,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 final class PlainJdbcExecutor implements QueryExecutor {
+
+    private static final Map<TestDatabase.Endpoint, Connection> CONNECTIONS = new ConcurrentHashMap<>();
 
     private final TestDatabase.Endpoint endpoint;
 
@@ -61,8 +65,7 @@ final class PlainJdbcExecutor implements QueryExecutor {
     }
 
     private <T> List<T> run(BoundQuery query, RowReader<T> reader) {
-        try (Connection c = DriverManager.getConnection(endpoint.url(), endpoint.user(), endpoint.password());
-                PreparedStatement statement = c.prepareStatement(query.sql())) {
+        try (PreparedStatement statement = connection().prepareStatement(query.sql())) {
             List<@Nullable Object> values = query.values();
             for (int i = 0; i < values.size(); i++) {
                 statement.setObject(i + 1, values.get(i));
@@ -77,6 +80,15 @@ final class PlainJdbcExecutor implements QueryExecutor {
         } catch (SQLException e) {
             throw new IllegalStateException("Query failed: " + query.sql(), e);
         }
+    }
+
+    private synchronized Connection connection() throws SQLException {
+        Connection connection = CONNECTIONS.get(endpoint);
+        if (connection == null || !connection.isValid(2)) {
+            connection = DriverManager.getConnection(endpoint.url(), endpoint.user(), endpoint.password());
+            CONNECTIONS.put(endpoint, connection);
+        }
+        return connection;
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })

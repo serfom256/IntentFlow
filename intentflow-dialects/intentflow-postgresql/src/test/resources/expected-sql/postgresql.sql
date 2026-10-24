@@ -63,11 +63,11 @@ SELECT * FROM "product" WHERE (("created_at" >= ? AND "created_at" < ?) OR ("cre
 binds: [2026-10-10T00:00, 2026-10-11T00:00, 2026-10-12T00:00, 2026-10-13T00:00]
 
 -- products | filter coalesce(discount, 0) > 10
-SELECT * FROM "product" WHERE COALESCE("discount", ?) > ? ORDER BY "id" ASC LIMIT 50
+SELECT * FROM "product" WHERE COALESCE(CAST("discount" AS NUMERIC), ?) > ? ORDER BY "id" ASC LIMIT 50
 binds: [0, 10]
 
 -- products | filter price * (1 - coalesce(discount, 0) / 100) < 500
-SELECT * FROM "product" WHERE ("price" * (? - (CAST(COALESCE("discount", ?) AS NUMERIC) / NULLIF(?, 0)))) < ? ORDER BY "id" ASC LIMIT 50
+SELECT * FROM "product" WHERE ("price" * (? - (CAST(COALESCE(CAST("discount" AS NUMERIC), ?) AS NUMERIC) / NULLIF(?, 0)))) < ? ORDER BY "id" ASC LIMIT 50
 binds: [1, 0, 100, 500]
 
 -- products | filter year(created_at) == 2025 and month(created_at) in (1, 2, 3)
@@ -89,7 +89,7 @@ binds: [2026-01-01T00:00, 2026-02-01T00:00]
 optimizations: date-ranges
 
 -- products | filter created_at::date == "2026-10-10"
-SELECT * FROM "product" WHERE CAST("created_at" AS DATE) = CAST(? AS DATE) ORDER BY "id" ASC LIMIT 50
+SELECT * FROM "product" WHERE CAST("created_at" AS DATE) = CAST(CAST(? AS TIMESTAMP) AS DATE) ORDER BY "id" ASC LIMIT 50
 binds: [2026-10-10]
 
 -- products | filter cast(sku as integer) > 1000

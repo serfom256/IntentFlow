@@ -26,9 +26,7 @@ public abstract class ExecutorDifferentialTest extends DifferentialTestBase {
 
     protected abstract QueryExecutor createExecutor(String jdbcUrl, String user, String password);
 
-    protected TestDatabase database() {
-        return DifferentialDatabase.POSTGRES;
-    }
+    protected abstract TestDatabase database();
 
     @Override
     protected SqlBuilder sqlBuilder() {
@@ -45,7 +43,7 @@ public abstract class ExecutorDifferentialTest extends DifferentialTestBase {
         TestDatabase.Endpoint db = database().endpoint();
         try (Connection c = DriverManager.getConnection(db.url(), db.user(), db.password())) {
             try (Statement s = c.createStatement()) {
-                s.execute("DROP TABLE IF EXISTS gadget");
+                Tables.drop(s, "gadget");
                 s.execute(database().createGadgetTable());
             }
             try (PreparedStatement insert = c.prepareStatement("INSERT INTO gadget VALUES (?, ?, ?, ?, ?, ?, ?)")) {

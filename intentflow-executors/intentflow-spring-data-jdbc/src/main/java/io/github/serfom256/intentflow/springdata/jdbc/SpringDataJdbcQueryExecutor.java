@@ -3,8 +3,12 @@ package io.github.serfom256.intentflow.springdata.jdbc;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.convert.ReadingConverter;
 import org.springframework.data.jdbc.core.convert.EntityRowMapper;
 import org.springframework.data.jdbc.core.convert.JdbcConverter;
+import org.springframework.data.jdbc.core.convert.JdbcCustomConversions;
+import org.springframework.data.jdbc.core.convert.JdbcTypeFactory;
 import org.springframework.data.jdbc.core.convert.MappingJdbcConverter;
 import org.springframework.data.jdbc.core.mapping.JdbcMappingContext;
 import org.springframework.data.relational.core.mapping.RelationalPersistentEntity;
@@ -25,11 +29,13 @@ public final class SpringDataJdbcQueryExecutor implements QueryExecutor {
     }
 
     public static SpringDataJdbcQueryExecutor of(DataSource dataSource) {
+        JdbcCustomConversions conversions = new JdbcCustomConversions(List.of(NumberToBoolean.INSTANCE));
         JdbcMappingContext context = new JdbcMappingContext();
+        context.setSimpleTypeHolder(conversions.getSimpleTypeHolder());
         MappingJdbcConverter converter = new MappingJdbcConverter(context, (identifier, path) -> {
             throw new UnsupportedOperationException("IntentFlow reads single-table entities; "
                     + path.toDotPath() + " needs a relation");
-        });
+        }, conversions, JdbcTypeFactory.unsupported());
         return new SpringDataJdbcQueryExecutor(JdbcClient.create(dataSource), converter);
     }
 
@@ -54,5 +60,15 @@ public final class SpringDataJdbcQueryExecutor implements QueryExecutor {
             }
             return row;
         }).list();
+    }
+
+    @ReadingConverter
+    private enum NumberToBoolean implements Converter<Number, Boolean> {
+        INSTANCE;
+
+        @Override
+        public Boolean convert(Number source) {
+            return source.intValue() != 0;
+        }
     }
 }

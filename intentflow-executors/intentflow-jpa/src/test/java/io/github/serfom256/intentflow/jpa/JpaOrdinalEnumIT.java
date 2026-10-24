@@ -13,14 +13,15 @@ import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
-import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.mysql.MySqlDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
@@ -28,7 +29,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +38,10 @@ import static org.assertj.core.api.Assertions.tuple;
 
 @Testcontainers(disabledWithoutDocker = true)
 class JpaOrdinalEnumIT {
+
+    static List<TestDatabase> databases() {
+        return List.of(PostgresDatabase.POSTGRES, MySqlDatabase.MYSQL);
+    }
 
     enum Priority {
         LOW, MEDIUM, HIGH
@@ -53,7 +58,7 @@ class JpaOrdinalEnumIT {
         Priority priority;
     }
 
-    private static final Map<DifferentialDatabase, EntityManager> MANAGERS = new EnumMap<>(DifferentialDatabase.class);
+    private static final Map<TestDatabase, EntityManager> MANAGERS = new HashMap<>();
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
             ServiceDescriptors.fromAnnotated(Ticket.class, List.of(new JpaNameResolver())));
@@ -61,7 +66,7 @@ class JpaOrdinalEnumIT {
     private static final SchemaFacts FACTS = SchemaFacts.of(
             Map.of("ord_ticket", ServiceDescriptors.factsOf(Ticket.class, List.of(new JpaNameResolver()))), Map.of());
 
-    private static synchronized EntityManager manager(DifferentialDatabase db) {
+    private static synchronized EntityManager manager(TestDatabase db) {
         return MANAGERS.computeIfAbsent(db, d -> {
             TestDatabase.Endpoint e = d.endpoint();
             try (Connection c = DriverManager.getConnection(e.url(), e.user(), e.password());
@@ -76,7 +81,7 @@ class JpaOrdinalEnumIT {
         });
     }
 
-    private static IntentResponse<Ticket> resolve(DifferentialDatabase db, String dsl) {
+    private static IntentResponse<Ticket> resolve(TestDatabase db, String dsl) {
         manager(db).clear();
         IntentPipeline pipeline = IntentPipelines.builder()
                 .llm((t, c) -> DslSources.of(dsl))
@@ -87,13 +92,13 @@ class JpaOrdinalEnumIT {
         return pipeline.resolve(IntentRequests.of("q"), Ticket.class);
     }
 
-    private static List<Long> ids(DifferentialDatabase db, String dsl) {
+    private static List<Long> ids(TestDatabase db, String dsl) {
         return resolve(db, dsl).items().stream().map(t -> t.id).toList();
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void filtersCompareTheStoredOrdinal(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void filtersCompareTheStoredOrdinal(TestDatabase db) {
         assertThat(ids(db, "tickets | filter priority == \"high\"")).containsExactly(2L, 5L);
         assertThat(ids(db, "tickets | filter priority in (\"low\", \"medium\")")).containsExactly(1L, 3L);
         assertThat(ids(db, "tickets | filter priority != \"high\"")).containsExactly(1L, 3L, 4L);
@@ -104,8 +109,8 @@ class JpaOrdinalEnumIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void sortingAndGroupingUseTheConstantNames(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void sortingAndGroupingUseTheConstantNames(TestDatabase db) {
         assertThat(ids(db, "tickets | sort priority, id")).containsExactly(2L, 5L, 1L, 3L, 4L);
         assertThat(resolve(db, "tickets | group priority | count").aggregation().rows())
                 .extracting(r -> r.group().getFirst(), AggregateRow::value)

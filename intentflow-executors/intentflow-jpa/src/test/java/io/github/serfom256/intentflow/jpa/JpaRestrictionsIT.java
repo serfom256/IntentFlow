@@ -16,8 +16,9 @@ import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
-import io.github.serfom256.intentflow.core.testing.DifferentialDatabase;
 import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.mysql.MySqlDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
@@ -28,14 +29,13 @@ import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.FilterDef;
 import org.hibernate.annotations.ParamDef;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +44,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers(disabledWithoutDocker = true)
 class JpaRestrictionsIT {
+
+    static List<TestDatabase> databases() {
+        return List.of(PostgresDatabase.POSTGRES, MySqlDatabase.MYSQL);
+    }
 
     @Entity
     @Table(name = "inh_item")
@@ -80,7 +84,7 @@ class JpaRestrictionsIT {
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
             SERVICES.stream().map(t -> ServiceDescriptors.fromAnnotated(t, RESOLVERS)).toList());
 
-    private static final Map<DifferentialDatabase, EntityManager> MANAGERS = new EnumMap<>(DifferentialDatabase.class);
+    private static final Map<TestDatabase, EntityManager> MANAGERS = new HashMap<>();
 
     private static SchemaFacts facts() {
         Map<String, TableFacts> tables = new HashMap<>();
@@ -93,7 +97,7 @@ class JpaRestrictionsIT {
         return SchemaFacts.of(tables, restrictions);
     }
 
-    private static synchronized EntityManager manager(DifferentialDatabase db) {
+    private static synchronized EntityManager manager(TestDatabase db) {
         return MANAGERS.computeIfAbsent(db, d -> {
             TestDatabase.Endpoint e = d.endpoint();
             try (Connection c = DriverManager.getConnection(e.url(), e.user(), e.password());
@@ -110,7 +114,7 @@ class JpaRestrictionsIT {
         });
     }
 
-    private static <T> IntentResponse<T> resolve(DifferentialDatabase db, String dsl, Class<T> type) {
+    private static <T> IntentResponse<T> resolve(TestDatabase db, String dsl, Class<T> type) {
         manager(db).clear();
         IntentPipeline pipeline = IntentPipelines.builder()
                 .llm((t, c) -> DslSources.of(dsl))
@@ -121,13 +125,13 @@ class JpaRestrictionsIT {
         return pipeline.resolve(IntentRequests.of("q"), type);
     }
 
-    private static List<Long> ids(DifferentialDatabase db, String dsl, Class<? extends Item> type) {
+    private static List<Long> ids(TestDatabase db, String dsl, Class<? extends Item> type) {
         return resolve(db, dsl, type).items().stream().map(i -> ((Item) i).id).toList();
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void aSubclassServiceSeesOnlyItsOwnRowsAndThoseOfItsSubclasses(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void aSubclassServiceSeesOnlyItsOwnRowsAndThoseOfItsSubclasses(TestDatabase db) {
         assertThat(ids(db, "items", Item.class)).containsExactly(1L, 2L, 3L, 4L, 5L);
         assertThat(ids(db, "books", Book.class)).containsExactly(2L, 3L);
         assertThat(ids(db, "films", Film.class)).containsExactly(4L, 5L);
@@ -136,8 +140,8 @@ class JpaRestrictionsIT {
     }
 
     @ParameterizedTest
-    @EnumSource(DifferentialDatabase.class)
-    void filtersEnabledOnTheSessionApplyWithTheirParameters(DifferentialDatabase db) {
+    @MethodSource("databases")
+    void filtersEnabledOnTheSessionApplyWithTheirParameters(TestDatabase db) {
         Session session = manager(db).unwrap(Session.class);
         session.enableFilter("minLevel").setParameter("level", 3);
         try {

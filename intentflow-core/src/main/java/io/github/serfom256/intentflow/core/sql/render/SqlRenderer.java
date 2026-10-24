@@ -3,6 +3,7 @@ package io.github.serfom256.intentflow.core.sql.render;
 import io.github.serfom256.intentflow.core.ErrorCode;
 import io.github.serfom256.intentflow.core.ast.BoolLiteral;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
+import io.github.serfom256.intentflow.core.ast.CastType;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
@@ -138,12 +139,8 @@ public final class SqlRenderer {
                 sql.text(")");
             }
             case SqlPredicate.Contains contains -> dialect.contains(sql, column(contains.column()), contains.text());
-            case SqlPredicate.Like like -> {
-                expr(like.value(), sql);
-                sql.text(" LIKE ");
-                expr(like.pattern(), sql);
-                sql.text(" ESCAPE '" + like.escape() + "'");
-            }
+            case SqlPredicate.ContainsValue contains -> dialect.contains(sql, () -> expr(contains.value(), sql),
+                    contains.text());
             case SqlPredicate.Raw raw -> sql.text("(").text(raw.sql()).text(")");
             case SqlPredicate.Bound bound -> {
                 sql.text("(");
@@ -173,7 +170,7 @@ public final class SqlRenderer {
             case SqlExpr.Param param -> dialect.literal(sql, bindable(param.value()));
             case SqlExpr.TimestampParam timestamp -> {
                 if (timestamp.bound() != null) {
-                    sql.param(timestamp.value(), timestamp.bound());
+                    dialect.timestamp(sql, timestamp.value(), timestamp.bound());
                 } else {
                     dialect.timestamp(sql, timestamp.value());
                 }
@@ -183,7 +180,7 @@ public final class SqlRenderer {
             case SqlExpr.Null n -> sql.text("NULL");
             case SqlExpr.Inline inline -> sql.text(Long.toString(inline.value()));
             case SqlExpr.Call call -> {
-                sql.text(call.function()).text("(");
+                sql.text(dialect.function(call.function())).text("(");
                 join(call.args(), ", ", e -> expr(e, sql), sql);
                 sql.text(")");
             }
@@ -195,6 +192,12 @@ public final class SqlRenderer {
                 expr(arithmetic.right(), sql);
                 sql.text(")");
             }
+            case SqlExpr.Cast cast when cast.value() instanceof SqlExpr.Param param
+                    && param.value() instanceof TextLiteral && cast.type() == CastType.TIMESTAMP ->
+                dialect.timestamp(sql, param.value());
+            case SqlExpr.Cast cast when cast.value() instanceof SqlExpr.Param param
+                    && param.value() instanceof TextLiteral && cast.type() == CastType.DATE ->
+                dialect.cast(sql, CastType.DATE, () -> dialect.timestamp(sql, param.value()));
             case SqlExpr.Cast cast -> dialect.cast(sql, cast.type(), () -> expr(cast.value(), sql));
             case SqlExpr.Extract extract -> dialect.extract(sql, extract.unit(), () -> expr(extract.value(), sql));
             case SqlExpr.Truncate truncate -> dialect.truncate(sql, truncate.unit(), () -> expr(truncate.value(), sql));

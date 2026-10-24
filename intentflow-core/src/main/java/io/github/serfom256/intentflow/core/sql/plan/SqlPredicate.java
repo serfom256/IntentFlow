@@ -38,7 +38,7 @@ public sealed interface SqlPredicate {
     record Contains(SqlExpr.Column column, String text) implements SqlPredicate {
     }
 
-    record Like(SqlExpr value, SqlExpr pattern, char escape) implements SqlPredicate {
+    record ContainsValue(SqlExpr value, String text) implements SqlPredicate {
     }
 
     record Raw(String sql) implements SqlPredicate {

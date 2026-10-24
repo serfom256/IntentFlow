@@ -9,7 +9,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -28,7 +28,7 @@ class DateRangeRewriteTest {
     private static final ServiceCatalog CATALOG = ServiceCatalogs.fromAnnotated(Event.class);
 
     private static BoundQuery sql(String filter) {
-        return SqlBuilders.create(new PostgresDialect()).build(AstValidators.create()
+        return SqlBuilders.create(new TestDialect()).build(AstValidators.create()
                 .validate(DslParsers.create().parse(DslSources.of("events | filter " + filter)), CATALOG));
     }
 

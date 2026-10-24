@@ -8,7 +8,11 @@ dependencies {
     compileOnly(libs.hibernate.core)
 
     testImplementation(testFixtures(projects.intentflowCore))
+    testImplementation(testFixtures(projects.intentflowPostgresql))
+    testImplementation(testFixtures(projects.intentflowMysql))
+    testImplementation(testFixtures(projects.intentflowOracle))
     testImplementation(libs.hibernate.core)
     testRuntimeOnly(libs.postgresql)
     testRuntimeOnly(libs.mysql)
+    testRuntimeOnly(libs.oracle)
 }

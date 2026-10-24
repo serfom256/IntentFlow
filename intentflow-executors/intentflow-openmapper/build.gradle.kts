@@ -8,6 +8,8 @@ dependencies {
     compileOnly(libs.spring.jdbc)
 
     testImplementation(testFixtures(projects.intentflowCore))
+    testImplementation(testFixtures(projects.intentflowPostgresql))
+    testImplementation(testFixtures(projects.intentflowMysql))
     testImplementation(libs.openmapper)
     testImplementation(libs.spring.boot.starter.jdbc)
     testRuntimeOnly(libs.postgresql)

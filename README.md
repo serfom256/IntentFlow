@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.4.4")
-    implementation("io.github.serfom256:intentflow-jdbc:0.4.4")
-    implementation("io.github.serfom256:intentflow-postgresql:0.4.4")
-    implementation("io.github.serfom256:intentflow-openai:0.4.4")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.5.0")
+    implementation("io.github.serfom256:intentflow-jdbc:0.5.0")
+    implementation("io.github.serfom256:intentflow-postgresql:0.5.0")
+    implementation("io.github.serfom256:intentflow-openai:0.5.0")
 }
 ```
 
@@ -159,8 +159,10 @@ IntentResponse<?> response = pipeline.resolve(IntentRequests.of("vip customers w
 | `trace()`       | The DSL, whether it was cached, the SQL and its parameters                      |
 | `nextCursor()`  | With `IntentRequests.page(text, cursor)`: where the next page starts, `null` on the last |
 
-Only the DSL is cached; every call runs the query. `ReactiveIntentPipeline` (`intentflow-reactive`) returns
-`Mono`s; the starter's `SpringIntentPipeline` also takes a `ParameterizedTypeReference<Event<Order>>`.
+Only the question → DSL translation is cached; every call runs the query. On WebFlux, `ReactiveIntentPipeline`
+(`intentflow-reactive`) returns `Mono`s. With the starter, inject `SpringIntentPipeline` to resolve a generic
+entity with `new ParameterizedTypeReference<Event<Order>>() {}`.
+
 Failures are unchecked exceptions with a stable `code()` and `details()`:
 
 | Exception                     | Raised when                                             | `code()`                                    | HTTP |
@@ -311,7 +313,7 @@ into ad-hoc SQL. Not supported:
 
 | Module                             | Maps rows with                                               |
 | ---------------------------------- | ------------------------------------------------------------ |
-| `intentflow-openmapper`            | OpenMapper `Procedures`                                      |
+| `intentflow-openmapper`            | OpenMapper `Procedures` (not yet on Oracle)                  |
 | `intentflow-jpa`                   | JPA: ids first, then JPQL with an optional entity graph      |
 | `intentflow-jimmer`                | Jimmer: ids first, then `findMapByIds` with an optional `Fetcher` |
 | `intentflow-spring-data-jdbc`      | Spring Data JDBC entity mapping                              |
@@ -325,6 +327,8 @@ overrides it.
 | ----------------------- | ----------------- |
 | `intentflow-postgresql` | PostgreSQL        |
 | `intentflow-mysql`      | MySQL 8+, MariaDB |
+| `intentflow-oracle`     | Oracle Database 19c+ (tested on 21c XE and 23ai Free) |
+| `intentflow-clickhouse` | ClickHouse 26.3; no sorting by a related field; pages by offset, since keys are not enforced |
 | `intentflow-h2`         | H2 2.x, with or without `DATABASE_TO_LOWER` |
 | `intentflow-cassandra`  | Cassandra 5       |
 
@@ -371,10 +375,12 @@ that service, including counts and relation subqueries. It comes from Hibernate'
 `@Table(schema = "billing")`.
 
 **Time zones.** Dates are bound as typed values, never as text the database interprets in its session zone. A
-column that stores an instant (PostgreSQL `timestamptz`, MySQL `TIMESTAMP`, or a Java `Instant`, `OffsetDateTime`
-or `ZonedDateTime`) gets an `OffsetDateTime` in `intentflow.time-zone`; any other timestamp gets the local date and
-time. On PostgreSQL, `year(t)`, `hour(t)` and `date_trunc` of an instant column are taken in that zone too. MySQL
-takes them in the session's zone, so keep it equal to `intentflow.time-zone`.
+column that stores an instant (PostgreSQL `timestamptz`, MySQL `TIMESTAMP`, Oracle `TIMESTAMP WITH TIME ZONE`,
+ClickHouse `DateTime` with a zone, or a Java `Instant`, `OffsetDateTime` or `ZonedDateTime`) gets an
+`OffsetDateTime` in `intentflow.time-zone`; any other timestamp gets the local date and time. On PostgreSQL, Oracle
+and ClickHouse, `year(t)`, `hour(t)` and `date_trunc` of an instant column are taken in that zone too. MySQL takes
+them in the session's zone, so keep it equal to `intentflow.time-zone`. The ClickHouse driver writes local
+timestamps in the JVM's zone, so keep the JVM zone equal to the ClickHouse session zone.
 
 **Inheritance and filters.** A service on a JPA subclass in single-table inheritance sees only rows of that
 class and its subclasses (`DTYPE IN (...)`). Hibernate `@Filter`s enabled on the current session are added to the
@@ -383,8 +389,9 @@ session-dependent conditions through `QueryExecutor.restrictions`.
 
 ## Access control
 
-An `AccessPolicy` bean decides per caller which services and fields the LLM sees and which rows a query returns
-([security model](docs/security.md)); the caller is from Spring Security, an `IntentContextProvider` or the request.
+An `AccessPolicy` bean decides, per caller, which services and fields the LLM sees and which rows every query
+returns. The caller comes from Spring Security, an `IntentContextProvider` bean, or `IntentRequests.of(text, context)`.
+What the model sees, and why a manipulated answer cannot widen access, is in the [security model](docs/security.md).
 
 ```java
 @Bean
@@ -437,20 +444,21 @@ redeploy, and for trying questions against the live catalog. See the [admin READ
 A SQL dialect is a module with three parts:
 
 1. A `SqlDialect`: quoting, contains, timestamps, null ordering, casts, date functions and paging.
-   `PostgresDialect`, `MySqlDialect` and `H2Dialect` are complete examples of about 100 lines. `capabilities()` declares what
+   `PostgresDialect`, `MySqlDialect`, `OracleDialect` and `H2Dialect` are complete examples of about 100 lines. `capabilities()` declares what
    the database lacks (window functions, native booleans) and its limits (`in` list size, bound parameters), so a
    query it cannot run is rejected with a clear message instead of failing in the database
 2. A `META-INF/services/io.github.serfom256.intentflow.core.pipeline.SqlDialect` entry
-3. A test extending `DialectConformanceTest` that returns your `TestDatabase` (a Testcontainers container, or
-   an in-memory URL as in `intentflow-h2`)
+3. Tests extending `DialectConformanceTest`, with your `TestDatabase` (a Testcontainers container or an in-memory
+   URL as in `intentflow-h2`), and `ExpectedSqlTest`, with your dialect
 
 The conformance test runs thousands of random queries against the real database and compares every result with an
-independent in-memory evaluation. `ExpectedSqlTest` pins the SQL of about 60 queries per dialect in `src/test/resources/expected-sql`, so any change to the
-generated SQL shows up as a readable diff.
+independent in-memory evaluation. `ExpectedSqlTest` pins the SQL of about 60 queries in the module's
+`src/test/resources/expected-sql`, so any change to the generated SQL shows up as a readable diff.
 
 ## Releasing
 
-The version lives in `gradle.properties`; `./gradlew syncVersion` copies it to the READMEs and UI packages (or `build` fails).
+The version lives only in `gradle.properties`. After changing it, `./gradlew syncVersion` writes it into the READMEs
+and the UI packages; `./gradlew build` fails while they are out of date.
 
 ## Configuration
 
@@ -475,12 +483,15 @@ The version lives in `gradle.properties`; `./gradlew syncVersion` copies it to t
 | intentflow.llm.rate-limit.questions, .period, .per, .store | 0, 1m, principal, memory | New questions (cache misses) a `principal` or `tenant` may ask per period; 0 for no limit. `store: zookeeper` shares the limit across instances; see [intentflow-ratelimiters](intentflow-ratelimiters/README.md). An `LlmRateLimiter` bean replaces it |
 | intentflow.llm.rate-limit.zookeeper.connect, .path, .fail-open | -, /intentflow/rate-limit, true | ZooKeeper to keep the buckets in (or a `CuratorFramework` bean); `fail-open: false` refuses questions while it is unreachable |
 | intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
-| intentflow.cache.ttl, .max-size       | 10m, 10000                  | How long a translation is cached, and how many      |
+| intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
+| intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
 | intentflow.paging.cursor-key          | random per instance         | Secret of at least 32 bytes that signs page cursors; the same on every instance, so next pages skip the LLM anywhere |
 | intentflow.catalog.packages           | your application's packages | Where `@IntentService` classes are scanned          |
 | intentflow.executor                   | first available             | `openmapper`, `jpa`, `jimmer`, `spring-data-jdbc`, `cassandra` or `jdbc` |
-| intentflow.dialect                    | detected                    | `postgresql`, `mysql` or `h2`                       |
-| intentflow.max-skip, .max-in-values, .max-question-length | 10000, 1000, 2000 | Largest `skip` (also for page cursors), most values in one `in (...)`, longest question in characters |
+| intentflow.dialect                    | detected                    | `postgresql`, `mysql`, `oracle`, `clickhouse` or `h2` |
+| intentflow.max-skip                   | 10000                       | Largest `skip` a query or an offset page cursor may use |
+| intentflow.max-in-values              | 1000                        | Most values in one `in (...)`                       |
+| intentflow.max-question-length        | 2000                        | Longest question in characters; longer ones are rejected before the LLM is called |
 | intentflow.time-zone                  | the JVM's zone              | Zone for dates without an offset, e.g. `Europe/Berlin` |
 | intentflow.schema.introspect          | true                        | Read keys and NOT NULL columns from the database    |
 | intentflow.sql.disabled-optimizations | empty                       | Optimizations to switch off                         |

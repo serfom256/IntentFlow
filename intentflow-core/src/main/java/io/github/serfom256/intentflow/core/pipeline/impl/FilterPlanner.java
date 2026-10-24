@@ -48,8 +48,8 @@ final class FilterPlanner {
             return exists(relation, List.of(expr), scope);
         }
         return switch (expr) {
-            case And a -> new SqlPredicate.And(List.of(plan(a.left(), scope), plan(a.right(), scope)));
-            case Or o -> new SqlPredicate.Or(List.of(plan(o.left(), scope), plan(o.right(), scope)));
+            case And a -> and(List.of(plan(a.left(), scope), plan(a.right(), scope)));
+            case Or o -> or(List.of(plan(o.left(), scope), plan(o.right(), scope)));
             case Not n -> negate(n, scope);
             case Compare c -> includeNulls(c, compare(c, scope), scope);
             case In i -> in(i, scope);
@@ -61,6 +61,16 @@ final class FilterPlanner {
                     : exprCompare(c, scope);
             case ExprIn i -> exprIn(i, scope);
         };
+    }
+
+    private static SqlPredicate and(List<SqlPredicate> parts) {
+        List<SqlPredicate> distinct = parts.stream().distinct().toList();
+        return distinct.size() == 1 ? distinct.getFirst() : new SqlPredicate.And(distinct);
+    }
+
+    private static SqlPredicate or(List<SqlPredicate> parts) {
+        List<SqlPredicate> distinct = parts.stream().distinct().toList();
+        return distinct.size() == 1 ? distinct.getFirst() : new SqlPredicate.Or(distinct);
     }
 
     private static SqlPredicate negate(Not not, SqlScope scope) {
@@ -123,7 +133,7 @@ final class FilterPlanner {
                     ? exists(relation, byRelation.get(relation), scope)
                     : plan((FilterExpr) item, scope));
         }
-        return planned.size() == 1 ? planned.getFirst() : new SqlPredicate.And(planned);
+        return and(planned);
     }
 
     private static SqlPredicate exists(String relation, List<FilterExpr> parts, SqlScope outer) {
@@ -179,8 +189,7 @@ final class FilterPlanner {
             case EQ, NE -> ordinal != null
                     ? new SqlPredicate.Compare(column, sqlOp(c.op()), ordinalParam(ordinal))
                     : new SqlPredicate.Compare(lower(name), sqlOp(c.op()), lower(new SqlExpr.Param(t)));
-            case CONTAINS -> new SqlPredicate.Like(lower(name),
-                    lower(new SqlExpr.Param(new TextLiteral(containing(t.value())))), '!');
+            case CONTAINS -> new SqlPredicate.ContainsValue(name, t.value());
             default -> new SqlPredicate.Compare(name, sqlOp(c.op()), new SqlExpr.Param(t));
         };
     }
@@ -194,13 +203,23 @@ final class FilterPlanner {
         return null;
     }
 
+    static boolean fractional(NumberLiteral number) {
+        return number.value().stripTrailingZeros().scale() > 0;
+    }
+
     private static SqlExpr ordinalParam(int ordinal) {
         return new SqlExpr.Param(new NumberLiteral(BigDecimal.valueOf(ordinal)));
     }
 
     private static SqlPredicate in(In in, SqlScope scope) {
-        List<DslLiteral> literals = in.values();
-        checkInList(literals.size(), scope);
+        checkInList(in.values().size(), scope);
+        List<DslLiteral> literals = scope.integer(in.field())
+                ? in.values().stream().filter(v -> !(v instanceof NumberLiteral n && fractional(n))).toList()
+                : in.values();
+        if (literals.isEmpty()) {
+            SqlExpr column = scope.column(in.field());
+            return new SqlPredicate.Compare(column, "<>", column);
+        }
         FieldMapping fm = scope.field(in.field());
         List<String> ordinals = scope.ordinals(in.field());
         if (!ordinals.isEmpty()) {
@@ -248,8 +267,7 @@ final class FilterPlanner {
         }
         if (c.op() == ComparisonOp.CONTAINS) {
             TextLiteral text = (TextLiteral) ((LiteralExpr) c.right()).value();
-            return new SqlPredicate.Like(lower(leftValue),
-                    lower(new SqlExpr.Param(new TextLiteral(containing(text.value())))), '!');
+            return new SqlPredicate.ContainsValue(leftValue, text.value());
         }
         String op = sqlOp(c.op());
         boolean temporal = left == ExprTypes.Type.TIMESTAMP || left == ExprTypes.Type.DATE;
@@ -304,18 +322,6 @@ final class FilterPlanner {
 
     private static SqlExpr lower(SqlExpr value) {
         return new SqlExpr.Call("LOWER", value);
-    }
-
-    private static String containing(String text) {
-        StringBuilder sb = new StringBuilder(text.length() + 2).append('%');
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == '!' || c == '%' || c == '_') {
-                sb.append('!');
-            }
-            sb.append(c);
-        }
-        return sb.append('%').toString();
     }
 
     private static boolean caseInsensitive(FieldMapping fm, DslLiteral value) {

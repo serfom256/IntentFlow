@@ -6,7 +6,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -20,7 +20,7 @@ class TypedQueryTest {
 
     private final DslParser parser = DslParsers.create();
     private final AstValidator validator = AstValidators.create();
-    private final SqlBuilder sqlBuilder = SqlBuilders.create(new PostgresDialect());
+    private final SqlBuilder sqlBuilder = SqlBuilders.create(new TestDialect());
 
     private String sql(String filter) {
         ValidatedQuery validated = validator.validate(parser.parse(DslSources.of("items | filter " + filter)), CATALOG);

@@ -1,4 +1,4 @@
-package io.github.serfom256.intentflow.core.pipeline;
+package io.github.serfom256.intentflow.core.testing;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -8,16 +8,17 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentRelation;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
+import io.github.serfom256.intentflow.core.pipeline.ResultShape;
+import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
+import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
+import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
 import io.github.serfom256.intentflow.core.sql.Optimization;
-import io.github.serfom256.intentflow.dialect.mysql.MySqlDialect;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ExpectedSqlTest {
+public abstract class ExpectedSqlTest {
 
     enum Category {
         LAPTOP, PHONE, TABLET
@@ -148,19 +149,22 @@ class ExpectedSqlTest {
             "billing.invoice", new TableFacts(List.of("id"), List.of(), Set.of("issued_at"), Map.of())),
             Map.of(ServiceNames.of("products"), "archived = false", ServiceNames.of("orders"), "deleted_at IS NULL"));
 
-    private static SqlBuilder builder(String dialect) {
-        return SqlBuilders.create(dialect.equals("postgresql") ? new PostgresDialect() : new MySqlDialect(),
-                SchemaFacts.none(), EnumSet.allOf(Optimization.class), ZoneOffset.UTC);
-    }
+    protected abstract SqlDialect dialect();
 
     private static String render(SqlBuilder builder, List<String> queries) {
         StringBuilder out = new StringBuilder();
         for (String line : queries) {
             boolean keys = line.startsWith("keys: ");
             String dsl = keys ? line.substring(6) : line;
-            BoundQuery query = builder.build(AstValidators.create()
-                    .validate(DslParsers.create().parse(DslSources.of(dsl)), CATALOG),
-                    keys ? ResultShape.KEYS : ResultShape.ROWS);
+            BoundQuery query;
+            try {
+                query = builder.build(AstValidators.create()
+                        .validate(DslParsers.create().parse(DslSources.of(dsl)), CATALOG),
+                        keys ? ResultShape.KEYS : ResultShape.ROWS);
+            } catch (ValidationException e) {
+                out.append("-- ").append(line).append('\n').append("rejected: ").append(e.getMessage()).append("\n\n");
+                continue;
+            }
             out.append("-- ").append(line).append('\n')
                     .append(query.sql()).append('\n')
                     .append("binds: ").append(query.values().stream().map(String::valueOf)
@@ -174,31 +178,28 @@ class ExpectedSqlTest {
         return out.toString();
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = { "postgresql", "mysql" })
-    void generatedSqlMatchesTheExpectedFile(String dialect) throws IOException {
-        compare(dialect + ".sql", render(builder(dialect), QUERIES));
+    @Test
+    void generatedSqlMatchesTheExpectedFile() throws IOException {
+        compare(dialect().name() + ".sql", render(SqlBuilders.create(dialect(), SchemaFacts.none(),
+                EnumSet.allOf(Optimization.class), ZoneOffset.UTC), QUERIES));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = { "postgresql", "mysql" })
-    void sqlWithSchemaFactsMatchesTheExpectedFile(String dialect) throws IOException {
-        SqlDialect sqlDialect = dialect.equals("postgresql") ? new PostgresDialect() : new MySqlDialect();
-        compare(dialect + "-facts.sql", render(SqlBuilders.create(sqlDialect, FACTS, EnumSet.allOf(Optimization.class),
-                ZoneOffset.UTC), WITH_FACTS));
+    @Test
+    void sqlWithSchemaFactsMatchesTheExpectedFile() throws IOException {
+        compare(dialect().name() + "-facts.sql", render(SqlBuilders.create(dialect(), FACTS,
+                EnumSet.allOf(Optimization.class), ZoneOffset.UTC), WITH_FACTS));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = { "postgresql", "mysql" })
-    void disabledOptimizationsKeepTheConservativeSql(String dialect) {
-        SqlDialect sqlDialect = dialect.equals("postgresql") ? new PostgresDialect() : new MySqlDialect();
-        String plain = render(SqlBuilders.create(sqlDialect, SchemaFacts.none(), Set.of()), WITH_FACTS);
+    @Test
+    void disabledOptimizationsKeepTheConservativeSql() {
+        String plain = render(SqlBuilders.create(dialect(), SchemaFacts.none(), Set.of()), WITH_FACTS);
         assertThat(plain).doesNotContain("optimizations:").doesNotContain("LEFT JOIN");
     }
 
     private static void compare(String file, String actual) throws IOException {
         Path expectedFile = Path.of("src/test/resources/expected-sql/" + file);
         if ("true".equals(System.getenv("INTENTFLOW_UPDATE_EXPECTED_SQL")) || !Files.exists(expectedFile)) {
+            Files.createDirectories(expectedFile.getParent());
             Files.writeString(expectedFile, actual, StandardCharsets.UTF_8);
         }
         List<String> expected = blocks(Files.readString(expectedFile, StandardCharsets.UTF_8));

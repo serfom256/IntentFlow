@@ -9,18 +9,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SqlDialectsTest {
 
     @Test
-    void dialectsOnTheClasspathAreFoundByNameOrAlias() {
-        assertThat(SqlDialects.named("MySQL").name()).isEqualTo("mysql");
-        assertThat(SqlDialects.named("mariadb").name()).isEqualTo("mysql");
-        assertThat(SqlDialects.named("postgres").name()).isEqualTo("postgresql");
+    void dialectsOnTheClasspathAreFoundByNameIgnoringCase() {
+        assertThat(SqlDialects.named(" Test ").name()).isEqualTo("test");
     }
 
     @Test
     void missingDialectNamesTheModuleToAdd() {
-        assertThatThrownBy(() -> SqlDialects.named("oracle"))
+        assertThatThrownBy(() -> SqlDialects.named("sqlserver"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("available: [mysql, postgresql]")
-                .hasMessageContaining("intentflow-oracle");
+                .hasMessageContaining("available: [test]")
+                .hasMessageContaining("intentflow-sqlserver");
         assertThatThrownBy(() -> SqlDialects.named("H2"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("intentflow-h2");

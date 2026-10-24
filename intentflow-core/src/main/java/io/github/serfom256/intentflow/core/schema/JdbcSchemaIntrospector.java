@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 public final class JdbcSchemaIntrospector {
 
     private static final Pattern UPPER_CASE = Pattern.compile("[A-Z_][A-Z0-9_]*");
+    private static final Pattern ZONED_TYPE = Pattern.compile(
+            "timestamp(\\(\\d+\\))? with (local )?time zone|(nullable\\()?datetime(64)?\\(.*'.+'\\)\\)?");
 
     private JdbcSchemaIntrospector() {
     }
@@ -61,7 +63,8 @@ public final class JdbcSchemaIntrospector {
                             primaryKey(metaData, catalog, inSchema, candidate).stream().map(folded).toList(),
                             uniqueKeys(metaData, catalog, inSchema, candidate).stream()
                                     .map(key -> key.stream().map(folded).toList()).toList(),
-                            names(columns.notNull(), folded), Map.of(), names(columns.zoned(), folded));
+                            names(columns.notNull(), folded), Map.of(), names(columns.zoned(), folded), Map.of(),
+                            names(columns.integers(), folded));
                 }
             }
         }
@@ -91,13 +94,14 @@ public final class JdbcSchemaIntrospector {
         }
     }
 
-    private record Columns(Set<String> notNull, Set<String> zoned) {
+    private record Columns(Set<String> notNull, Set<String> zoned, Set<String> integers) {
     }
 
     private static @Nullable Columns columns(DatabaseMetaData metaData, String catalog, @Nullable String schema,
             String table) throws SQLException {
         Set<String> notNull = new HashSet<>();
         Set<String> zoned = new HashSet<>();
+        Set<String> integers = new HashSet<>();
         boolean mysql = metaData.getDatabaseProductName().toLowerCase(Locale.ROOT).matches(".*(mysql|mariadb).*");
         boolean found = false;
         try (ResultSet rs = metaData.getColumns(catalog, schema, table, "%")) {
@@ -107,18 +111,30 @@ public final class JdbcSchemaIntrospector {
                 if ("NO".equals(rs.getString("IS_NULLABLE"))) {
                     notNull.add(column);
                 }
-                if (zoned(rs.getInt("DATA_TYPE"), rs.getString("TYPE_NAME"), mysql)) {
+                int dataType = rs.getInt("DATA_TYPE");
+                if (zoned(dataType, rs.getString("TYPE_NAME"), mysql)) {
                     zoned.add(column);
+                }
+                if (integer(dataType, rs.getInt("COLUMN_SIZE"), rs.getInt("DECIMAL_DIGITS"), rs.wasNull())) {
+                    integers.add(column);
                 }
             }
         }
-        return found ? new Columns(notNull, zoned) : null;
+        return found ? new Columns(notNull, zoned, integers) : null;
+    }
+
+    private static boolean integer(int dataType, int size, int digits, boolean noDigits) {
+        return switch (dataType) {
+            case Types.TINYINT, Types.SMALLINT, Types.INTEGER, Types.BIGINT -> true;
+            case Types.NUMERIC, Types.DECIMAL -> !noDigits && digits == 0 && size > 0;
+            default -> false;
+        };
     }
 
     private static boolean zoned(int dataType, @Nullable String typeName, boolean mysql) {
         String type = typeName == null ? "" : typeName.toLowerCase(Locale.ROOT);
         return dataType == Types.TIMESTAMP_WITH_TIMEZONE || type.equals("timestamptz")
-                || type.equals("timestamp with time zone") || (mysql && type.equals("timestamp"));
+                || ZONED_TYPE.matcher(type).matches() || (mysql && type.equals("timestamp"));
     }
 
     private static List<String> primaryKey(DatabaseMetaData metaData, String catalog, @Nullable String schema,

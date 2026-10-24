@@ -4,13 +4,12 @@ import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
+import io.github.serfom256.intentflow.core.testing.TestDatabase;
+import io.github.serfom256.intentflow.dialect.postgresql.PostgresDatabase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,11 +17,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Testcontainers(disabledWithoutDocker = true)
 class JdbcMappingStylesIT {
 
-    @Container
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.4");
+    private static final TestDatabase.Endpoint POSTGRES = PostgresDatabase.POSTGRES.endpoint();
 
     enum Status {
         ACTIVE, RETIRED
@@ -66,7 +63,8 @@ class JdbcMappingStylesIT {
     @BeforeAll
     static void seed() {
         JdbcClient jdbc = JdbcClient.create(new DriverManagerDataSource(
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+                POSTGRES.url(), POSTGRES.user(), POSTGRES.password()));
+        jdbc.sql("DROP TABLE IF EXISTS item").update();
         jdbc.sql("""
                 CREATE TABLE item (id BIGINT, full_name TEXT, status TEXT, price NUMERIC(8,2),
                                    stock INTEGER, created_at TIMESTAMPTZ)

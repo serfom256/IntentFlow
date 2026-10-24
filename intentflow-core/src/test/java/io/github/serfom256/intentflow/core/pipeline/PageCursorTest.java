@@ -15,7 +15,7 @@ import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -60,7 +60,7 @@ class PageCursorTest {
                         llmCalls.incrementAndGet();
                         return DslSources.of(queue.size() > 1 ? queue.poll() : queue.peek());
                     })
-                    .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
+                    .sqlBuilder(SqlBuilders.create(new TestDialect()))
                     .executor(new QueryExecutor() {
                         @Override
                         @SuppressWarnings("unchecked")

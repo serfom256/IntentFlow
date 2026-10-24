@@ -15,6 +15,8 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.pipeline.IntentPipeline;
 import io.github.serfom256.intentflow.core.pipeline.QueryExecutor;
+import io.github.serfom256.intentflow.core.pipeline.SqlCapabilities;
+import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.pipeline.factories.IntentPipelines;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.schema.JdbcSchemaIntrospector;
@@ -34,6 +36,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -41,6 +44,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
 
@@ -68,7 +72,7 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
             @IntentField BigDecimal total) {
     }
 
-    @IntentService(value = "notes", table = "conf_note", uri = "/notes/{{id}}", defaultSort = "id", restriction = "deleted = FALSE")
+    @IntentService(value = "notes", table = "conf_note", uri = "/notes/{{id}}", defaultSort = "id", restriction = "deleted = 0")
     @IntentRelation(name = "customer", service = "customers", from = "customer_id", to = "id")
     public record Note(@IntentField long id, @IntentField long customerId, @IntentField String text) {
     }
@@ -108,11 +112,11 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         TestDatabase.Endpoint endpoint = RelationTables.prepare(database());
         try (Connection c = DriverManager.getConnection(endpoint.url(), endpoint.user(), endpoint.password());
                 Statement s = c.createStatement()) {
-            s.execute("DROP TABLE IF EXISTS conf_note");
-            s.execute("CREATE TABLE conf_note (id BIGINT PRIMARY KEY, customer_id BIGINT NOT NULL, "
-                    + "text VARCHAR(40), deleted BOOLEAN NOT NULL)");
-            s.execute("INSERT INTO conf_note VALUES (1, 1, 'call back', FALSE), (2, 2, 'call back', TRUE), "
-                    + "(3, 3, 'invoice sent', FALSE)");
+            Tables.drop(s, "conf_note");
+            s.execute(database().ddl("CREATE TABLE conf_note (id BIGINT PRIMARY KEY, customer_id BIGINT NOT NULL, "
+                    + "text VARCHAR(40), deleted INTEGER NOT NULL)"));
+            Tables.insert(c, "conf_note", List.of(List.of(1, 1, "call back", 0), List.of(2, 2, "call back", 1),
+                    List.of(3, 3, "invoice sent", 0)));
         } catch (SQLException e) {
             throw new IllegalStateException(e);
         }
@@ -152,12 +156,27 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
 
     @Test
     void sortsByRelatedFields() {
-        assertThat(ids("orders | sort customer.name desc", Order.class)).containsExactly(13L, 14L, 12L, 10L, 11L);
-        assertThat(ids("customers | sort orders.total desc", Customer.class)).containsExactly(3L, 1L, 2L, 4L);
+        SqlCapabilities capabilities = database().dialect().capabilities();
+        if (capabilities.sortBySubquery() || capabilities.enforcedKeys()) {
+            assertThat(ids("orders | sort customer.name desc", Order.class))
+                    .containsExactly(13L, 14L, 12L, 10L, 11L);
+        } else {
+            assertThatThrownBy(() -> ids("orders | sort customer.name desc", Order.class))
+                    .isInstanceOfSatisfying(ValidationException.class,
+                            e -> assertThat(e.code()).isEqualTo(ErrorCode.UNSUPPORTED));
+        }
+        if (capabilities.sortBySubquery()) {
+            assertThat(ids("customers | sort orders.total desc", Customer.class)).containsExactly(3L, 1L, 2L, 4L);
+        } else {
+            assertThatThrownBy(() -> ids("customers | sort orders.total desc", Customer.class))
+                    .isInstanceOfSatisfying(ValidationException.class,
+                            e -> assertThat(e.code()).isEqualTo(ErrorCode.UNSUPPORTED));
+        }
     }
 
     @Test
     void sortingByAToOneRelationJoinsItsTable() {
+        assumeTrue(database().dialect().capabilities().enforcedKeys(), "the join needs an enforced key");
         IntentResponse<Order> response = resolve("orders | sort customer.name desc", Order.class);
 
         assertThat(response.items()).extracting(Order::id).containsExactly(13L, 14L, 12L, 10L, 11L);
@@ -179,9 +198,9 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         boolean mysql = database().dialect().name().equals("mysql");
         try (Connection c = DriverManager.getConnection(endpoint.url(), endpoint.user(), endpoint.password());
                 Statement s = c.createStatement()) {
-            s.execute("DROP TABLE IF EXISTS conf_event");
-            s.execute("CREATE TABLE conf_event (id BIGINT PRIMARY KEY, at "
-                    + (mysql ? "TIMESTAMP NULL" : "TIMESTAMP WITH TIME ZONE") + ")");
+            Tables.drop(s, "conf_event");
+            s.execute(database().ddl("CREATE TABLE conf_event (id BIGINT PRIMARY KEY, at "
+                    + (mysql ? "TIMESTAMP NULL" : "TIMESTAMP WITH TIME ZONE") + ")"));
             try (PreparedStatement insert = c.prepareStatement("INSERT INTO conf_event VALUES (?, ?)")) {
                 List<String> instants = List.of("2026-10-09T21:30:00Z", "2026-10-09T22:30:00Z",
                         "2026-10-10T21:30:00Z", "2026-10-10T22:30:00Z");
@@ -230,16 +249,15 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         TestDatabase.Endpoint endpoint = database().endpoint();
         try (Connection c = DriverManager.getConnection(endpoint.url(), endpoint.user(), endpoint.password());
                 Statement s = c.createStatement()) {
-            s.execute("DROP TABLE IF EXISTS conf_page");
-            s.execute("CREATE TABLE conf_page (id BIGINT PRIMARY KEY, name VARCHAR(20) NOT NULL, "
-                    + "price DECIMAL(10, 2) NOT NULL, note VARCHAR(20))");
-            StringBuilder rows = new StringBuilder();
+            Tables.drop(s, "conf_page");
+            s.execute(database().ddl("CREATE TABLE conf_page (id BIGINT PRIMARY KEY, name VARCHAR(20) NOT NULL, "
+                    + "price DECIMAL(10, 2) NOT NULL, note VARCHAR(20))"));
+            List<List<Object>> rows = new ArrayList<>();
             for (int id = 1; id <= 23; id++) {
-                rows.append(id == 1 ? "" : ", ").append("(").append(id).append(", 'item ").append(100 - id)
-                        .append("', ").append((id * 7) % 5 * 10).append(".50, ")
-                        .append(id % 4 == 0 ? "NULL" : "'n" + (id % 3) + "'").append(")");
+                rows.add(Arrays.asList(id, "item " + (100 - id), new BigDecimal((id * 7) % 5 * 10 + ".50"),
+                        id % 4 == 0 ? null : "n" + (id % 3)));
             }
-            s.execute("INSERT INTO conf_page VALUES " + rows);
+            Tables.insert(c, "conf_page", rows);
         } catch (SQLException e) {
             throw new IllegalStateException(e);
         }
@@ -285,7 +303,11 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         List<Long> paged = allPages(paging(dsl), optimizations);
 
         assertThat(paged).hasSize(23).containsExactlyElementsOf(expected);
-        assertThat(optimizations).contains("keyset-paging");
+        if (database().dialect().capabilities().enforcedKeys()) {
+            assertThat(optimizations).contains("keyset-paging");
+        } else {
+            assertThat(optimizations).doesNotContain("keyset-paging");
+        }
     }
 
     @Test

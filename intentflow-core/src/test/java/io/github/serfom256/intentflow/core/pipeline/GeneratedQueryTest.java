@@ -29,8 +29,7 @@ import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
 import io.github.serfom256.intentflow.core.pipeline.factories.DslParsers;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
 import io.github.serfom256.intentflow.core.testing.RandomQueries;
-import io.github.serfom256.intentflow.dialect.mysql.MySqlDialect;
-import io.github.serfom256.intentflow.dialect.postgresql.PostgresDialect;
+import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -86,8 +85,7 @@ class GeneratedQueryTest {
 
     private final DslParser parser = DslParsers.create();
     private final AstValidator validator = AstValidators.create();
-    private final SqlBuilder sqlBuilder = SqlBuilders.create(new PostgresDialect());
-    private final SqlBuilder mySqlBuilder = SqlBuilders.create(new MySqlDialect());
+    private final SqlBuilder sqlBuilder = SqlBuilders.create(new TestDialect());
 
     static LongStream seeds() {
         return LongStream.rangeClosed(1, 20);
@@ -130,13 +128,6 @@ class GeneratedQueryTest {
                 assertThat(p).as(dsl).isNotNull();
             }
 
-            BoundQuery mysql = mySqlBuilder.build(validator.validate(q, CATALOG));
-            assertThat(count(mysql.sql(), '?')).as("MySQL placeholders vs binds: %s", dsl)
-                    .isEqualTo(mysql.parameters().size());
-            assertOnlyKnownTokens(mysql.sql(), dsl);
-            assertThat(mysql.sql()).as(dsl)
-                    .startsWith(q.top() == null ? "SELECT * FROM `item_table`" : "SELECT * FROM (SELECT `item_table`.*")
-                    .doesNotContain("\"");
         }
     }
 
