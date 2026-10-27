@@ -1,10 +1,6 @@
 package io.github.serfom256.intentflow.core.ast;
 
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
-import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
-import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
-import io.github.serfom256.intentflow.core.ast.factories.Skips;
-import io.github.serfom256.intentflow.core.ast.factories.Takes;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,8 +15,7 @@ class ValueTypesTest {
 
     @Test
     void dslSourceRejectsBlank() {
-        assertThatThrownBy(() -> DslSources.of(""))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DslSources.of("")).isInstanceOf(IllegalArgumentException.class);
     }
 
 }

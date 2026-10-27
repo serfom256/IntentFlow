@@ -27,8 +27,8 @@ public final class MySqlDialect implements SqlDialect {
 
     @Override
     public void contains(SqlWriter sql, String column, String text) {
-        sql.text("LOWER(").text(column).text(") LIKE LOWER(")
-                .param(new TextLiteral(LikePatterns.containing(text, '!'))).text(") ESCAPE '!'");
+        sql.text("LOWER(").text(column).text(") LIKE LOWER(").param(new TextLiteral(LikePatterns.containing(text, '!')))
+                .text(") ESCAPE '!'");
     }
 
     @Override
@@ -54,10 +54,10 @@ public final class MySqlDialect implements SqlDialect {
             return;
         }
         String format = switch (unit) {
-            case "year" -> "%Y-01-01";
-            case "month" -> "%Y-%m-01";
-            case "hour" -> "%Y-%m-%d %H:00:00";
-            default -> throw new IllegalArgumentException("unsupported date_trunc unit: " + unit);
+        case "year" -> "%Y-01-01";
+        case "month" -> "%Y-%m-01";
+        case "hour" -> "%Y-%m-%d %H:00:00";
+        default -> throw new IllegalArgumentException("unsupported date_trunc unit: " + unit);
         };
         sql.text("CAST(DATE_FORMAT(");
         value.run();
@@ -76,11 +76,11 @@ public final class MySqlDialect implements SqlDialect {
         sql.text("CAST(");
         value.run();
         sql.text(switch (type) {
-            case NUMBER -> " AS DECIMAL(38, 10))";
-            case INTEGER -> " AS SIGNED)";
-            case TEXT -> " AS CHAR)";
-            case TIMESTAMP -> " AS DATETIME(6))";
-            case DATE -> " AS DATE)";
+        case NUMBER -> " AS DECIMAL(38, 10))";
+        case INTEGER -> " AS SIGNED)";
+        case TEXT -> " AS CHAR)";
+        case TIMESTAMP -> " AS DATETIME(6))";
+        case DATE -> " AS DATE)";
         });
     }
 

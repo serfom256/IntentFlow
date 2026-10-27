@@ -64,12 +64,8 @@ class DateRangeRewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-            "month(at) == 2",
-            "year(at) == 2025.5",
-            "date_trunc(\"month\", at) == \"2026-10-17\"",
-            "year == 2025",
-            "hour(at) == 9" })
+    @ValueSource(strings = { "month(at) == 2", "year(at) == 2025.5", "date_trunc(\"month\", at) == \"2026-10-17\"",
+            "year == 2025", "hour(at) == 9" })
     void leavesComparisonsThatAreNotRangesUnchanged(String filter) {
         assertThat(sql(filter).optimizations()).doesNotContain("date-ranges");
     }

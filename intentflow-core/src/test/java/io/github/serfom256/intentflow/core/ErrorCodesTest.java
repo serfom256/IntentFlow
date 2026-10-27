@@ -29,18 +29,13 @@ class ErrorCodesTest {
     }
 
     private static IntentPipeline answering(String dsl) {
-        return IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(new QueryExecutor() {
+        return IntentPipelines.builder().llm((text, catalog) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(new TestDialect())).executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         return List.of();
                     }
-                })
-                .catalog(ServiceCatalogs.fromAnnotated(Book.class))
-                .maxRepairs(0)
-                .build();
+                }).catalog(ServiceCatalogs.fromAnnotated(Book.class)).maxRepairs(0).build();
     }
 
     private static IntentFlowException failure(String dsl) {

@@ -26,9 +26,8 @@ class ParserConcurrencyTest {
         Lexer lexer = Lexers.create();
         Parser parser = Parsers.create();
 
-        List<Token> tokens = lexer.tokenize(DslSources.of(
-                "books | filter author == \"Doe\" and year >= 2000"
-                        + " | sort year desc | take 20"));
+        List<Token> tokens = lexer.tokenize(
+                DslSources.of("books | filter author == \"Doe\" and year >= 2000" + " | sort year desc | take 20"));
 
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         CountDownLatch ready = new CountDownLatch(threads);
@@ -73,16 +72,10 @@ class ParserConcurrencyTest {
         Parser parser = Parsers.create();
         Lexer lexer = Lexers.create();
 
-        String[] inputs = {
-                "books",
-                "books | filter year >= 2000",
-                "books | filter title ~ \"ring\" | take 5",
-                "books | sort year desc, title asc",
-                "books | sort title | skip 10 | take 10",
-                "books | filter (a == 1 or b == 2) and c == 3",
-                "books | filter status in (\"open\", \"closed\")",
-                "books | filter deletedAt == null",
-        };
+        String[] inputs = { "books", "books | filter year >= 2000", "books | filter title ~ \"ring\" | take 5",
+                "books | sort year desc, title asc", "books | sort title | skip 10 | take 10",
+                "books | filter (a == 1 or b == 2) and c == 3", "books | filter status in (\"open\", \"closed\")",
+                "books | filter deletedAt == null", };
 
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         CountDownLatch done = new CountDownLatch(threads);

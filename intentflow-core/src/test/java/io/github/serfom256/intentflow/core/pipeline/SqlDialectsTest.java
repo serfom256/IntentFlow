@@ -15,12 +15,9 @@ class SqlDialectsTest {
 
     @Test
     void missingDialectNamesTheModuleToAdd() {
-        assertThatThrownBy(() -> SqlDialects.named("sqlserver"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("available: [test]")
-                .hasMessageContaining("intentflow-sqlserver");
-        assertThatThrownBy(() -> SqlDialects.named("H2"))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> SqlDialects.named("sqlserver")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("available: [test]").hasMessageContaining("intentflow-sqlserver");
+        assertThatThrownBy(() -> SqlDialects.named("H2")).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("intentflow-h2");
     }
 }

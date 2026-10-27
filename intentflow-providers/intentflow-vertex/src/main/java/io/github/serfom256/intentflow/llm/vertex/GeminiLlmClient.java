@@ -60,9 +60,7 @@ public final class GeminiLlmClient implements LlmClient {
     private DslSource complete(ServiceCatalog catalog, List<Content> contents) {
         GenerateContentConfig config = GenerateContentConfig.builder()
                 .systemInstruction(Content.fromParts(Part.fromText(LlmPrompts.system(catalog, LocalDate.now(clock)))))
-                .temperature(0f)
-                .maxOutputTokens(maxTokens)
-                .build();
+                .temperature(0f).maxOutputTokens(maxTokens).build();
         GenerateContentResponse response;
         try {
             response = client.models.generateContent(model, contents, config);

@@ -72,13 +72,8 @@ class PipelineTracerTest {
                 return List.of();
             }
         };
-        return IntentPipelines.builder()
-                .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(executor)
-                .catalog(CATALOG)
-                .tracer(tracer)
-                .build();
+        return IntentPipelines.builder().llm(llm).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(executor)
+                .catalog(CATALOG).tracer(tracer).build();
     }
 
     @Test
@@ -86,20 +81,9 @@ class PipelineTracerTest {
         pipeline("books | filter author == \"x\"", "books | filter title == \"x\"")
                 .resolve(IntentRequests.of("books by x"), Book.class);
 
-        assertThat(spans).containsExactly(
-                "REQUEST",
-                "  GENERATE",
-                "  /GENERATE books ok",
-                "  VALIDATE",
-                "  /VALIDATE books rejected ValidationException",
-                "  REPAIR",
-                "  /REPAIR books ok",
-                "  VALIDATE",
-                "  /VALIDATE books ok",
-                "  BUILD",
-                "  /BUILD books ok",
-                "  QUERY",
-                "  /QUERY books ok",
+        assertThat(spans).containsExactly("REQUEST", "  GENERATE", "  /GENERATE books ok", "  VALIDATE",
+                "  /VALIDATE books rejected ValidationException", "  REPAIR", "  /REPAIR books ok", "  VALIDATE",
+                "  /VALIDATE books ok", "  BUILD", "  /BUILD books ok", "  QUERY", "  /QUERY books ok",
                 "/REQUEST books answered");
     }
 
@@ -127,8 +111,7 @@ class PipelineTracerTest {
     void aFailingQueryEndsItsSpanAndTheRequestWithTheError() {
         queryFailure = new IllegalStateException("database is down");
 
-        assertThatThrownBy(() -> pipeline("books").resolve(IntentRequests.of("q")))
-                .isSameAs(queryFailure);
+        assertThatThrownBy(() -> pipeline("books").resolve(IntentRequests.of("q"))).isSameAs(queryFailure);
 
         assertThat(spans).endsWith("  /QUERY books error IllegalStateException",
                 "/REQUEST - failed IllegalStateException");
@@ -137,25 +120,18 @@ class PipelineTracerTest {
     @Test
     void aDeniedRequestIsTraced() {
         IntentContext anyone = IntentContexts.anonymous();
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of("books"))
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(new QueryExecutor() {
+        IntentPipeline pipeline = IntentPipelines.builder().llm((text, catalog) -> DslSources.of("books"))
+                .sqlBuilder(SqlBuilders.create(new TestDialect())).executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         return List.of();
                     }
-                })
-                .catalog(CATALOG)
-                .accessPolicy(new AccessPolicy() {
+                }).catalog(CATALOG).accessPolicy(new AccessPolicy() {
                     @Override
                     public boolean canQuery(ServiceDescriptor service, IntentContext caller) {
                         return false;
                     }
-                })
-                .defaultCaller(() -> anyone)
-                .tracer(tracer)
-                .build();
+                }).defaultCaller(() -> anyone).tracer(tracer).build();
 
         assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("q"), Book.class))
                 .isInstanceOf(AccessDeniedException.class);

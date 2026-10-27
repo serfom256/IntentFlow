@@ -62,8 +62,8 @@ public final class RandomQueries {
     private final String textAlphabet;
     private final int maxDepth;
 
-    public RandomQueries(long seed, ServiceDescriptor service, Map<String, List<DslLiteral>> pools,
-            String textAlphabet, int maxDepth) {
+    public RandomQueries(long seed, ServiceDescriptor service, Map<String, List<DslLiteral>> pools, String textAlphabet,
+            int maxDepth) {
         this.rnd = new Random(seed);
         this.service = service;
         this.queryable = service.fields().stream().filter(FieldMapping::queryable).toList();
@@ -78,10 +78,9 @@ public final class RandomQueries {
 
     public AstQuery query() {
         FilterExpr filter = rnd.nextInt(5) == 0 ? null : filter(rnd.nextInt(maxDepth + 1));
-        return AstQueries.of(service.name(), filter, sort(),
-                rnd.nextInt(3) == 0 ? Skips.of(rnd.nextInt(5)) : null,
-                rnd.nextInt(3) == 0 ? Takes.of(1 + rnd.nextInt(service.maxTake().value())) : null,
-                null, rnd.nextInt(4) == 0 ? top() : null);
+        return AstQueries.of(service.name(), filter, sort(), rnd.nextInt(3) == 0 ? Skips.of(rnd.nextInt(5)) : null,
+                rnd.nextInt(3) == 0 ? Takes.of(1 + rnd.nextInt(service.maxTake().value())) : null, null,
+                rnd.nextInt(4) == 0 ? top() : null);
     }
 
     private TopN top() {
@@ -122,9 +121,9 @@ public final class RandomQueries {
         }
         AggregateFunction function = pick(List.of(AggregateFunction.values()));
         ValueExpr argument = switch (function) {
-            case COUNT -> null;
-            case SUM, AVG -> rnd.nextInt(3) == 0 ? numberExpression(numbers) : new FieldRef(pick(numbers).logical());
-            case MIN, MAX -> new FieldRef(pick(ordered).logical());
+        case COUNT -> null;
+        case SUM, AVG -> rnd.nextInt(3) == 0 ? numberExpression(numbers) : new FieldRef(pick(numbers).logical());
+        case MIN, MAX -> new FieldRef(pick(ordered).logical());
         };
         List<SortKey> sort = new ArrayList<>();
         if (!groupBy.isEmpty() && rnd.nextBoolean()) {
@@ -138,10 +137,8 @@ public final class RandomQueries {
             }
         }
         FilterExpr filter = rnd.nextInt(3) == 0 ? null : filter(rnd.nextInt(maxDepth + 1));
-        return AstQueries.of(service.name(), filter, sort,
-                rnd.nextInt(4) == 0 ? Skips.of(rnd.nextInt(3)) : null,
-                rnd.nextInt(3) == 0 ? Takes.of(1 + rnd.nextInt(5)) : null,
-                new Aggregate(function, argument, groupBy));
+        return AstQueries.of(service.name(), filter, sort, rnd.nextInt(4) == 0 ? Skips.of(rnd.nextInt(3)) : null,
+                rnd.nextInt(3) == 0 ? Takes.of(1 + rnd.nextInt(5)) : null, new Aggregate(function, argument, groupBy));
     }
 
     private ValueExpr groupExpression() {
@@ -164,17 +161,17 @@ public final class RandomQueries {
 
     private ValueExpr numberExpression(List<FieldMapping> numbers) {
         return switch (rnd.nextInt(8)) {
-            case 0 ->
-                new Call(ExprFunction.COALESCE, List.of(field(numbers), new LiteralExpr(new NumberLiteral(number()))));
-            case 1 -> new Call(ExprFunction.ROUND, List.of(field(numbers)));
-            case 2 -> new Call(ExprFunction.ROUND,
-                    List.of(field(numbers), new LiteralExpr(new NumberLiteral(BigDecimal.ONE))));
-            case 3 -> new Call(ExprFunction.ABS, List.of(field(numbers)));
-            case 4 -> new Arith(ArithOp.ADD, field(numbers), field(numbers));
-            case 5 -> new Arith(ArithOp.MULTIPLY, field(numbers),
-                    new LiteralExpr(new NumberLiteral(BigDecimal.valueOf(rnd.nextInt(7) - 3, rnd.nextInt(2)))));
-            case 6 -> new Arith(ArithOp.SUBTRACT, field(numbers), new LiteralExpr(new NumberLiteral(number())));
-            default -> new CastExpr(field(numbers), CastType.INTEGER);
+        case 0 ->
+            new Call(ExprFunction.COALESCE, List.of(field(numbers), new LiteralExpr(new NumberLiteral(number()))));
+        case 1 -> new Call(ExprFunction.ROUND, List.of(field(numbers)));
+        case 2 ->
+            new Call(ExprFunction.ROUND, List.of(field(numbers), new LiteralExpr(new NumberLiteral(BigDecimal.ONE))));
+        case 3 -> new Call(ExprFunction.ABS, List.of(field(numbers)));
+        case 4 -> new Arith(ArithOp.ADD, field(numbers), field(numbers));
+        case 5 -> new Arith(ArithOp.MULTIPLY, field(numbers),
+                new LiteralExpr(new NumberLiteral(BigDecimal.valueOf(rnd.nextInt(7) - 3, rnd.nextInt(2)))));
+        case 6 -> new Arith(ArithOp.SUBTRACT, field(numbers), new LiteralExpr(new NumberLiteral(number())));
+        default -> new CastExpr(field(numbers), CastType.INTEGER);
         };
     }
 
@@ -195,14 +192,13 @@ public final class RandomQueries {
         if (!texts.isEmpty()) {
             options.add(() -> new ExprCompare(new Call(ExprFunction.LENGTH, List.of(field(texts))), orderOp(),
                     new LiteralExpr(new NumberLiteral(BigDecimal.valueOf(rnd.nextInt(9))))));
-            options.add(
-                    () -> new ExprCompare(new Call(ExprFunction.LOWER, List.of(field(texts))), ComparisonOp.CONTAINS,
-                            text(text())));
+            options.add(() -> new ExprCompare(new Call(ExprFunction.LOWER, List.of(field(texts))),
+                    ComparisonOp.CONTAINS, text(text())));
             options.add(() -> {
                 FieldMapping f = pick(texts);
                 return new ExprCompare(
-                        new Call(ExprFunction.COALESCE, List.of(new FieldRef(f.logical()), text("none"))),
-                        equalityOp(), new LiteralExpr(value(f)));
+                        new Call(ExprFunction.COALESCE, List.of(new FieldRef(f.logical()), text("none"))), equalityOp(),
+                        new LiteralExpr(value(f)));
             });
         }
         if (!times.isEmpty()) {
@@ -251,10 +247,10 @@ public final class RandomQueries {
             return leaf();
         }
         return switch (rnd.nextInt(4)) {
-            case 0 -> new And(filter(depth - 1), filter(rnd.nextInt(depth)));
-            case 1 -> new Or(filter(rnd.nextInt(depth)), filter(depth - 1));
-            case 2 -> new Not(filter(depth - 1));
-            default -> leaf();
+        case 0 -> new And(filter(depth - 1), filter(rnd.nextInt(depth)));
+        case 1 -> new Or(filter(rnd.nextInt(depth)), filter(depth - 1));
+        case 2 -> new Not(filter(depth - 1));
+        default -> leaf();
         };
     }
 
@@ -288,12 +284,11 @@ public final class RandomQueries {
 
     private ComparisonOp op(FieldMapping f) {
         return switch (f.type()) {
-            case BOOLEAN -> rnd.nextBoolean() ? ComparisonOp.EQ : ComparisonOp.NE;
-            case TEXT, ANY -> pick(f.allowedValues().isEmpty()
-                    ? List.of(ComparisonOp.values())
-                    : List.of(ComparisonOp.EQ, ComparisonOp.NE, ComparisonOp.CONTAINS));
-            case NUMBER, TIMESTAMP -> pick(List.of(ComparisonOp.EQ, ComparisonOp.NE, ComparisonOp.LT,
-                    ComparisonOp.LE, ComparisonOp.GT, ComparisonOp.GE));
+        case BOOLEAN -> rnd.nextBoolean() ? ComparisonOp.EQ : ComparisonOp.NE;
+        case TEXT, ANY -> pick(f.allowedValues().isEmpty() ? List.of(ComparisonOp.values())
+                : List.of(ComparisonOp.EQ, ComparisonOp.NE, ComparisonOp.CONTAINS));
+        case NUMBER, TIMESTAMP -> pick(List.of(ComparisonOp.EQ, ComparisonOp.NE, ComparisonOp.LT, ComparisonOp.LE,
+                ComparisonOp.GT, ComparisonOp.GE));
         };
     }
 
@@ -308,12 +303,11 @@ public final class RandomQueries {
             return v;
         }
         return switch (f.type()) {
-            case TEXT, ANY -> f.allowedValues().isEmpty()
-                    ? new TextLiteral(text())
-                    : new TextLiteral(randomCase(pick(f.allowedValues())));
-            case NUMBER -> new NumberLiteral(number());
-            case BOOLEAN -> new BoolLiteral(rnd.nextBoolean());
-            case TIMESTAMP -> new TextLiteral(timestamp());
+        case TEXT, ANY -> f.allowedValues().isEmpty() ? new TextLiteral(text())
+                : new TextLiteral(randomCase(pick(f.allowedValues())));
+        case NUMBER -> new NumberLiteral(number());
+        case BOOLEAN -> new BoolLiteral(rnd.nextBoolean());
+        case TIMESTAMP -> new TextLiteral(timestamp());
         };
     }
 
@@ -339,9 +333,8 @@ public final class RandomQueries {
         int len = rnd.nextInt(6);
         StringBuilder sb = new StringBuilder(len);
         for (int i = 0; i < len; i++) {
-            sb.appendCodePoint(textAlphabet.codePointAt(
-                    textAlphabet.offsetByCodePoints(0,
-                            rnd.nextInt(textAlphabet.codePointCount(0, textAlphabet.length())))));
+            sb.appendCodePoint(textAlphabet.codePointAt(textAlphabet.offsetByCodePoints(0,
+                    rnd.nextInt(textAlphabet.codePointCount(0, textAlphabet.length())))));
         }
         return sb.toString();
     }
@@ -353,8 +346,7 @@ public final class RandomQueries {
 
     private String timestamp() {
         LocalDate day = LocalDate.of(2020, 1, 1).plusDays(rnd.nextInt(365 * 8));
-        return rnd.nextBoolean()
-                ? day.toString()
+        return rnd.nextBoolean() ? day.toString()
                 : day + "T%02d:%02d:%02d".formatted(rnd.nextInt(24), rnd.nextInt(60), rnd.nextInt(60));
     }
 
@@ -372,11 +364,9 @@ public final class RandomQueries {
 
     public static String print(AstQuery q) {
         StringBuilder sb = new StringBuilder(q.service().value());
-        if (q.filter() != null) {
-            sb.append(" | filter ").append(print(q.filter()));
-        }
-        if (q.aggregate() != null) {
-            Aggregate a = q.aggregate();
+        q.filter().ifPresent(filter -> sb.append(" | filter ").append(print(filter)));
+        if (q.aggregate().isPresent()) {
+            Aggregate a = q.aggregate().get();
             if (!a.groupBy().isEmpty()) {
                 sb.append(" | group ").append(String.join(", ", a.groupNames()));
             }
@@ -385,24 +375,20 @@ public final class RandomQueries {
                 sb.append(' ').append(Expressions.print(a.argument()));
             }
         }
-        if (q.top() != null) {
-            TopN top = q.top();
+        if (q.top().isPresent()) {
+            TopN top = q.top().get();
             sb.append(" | top ").append(top.count());
             if (!top.partition().isEmpty()) {
-                sb.append(" per ").append(top.partition().stream().map(Expressions::print)
-                        .collect(Collectors.joining(", ")));
+                sb.append(" per ")
+                        .append(top.partition().stream().map(Expressions::print).collect(Collectors.joining(", ")));
             }
             sb.append(" by ").append(sortKeys(top.order()));
         }
         if (!q.sort().isEmpty()) {
             sb.append(" | sort ").append(sortKeys(q.sort()));
         }
-        if (q.skip() != null) {
-            sb.append(" | skip ").append(q.skip().value());
-        }
-        if (q.take() != null) {
-            sb.append(" | take ").append(q.take().value());
-        }
+        q.skip().ifPresent(skip -> sb.append(" | skip ").append(skip.value()));
+        q.take().ifPresent(take -> sb.append(" | take ").append(take.value()));
         return sb.toString();
     }
 
@@ -419,41 +405,40 @@ public final class RandomQueries {
 
     public static String print(FilterExpr e) {
         return switch (e) {
-            case And a -> "(" + print(a.left()) + " and " + print(a.right()) + ")";
-            case Or o -> "(" + print(o.left()) + " or " + print(o.right()) + ")";
-            case Not n -> "not (" + print(n.inner()) + ")";
-            case Compare c -> c.field().value() + " " + symbol(c.op()) + " " + print(c.value());
-            case In in -> in.field().value() + " in ("
-                    + String.join(", ", in.values().stream().map(RandomQueries::print).toList()) + ")";
-            case IsNull n -> n.field().value() + " == null";
-            case IsNotNull n -> n.field().value() + " != null";
-            case ExprCompare c ->
-                Expressions.print(c.left()) + " " + symbol(c.op()) + " " + Expressions.print(c.right());
-            case ExprIn in -> Expressions.print(in.value()) + " in ("
-                    + String.join(", ", in.values().stream().map(RandomQueries::print).toList()) + ")";
+        case And a -> "(" + print(a.left()) + " and " + print(a.right()) + ")";
+        case Or o -> "(" + print(o.left()) + " or " + print(o.right()) + ")";
+        case Not n -> "not (" + print(n.inner()) + ")";
+        case Compare c -> c.field().value() + " " + symbol(c.op()) + " " + print(c.value());
+        case In in -> in.field().value() + " in ("
+                + String.join(", ", in.values().stream().map(RandomQueries::print).toList()) + ")";
+        case IsNull n -> n.field().value() + " == null";
+        case IsNotNull n -> n.field().value() + " != null";
+        case ExprCompare c -> Expressions.print(c.left()) + " " + symbol(c.op()) + " " + Expressions.print(c.right());
+        case ExprIn in -> Expressions.print(in.value()) + " in ("
+                + String.join(", ", in.values().stream().map(RandomQueries::print).toList()) + ")";
         };
     }
 
     public static String print(DslLiteral v) {
         return switch (v) {
-            case TextLiteral t -> "\"" + t.value()
-                    .replace("\\", "\\\\").replace("\"", "\\\"")
-                    .replace("\n", "\\n").replace("\t", "\\t") + "\"";
-            case NumberLiteral n -> n.value().toPlainString();
-            case BoolLiteral b -> Boolean.toString(b.value());
-            case NullLiteral n -> "null";
+        case TextLiteral t ->
+            "\"" + t.value().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\t", "\\t")
+                    + "\"";
+        case NumberLiteral n -> n.value().toPlainString();
+        case BoolLiteral b -> Boolean.toString(b.value());
+        case NullLiteral n -> "null";
         };
     }
 
     private static String symbol(ComparisonOp op) {
         return switch (op) {
-            case EQ -> "==";
-            case NE -> "!=";
-            case LT -> "<";
-            case LE -> "<=";
-            case GT -> ">";
-            case GE -> ">=";
-            case CONTAINS -> "~";
+        case EQ -> "==";
+        case NE -> "!=";
+        case LT -> "<";
+        case LE -> "<=";
+        case GT -> ">";
+        case GE -> ">=";
+        case CONTAINS -> "~";
         };
     }
 }

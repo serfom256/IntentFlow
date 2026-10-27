@@ -53,8 +53,8 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<Order> create(@Valid @RequestBody OrderRequest request) {
         Order created = orderService.create(request);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}").buildAndExpand(created.getId()).toUri();
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(created.getId())
+                .toUri();
         return ResponseEntity.created(location).body(created);
     }
 

@@ -65,8 +65,8 @@ public final class VisibleEntities {
             for (int i = 0; i < components.length; i++) {
                 RecordComponent component = components[i];
                 types[i] = component.getType();
-                args[i] = value(component.getName(), component.getType(),
-                        () -> invoke(component, item), properties, relations, view);
+                args[i] = value(component.getName(), component.getType(), () -> invoke(component, item), properties,
+                        relations, view);
             }
             return construct(constructor(type, types), args);
         }
@@ -75,20 +75,20 @@ public final class VisibleEntities {
         if (noArg != null) {
             Object copy = construct(noArg);
             for (Field field : fields) {
-                set(field, copy, value(field.getName(), field.getType(), () -> get(field, item), properties,
-                        relations, view));
+                set(field, copy,
+                        value(field.getName(), field.getType(), () -> get(field, item), properties, relations, view));
             }
             return copy;
         }
         Constructor<?> all = Objects.requireNonNull(allFieldsConstructor(type), type.getName());
-        Object[] args = fields.stream().map(field -> value(field.getName(), field.getType(), () -> get(field, item),
-                properties, relations, view)).toArray();
+        Object[] args = fields.stream().map(
+                field -> value(field.getName(), field.getType(), () -> get(field, item), properties, relations, view))
+                .toArray();
         return construct(all, args);
     }
 
     private static @Nullable Object value(String name, Class<?> type, Supplier<@Nullable Object> reader,
-            Set<String> properties,
-            Map<String, ServiceDescriptor> relations, ServiceCatalog view) {
+            Set<String> properties, Map<String, ServiceDescriptor> relations, ServiceCatalog view) {
         if (properties.contains(name)) {
             return reader.get();
         }
@@ -122,9 +122,7 @@ public final class VisibleEntities {
     private static Set<String> properties(ServiceDescriptor service) {
         Set<String> properties = new LinkedHashSet<>();
         for (FieldMapping field : service.fields()) {
-            if (field.property() != null) {
-                properties.add(field.property());
-            }
+            field.property().ifPresent(properties::add);
         }
         return properties;
     }

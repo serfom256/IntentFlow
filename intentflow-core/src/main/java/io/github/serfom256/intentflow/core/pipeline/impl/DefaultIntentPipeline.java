@@ -17,6 +17,7 @@ import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.Expressions;
 import io.github.serfom256.intentflow.core.ast.FieldRef;
+import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.ValueExpr;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -162,7 +163,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     }
 
     private Caller caller(IntentRequest request, Trail trail) {
-        IntentContext context = request.context() != null ? request.context() : defaultCaller.get();
+        IntentContext context = request.context().orElseGet(defaultCaller);
         trail.caller = context;
         if (policy == AccessPolicy.ALLOW_ALL) {
             return new Caller(context, catalog, executor::restrictions);
@@ -175,8 +176,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
     }
 
     private ServiceDescriptor permitted(ServiceDescriptor service, Caller caller) {
-        return caller.view().find(service.name()).orElseThrow(() -> new AccessDeniedException(
-                "The caller may not query " + service.name().value(), Map.of("service", service.name().value())));
+        return caller.view().find(service.name())
+                .orElseThrow(() -> new AccessDeniedException("The caller may not query " + service.name().value(),
+                        Map.of("service", service.name().value())));
     }
 
     private <R> R observed(long start, @Nullable ServiceName service, IntentRequest request, Trail trail,
@@ -184,8 +186,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         Span span = tracer.start(Stage.REQUEST);
         try {
             R response = resolve.get();
-            ended(span, start, response instanceof IntentResponse<?> r ? r.service() : service, Outcome.ANSWERED,
-                    null, request, trail);
+            ended(span, start, response instanceof IntentResponse<?> r ? r.service() : service, Outcome.ANSWERED, null,
+                    request, trail);
             return response;
         } catch (UnsupportedRequestException e) {
             ended(span, start, service, Outcome.DECLINED, e, request, trail);
@@ -217,10 +219,10 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             return;
         }
         try {
-            IntentContext who = trail.caller != null ? trail.caller : request.context();
+            IntentContext who = trail.caller != null ? trail.caller : request.context().orElse(null);
             BoundQuery query = trail.query;
-            audit.question(new QuestionAudit(Instant.now(), who == null ? null : who.principal(),
-                    who == null ? null : who.tenant(), request.text().value(), service, outcome, trail.dsl,
+            audit.question(new QuestionAudit(Instant.now(), who == null ? null : who.principal().orElse(null),
+                    who == null ? null : who.tenant().orElse(null), request.text().value(), service, outcome, trail.dsl,
                     trail.cached, query == null ? null : query.sql(), query == null ? List.of() : query.values(),
                     trail.rows, trail.tokens, elapsed, cause == null ? null : cause.getMessage()));
         } catch (RuntimeException e) {
@@ -233,7 +235,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         try {
             R result = work.get();
             if (result instanceof DslSource dsl && !dsl.usage().equals(TokenUsage.NONE)) {
-                span.usage(dsl.usage(), dsl.model());
+                span.usage(dsl.usage(), dsl.model().orElse(null));
             }
             span.end(service, "ok", null);
             return result;
@@ -254,15 +256,15 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         return catalog.findByType(type)
                 .flatMap(service -> service.relations().stream().filter(r -> r.name().equals(relationName)).findFirst())
                 .flatMap(relation -> catalog.find(relation.target()).map(target -> {
-                    String column = target.fields().stream().filter(f -> f.logical().equals(relation.to()))
-                            .findFirst().map(f -> f.column().value()).orElse(relation.to().value());
+                    String column = target.fields().stream().filter(f -> f.logical().equals(relation.to())).findFirst()
+                            .map(f -> f.column().value()).orElse(relation.to().value());
                     return sqlBuilder.buildRelated(target, column, List.copyOf(keys), restrictions);
                 }));
     }
 
     private ServiceDescriptor serviceFor(Class<?> resultType) {
-        return catalog.findByType(resultType).orElseThrow(() -> new IllegalArgumentException(
-                "No IntentFlow service maps to " + resultType.getName()));
+        return catalog.findByType(resultType).orElseThrow(
+                () -> new IllegalArgumentException("No IntentFlow service maps to " + resultType.getName()));
     }
 
     private static ServiceCatalog scopeOf(ServiceDescriptor service, ServiceCatalog view) {
@@ -281,13 +283,13 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         UserText normalized = normalizer.normalize(request.text());
         int length = normalized.value().codePointCount(0, normalized.value().length());
         if (length > maxQuestionLength) {
-            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED, "The question has " + length
-                    + " characters, more than the " + maxQuestionLength + " allowed",
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
+                    "The question has " + length + " characters, more than the " + maxQuestionLength + " allowed",
                     Map.of("limit", maxQuestionLength));
         }
         String question = PageCursor.question(normalized.value());
-        PageCursor cursor = request.paged() && request.cursor() != null
-                ? PageCursor.decode(request.cursor(), cursorKey)
+        PageCursor cursor = request.paged()
+                ? request.cursor().map(text -> PageCursor.decode(text, cursorKey)).orElse(null)
                 : null;
         if (cursor != null && !cursor.question().equals(question)) {
             throw PageCursor.invalid();
@@ -344,8 +346,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 repairs++;
                 long llmStart = System.nanoTime();
                 DslSource failed = dsl;
-                dsl = askLlm(true, expectedName,
-                        () -> llm.repairDsl(normalized, scope, failed, rejected.getMessage()));
+                dsl = askLlm(true, expectedName, () -> llm.repairDsl(normalized, scope, failed, rejected.getMessage()));
                 tokens = tokens.plus(dsl.usage());
                 trail.dsl = dsl.value();
                 trail.tokens = tokens;
@@ -361,9 +362,9 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         Paging paging = null;
         List<Object> after = null;
         ValidatedQuery planned = valid;
-        if (request.paged() && ast.aggregate() == null && ast.top() == null) {
-            int size = ast.take() != null ? ast.take().value() : valid.service().maxTake().value();
-            int offset = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
+        if (request.paged() && ast.aggregate().isEmpty() && ast.top().isEmpty()) {
+            int size = ast.take().map(Take::value).orElse(valid.service().maxTake().value());
+            int offset = ast.skip().map(skip -> Math.max(0, skip.value())).orElse(0);
             if (cursor != null) {
                 if (!cursor.dsl().equals(dsl.value())
                         || (cursor.after() != null && !sqlBuilder.supportsKeyset(valid))) {
@@ -374,18 +375,21 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             }
             paging = new Paging(size, offset, question);
             if (after == null && offset > 0) {
-                validator.validate(AstQueries.of(ast.service(), ast.filter(), ast.sort(), Skips.of(offset),
+                validator.validate(AstQueries.of(ast.service(), ast.filter().orElse(null), ast.sort(), Skips.of(offset),
                         Takes.of(size)), caller.view());
             }
-            planned = ValidatedQueries.of(valid.service(), AstQueries.of(ast.service(), ast.filter(), ast.sort(),
-                    after != null || offset == 0 ? null : Skips.of(offset), Takes.of(size + 1)), valid.related());
+            planned = ValidatedQueries.of(valid.service(),
+                    AstQueries.of(ast.service(), ast.filter().orElse(null), ast.sort(),
+                            after != null || offset == 0 ? null : Skips.of(offset), Takes.of(size + 1)),
+                    valid.related());
         }
         ValidatedQuery page = planned;
         List<Object> continueAfter = after;
-        BoundQuery query = traced(Stage.BUILD, valid.service().name(), () -> continueAfter != null
-                ? sqlBuilder.buildAfter(page, executor.shape(page.service().resultType()), caller.restrictions(),
-                        continueAfter)
-                : sqlBuilder.build(page, executor.shape(page.service().resultType()), caller.restrictions()));
+        BoundQuery query = traced(Stage.BUILD, valid.service().name(),
+                () -> continueAfter != null
+                        ? sqlBuilder.buildAfter(page, executor.shape(page.service().resultType()),
+                                caller.restrictions(), continueAfter)
+                        : sqlBuilder.build(page, executor.shape(page.service().resultType()), caller.restrictions()));
         trail.query = query;
         log.debug("Query: {} binds={}", query.sql(), LogValues.values(logValues, query.values()));
         return new Compiled(normalized, dsl, cached, validated, query, start, repairs, tokens, paging);
@@ -397,7 +401,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             DslSource dsl = traced(repair ? Stage.REPAIR : Stage.GENERATE, service, call);
             listener.llm(repair, since(start), false);
             if (!dsl.usage().equals(TokenUsage.NONE)) {
-                listener.tokens(dsl.model(), repair, dsl.usage());
+                listener.tokens(dsl.model().orElse(null), repair, dsl.usage());
             }
             return dsl;
         } catch (RuntimeException e) {
@@ -425,18 +429,17 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         BoundQuery query = compiled.query();
         @SuppressWarnings("unchecked")
         Class<T> type = (Class<T>) validated.service().resultType();
-        Aggregate aggregate = validated.ast().aggregate();
+        Aggregate aggregate = validated.ast().aggregate().orElse(null);
         long start = System.nanoTime();
         Span span = tracer.start(Stage.QUERY);
         List<T> items;
         Aggregation aggregation;
         try {
             items = aggregate == null
-                    ? executor.execute(query, type, (t, relation, keys) -> related(t, relation, keys,
-                            caller.restrictions()))
+                    ? executor.execute(query, type,
+                            (t, relation, keys) -> related(t, relation, keys, caller.restrictions()))
                     : List.of();
-            aggregation = aggregate == null ? null
-                    : aggregation(aggregate, validated.service(), executor.rows(query));
+            aggregation = aggregate == null ? null : aggregation(aggregate, validated.service(), executor.rows(query));
         } catch (RuntimeException e) {
             listener.query(validated.service().name(), aggregate != null, since(start), 0, true);
             span.end(validated.service().name(), "error", e);
@@ -450,8 +453,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                     ? PageCursor.values(items.getLast(), validated.effectiveSort(), validated.service())
                     : null;
             nextCursor = new PageCursor(paging.question(), compiled.dsl().value(), paging.offset() + paging.size(),
-                    last,
-                    true).encode(cursorKey);
+                    last, true).encode(cursorKey);
         }
         int rows = aggregation == null ? items.size() : aggregation.rows().size();
         trail.rows = rows;
@@ -467,8 +469,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 nextCursor);
     }
 
-    private Aggregation aggregation(Aggregate aggregate, ServiceDescriptor service,
-            List<List<@Nullable Object>> rows) {
+    private Aggregation aggregation(Aggregate aggregate, ServiceDescriptor service, List<List<@Nullable Object>> rows) {
         int groups = aggregate.groupBy().size();
         List<Boolean> booleans = new ArrayList<>(groups);
         for (ValueExpr group : aggregate.groupBy()) {
@@ -478,8 +479,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         List<AggregateRow> out = new ArrayList<>(rows.size());
         for (List<@Nullable Object> row : rows) {
             if (row.size() != groups + 1) {
-                throw new IllegalStateException("aggregate row has " + row.size() + " columns, expected "
-                        + (groups + 1));
+                throw new IllegalStateException(
+                        "aggregate row has " + row.size() + " columns, expected " + (groups + 1));
             }
             List<@Nullable Object> group = new ArrayList<>(groups);
             for (int i = 0; i < groups; i++) {
@@ -489,8 +490,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
             out.add(new AggregateRow(group, AggregateValues.normalize(sqlBuilder.read(row.get(groups)))));
         }
         return new Aggregation(aggregate.function().keyword(),
-                aggregate.argument() == null ? null : Expressions.print(aggregate.argument()),
-                aggregate.groupNames(), out);
+                aggregate.argument() == null ? null : Expressions.print(aggregate.argument()), aggregate.groupNames(),
+                out);
     }
 
     private Object text(@Nullable String text) {

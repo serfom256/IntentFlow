@@ -31,8 +31,8 @@ class JdbcCatalogOverridesTest {
         long initial = store.version();
 
         store.put(BOOKS, new ServiceOverride("Every book", "/catalog/{{isbn}}", Map.of("title", "full title")));
-        assertThat(store.find(BOOKS)).contains(
-                new ServiceOverride("Every book", "/catalog/{{isbn}}", Map.of("title", "full title")));
+        assertThat(store.find(BOOKS))
+                .contains(new ServiceOverride("Every book", "/catalog/{{isbn}}", Map.of("title", "full title")));
         assertThat(store.version()).isGreaterThan(initial);
 
         store.put(BOOKS, new ServiceOverride(null, null, Map.of("isbn", "ISBN-13 with dashes")));
@@ -64,10 +64,9 @@ class JdbcCatalogOverridesTest {
 
     @Test
     void aMissingTableExplainsHowToCreateIt() {
-        assertThatThrownBy(() -> new JdbcCatalogOverrides(dataSource, "intentflow_catalog_override", false,
-                Duration.ZERO))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("intentflow_catalog_override")
+        assertThatThrownBy(
+                () -> new JdbcCatalogOverrides(dataSource, "intentflow_catalog_override", false, Duration.ZERO))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("intentflow_catalog_override")
                 .hasMessageContaining("classpath:db/intentflow/intentflow-admin.changelog.yaml")
                 .hasMessageContaining("intentflow.admin.create-table=true");
     }

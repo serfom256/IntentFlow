@@ -28,8 +28,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import javax.sql.DataSource;
 
 @Slf4j
-@AutoConfiguration(afterName = {
-        "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+@AutoConfiguration(afterName = { "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
         "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration" })
 @ConditionalOnProperty(prefix = "intentflow.admin", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(IntentFlowAdminProperties.class)

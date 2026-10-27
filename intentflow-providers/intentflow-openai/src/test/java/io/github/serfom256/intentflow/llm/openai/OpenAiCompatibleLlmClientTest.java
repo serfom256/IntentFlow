@@ -52,15 +52,12 @@ class OpenAiCompatibleLlmClientTest {
 
     private static final ServiceName BOOKS = ServiceNames.of("books");
 
-    private static final ServiceDescriptor BOOKS_SERVICE = ServiceDescriptors.of(
-            BOOKS, ServiceDescriptions.of("Library book catalog"), TableNames.of("book"),
-            List.of(
-                    FieldMappings.of(LogicalFieldNames.of("title"), ColumnNames.of("title"), true),
+    private static final ServiceDescriptor BOOKS_SERVICE = ServiceDescriptors.of(BOOKS,
+            ServiceDescriptions.of("Library book catalog"), TableNames.of("book"),
+            List.of(FieldMappings.of(LogicalFieldNames.of("title"), ColumnNames.of("title"), true),
                     FieldMappings.of(LogicalFieldNames.of("secret"), ColumnNames.of("secret"), false)),
-            List.of(SortKeys.of(LogicalFieldNames.of("title"), SortKey.Direction.ASC)),
-            MaxTakes.of(50),
-            UriTemplates.of("/books"),
-            Object.class);
+            List.of(SortKeys.of(LogicalFieldNames.of("title"), SortKey.Direction.ASC)), MaxTakes.of(50),
+            UriTemplates.of("/books"), Object.class);
 
     private static final ServiceCatalog CATALOG = new ServiceCatalog() {
         @Override
@@ -131,14 +128,14 @@ class OpenAiCompatibleLlmClientTest {
 
     private LlmClient client(String apiKey, LlmHttpOptions options) {
         URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
-        return OpenAiLlmClients.of(base, "test-model", apiKey, Duration.ofSeconds(5),
-                Clock.systemDefaultZone(), options);
+        return OpenAiLlmClients.of(base, "test-model", apiKey, Duration.ofSeconds(5), Clock.systemDefaultZone(),
+                options);
     }
 
     private static String completion(String content) {
         String escaped = content.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-        return "{\"id\":\"x\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\""
-                + escaped + "\"},\"finish_reason\":\"stop\"}]}";
+        return "{\"id\":\"x\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"" + escaped
+                + "\"},\"finish_reason\":\"stop\"}]}";
     }
 
     @Test
@@ -159,8 +156,7 @@ class OpenAiCompatibleLlmClientTest {
                 DslSources.of("books | filter name ~ \"dune\""), "field 'name' is not declared").value();
 
         assertThat(dsl).isEqualTo("books | filter title ~ \"dune\"");
-        assertThat(lastRequest.get())
-                .contains("{\"role\":\"user\",\"content\":\"books about dune\"}")
+        assertThat(lastRequest.get()).contains("{\"role\":\"user\",\"content\":\"books about dune\"}")
                 .contains("{\"role\":\"assistant\",\"content\":\"books | filter name ~ \\\"dune\\\"\"}")
                 .contains("That query was rejected: field 'name' is not declared");
     }
@@ -171,34 +167,26 @@ class OpenAiCompatibleLlmClientTest {
 
         client("").generateDsl(UserTexts.of("all books"), CATALOG);
 
-        assertThat(lastRequest.get())
-                .contains("\"model\":\"test-model\"")
-                .contains("- books: Library book catalog")
-                .contains("    title\\n")
-                .doesNotContain("secret")
-                .contains("\"content\":\"all books\"");
+        assertThat(lastRequest.get()).contains("\"model\":\"test-model\"").contains("- books: Library book catalog")
+                .contains("  title\\n").doesNotContain("secret").contains("\"content\":\"all books\"");
     }
 
     @Test
     void promptDescribesTypesAllowedValuesAndToday() {
-        ServiceDescriptor typed = ServiceDescriptors.of(
-                BOOKS, null, TableNames.of("book"),
-                List.of(
-                        FieldMappings.of(LogicalFieldNames.of("price"), ColumnNames.of("price"), true,
-                                FieldType.NUMBER, "in USD", List.of()),
-                        FieldMappings.of(LogicalFieldNames.of("genre"), ColumnNames.of("genre"), true,
-                                FieldType.TEXT, null, List.of("FANTASY", "SCI_FI"))),
+        ServiceDescriptor typed = ServiceDescriptors.of(BOOKS, null, TableNames.of("book"),
+                List.of(FieldMappings.of(LogicalFieldNames.of("price"), ColumnNames.of("price"), true, FieldType.NUMBER,
+                        "in USD", List.of()),
+                        FieldMappings.of(LogicalFieldNames.of("genre"), ColumnNames.of("genre"), true, FieldType.TEXT,
+                                null, List.of("FANTASY", "SCI_FI"))),
                 List.of(), MaxTakes.of(5), UriTemplates.of("/books"), Object.class);
         reply = completion("books");
         Clock clock = Clock.fixed(Instant.parse("2026-10-11T12:00:00Z"), ZoneOffset.UTC);
         URI base = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
 
-        OpenAiLlmClients.of(base, "m", "", Duration.ofSeconds(5), clock)
-                .generateDsl(UserTexts.of("x"), ServiceCatalogs.of(typed));
+        OpenAiLlmClients.of(base, "m", "", Duration.ofSeconds(5), clock).generateDsl(UserTexts.of("x"),
+                ServiceCatalogs.of(typed));
 
-        assertThat(lastRequest.get())
-                .contains("Today is 2026-10-11.")
-                .contains("price (number) - in USD")
+        assertThat(lastRequest.get()).contains("Today is 2026-10-11.").contains("price (number) - in USD")
                 .contains("genre (text, one of: FANTASY, SCI_FI)");
     }
 
@@ -224,10 +212,8 @@ class OpenAiCompatibleLlmClientTest {
     void nonSuccessStatusBecomesLlmExceptionWithoutTheResponseBody() {
         status = 500;
 
-        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
-                .isInstanceOf(LlmException.class)
-                .hasMessage("LLM returned HTTP 500 after 3 attempts")
-                .hasMessageNotContaining("model not loaded");
+        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG)).isInstanceOf(LlmException.class)
+                .hasMessage("LLM returned HTTP 500 after 3 attempts").hasMessageNotContaining("model not loaded");
         assertThat(requests.get()).isEqualTo(3);
     }
 
@@ -288,8 +274,7 @@ class OpenAiCompatibleLlmClientTest {
     void malformedResponseBecomesLlmException() {
         reply = "{\"choices\":[]}";
 
-        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
-                .isInstanceOf(LlmException.class)
+        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG)).isInstanceOf(LlmException.class)
                 .hasMessage("Unexpected LLM response shape");
     }
 
@@ -297,8 +282,7 @@ class OpenAiCompatibleLlmClientTest {
     void theResponseBodyStaysOutOfErrors() {
         reply = "{\"echo\":\"salary of ann smith\"}";
 
-        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
-                .isInstanceOf(LlmException.class)
+        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG)).isInstanceOf(LlmException.class)
                 .message().doesNotContain("salary");
     }
 
@@ -306,8 +290,7 @@ class OpenAiCompatibleLlmClientTest {
     void emptyAnswerBecomesLlmException() {
         reply = completion("<think>hmm</think>   ");
 
-        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG))
-                .isInstanceOf(LlmException.class)
+        assertThatThrownBy(() -> client("").generateDsl(UserTexts.of("x"), CATALOG)).isInstanceOf(LlmException.class)
                 .hasMessageContaining("empty answer");
     }
 
@@ -353,7 +336,7 @@ class OpenAiCompatibleLlmClientTest {
 
         assertThat(dsl.usage()).isEqualTo(new TokenUsage(812, 15));
         assertThat(dsl.usage().total()).isEqualTo(827);
-        assertThat(dsl.model()).isEqualTo("test-model-2026");
+        assertThat(dsl.model()).hasValue("test-model-2026");
     }
 
     @Test
@@ -363,6 +346,6 @@ class OpenAiCompatibleLlmClientTest {
         DslSource dsl = client("").generateDsl(UserTexts.of("books"), CATALOG);
 
         assertThat(dsl.usage()).isEqualTo(TokenUsage.NONE);
-        assertThat(dsl.model()).isEqualTo("test-model");
+        assertThat(dsl.model()).hasValue("test-model");
     }
 }

@@ -39,17 +39,11 @@ class CachingAndLimitsTest {
     };
 
     private IntentPipeline pipeline(Deque<String> answers, AtomicInteger calls, AstValidator validator) {
-        return IntentPipelines.builder()
-                .llm((text, catalog) -> {
-                    calls.incrementAndGet();
-                    return DslSources.of(answers.size() > 1 ? answers.poll() : answers.peek());
-                })
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(executor)
-                .catalog(CATALOG)
-                .validator(validator)
-                .maxRepairs(0)
-                .build();
+        return IntentPipelines.builder().llm((text, catalog) -> {
+            calls.incrementAndGet();
+            return DslSources.of(answers.size() > 1 ? answers.poll() : answers.peek());
+        }).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(executor).catalog(CATALOG).validator(validator)
+                .maxRepairs(0).build();
     }
 
     @Test
@@ -63,22 +57,17 @@ class CachingAndLimitsTest {
                 return List.of();
             }
         };
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((text, catalog) -> {
-                    calls.incrementAndGet();
-                    return DslSources.of("books | filter title == \"Dune\"");
-                })
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(counting)
-                .catalog(CATALOG)
-                .build();
+        IntentPipeline pipeline = IntentPipelines.builder().llm((text, catalog) -> {
+            calls.incrementAndGet();
+            return DslSources.of("books | filter title == \"Dune\"");
+        }).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(counting).catalog(CATALOG).build();
 
         IntentTrace trace = pipeline.explain(IntentRequests.of("dune"), Book.class);
 
         assertThat(trace.dsl()).isEqualTo("books | filter title == \"Dune\"");
         assertThat(trace.cached()).isFalse();
-        assertThat(trace.query()).isEqualTo(
-                "SELECT * FROM \"book\" WHERE LOWER(\"title\") = LOWER(?) ORDER BY \"id\" ASC LIMIT 50");
+        assertThat(trace.query())
+                .isEqualTo("SELECT * FROM \"book\" WHERE LOWER(\"title\") = LOWER(?) ORDER BY \"id\" ASC LIMIT 50");
         assertThat(trace.parameters()).containsExactly("Dune");
         assertThat(executed).hasValue(0);
 
@@ -91,8 +80,8 @@ class CachingAndLimitsTest {
     void invalidTranslationsAreNotCachedSoARetryAsksTheLlmAgain() {
         AtomicInteger calls = new AtomicInteger();
         IntentPipeline pipeline = pipeline(
-                new ArrayDeque<>(List.of("books | filter ((", "books | filter title ~ \"x\"")),
-                calls, AstValidators.create());
+                new ArrayDeque<>(List.of("books | filter ((", "books | filter title ~ \"x\"")), calls,
+                AstValidators.create());
 
         assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("x books"))).isInstanceOf(DslParseException.class);
         assertThat(pipeline.resolve(IntentRequests.of("x books")).trace().cached()).isFalse();
@@ -103,8 +92,8 @@ class CachingAndLimitsTest {
     @Test
     void validationFailuresAreNotCachedEither() {
         AtomicInteger calls = new AtomicInteger();
-        IntentPipeline pipeline = pipeline(new ArrayDeque<>(List.of("books | filter author == \"x\"", "books")),
-                calls, AstValidators.create());
+        IntentPipeline pipeline = pipeline(new ArrayDeque<>(List.of("books | filter author == \"x\"", "books")), calls,
+                AstValidators.create());
 
         assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("by author")))
                 .isInstanceOf(ValidationException.class);
@@ -115,8 +104,8 @@ class CachingAndLimitsTest {
     @Test
     void declinesAreCachedBecauseTheyAreAnswers() {
         AtomicInteger calls = new AtomicInteger();
-        IntentPipeline pipeline = pipeline(new ArrayDeque<>(List.of("unsupported \"no authors\"")),
-                calls, AstValidators.create());
+        IntentPipeline pipeline = pipeline(new ArrayDeque<>(List.of("unsupported \"no authors\"")), calls,
+                AstValidators.create());
 
         for (int i = 0; i < 3; i++) {
             assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("authors")))

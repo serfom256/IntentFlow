@@ -141,8 +141,9 @@ class LlmResilienceTest {
             assertThatThrownBy(() -> ask(breaker)).hasMessage("LLM returned HTTP 503");
             clock.advance(Duration.ofSeconds(10));
 
-            assertThatThrownBy(() -> ask(breaker)).isInstanceOfSatisfying(LlmUnavailableException.class,
-                    e -> assertThat(e.retryAfter()).contains(Duration.ofSeconds(20)))
+            assertThatThrownBy(() -> ask(breaker))
+                    .isInstanceOfSatisfying(LlmUnavailableException.class,
+                            e -> assertThat(e.retryAfter()).contains(Duration.ofSeconds(20)))
                     .hasMessage("LLM circuit is open after repeated failures (threshold 2)");
             assertThat(llm.calls).hasValue(2);
             clock.advance(Duration.ofSeconds(20));
@@ -213,8 +214,8 @@ class LlmResilienceTest {
         @Test
         void programmingErrorsAreNotRetriedOnTheFallback() {
             ScriptedLlm fallback = new ScriptedLlm("fallback");
-            LlmClient llm = LlmClients.withFallback(new ScriptedLlm("primary").failing(new IllegalStateException(
-                    "bug")), fallback);
+            LlmClient llm = LlmClients
+                    .withFallback(new ScriptedLlm("primary").failing(new IllegalStateException("bug")), fallback);
 
             assertThatThrownBy(() -> ask(llm)).hasMessage("bug");
             assertThat(fallback.calls).hasValue(0);
@@ -223,8 +224,8 @@ class LlmResilienceTest {
         @Test
         void anOpenCircuitSendsQuestionsToTheFallbackWithoutCallingThePrimary() {
             ScriptedLlm primary = new ScriptedLlm("primary").failing(down());
-            LlmClient llm = LlmClients.withFallback(
-                    LlmClients.circuitBreaker(primary, 1, Duration.ofSeconds(30)), new ScriptedLlm("fallback"));
+            LlmClient llm = LlmClients.withFallback(LlmClients.circuitBreaker(primary, 1, Duration.ofSeconds(30)),
+                    new ScriptedLlm("fallback"));
 
             assertThat(ask(llm)).isEqualTo("fallback");
             assertThat(ask(llm)).isEqualTo("fallback");
@@ -246,8 +247,9 @@ class LlmResilienceTest {
                 }
             };
 
-            LlmClients.withFallback(LlmClients.circuitBreaker(LlmClients.limited(primary, 1, Duration.ZERO), 1,
-                    Duration.ofSeconds(1)), new ScriptedLlm("fallback")).ping();
+            LlmClients.withFallback(
+                    LlmClients.circuitBreaker(LlmClients.limited(primary, 1, Duration.ZERO), 1, Duration.ofSeconds(1)),
+                    new ScriptedLlm("fallback")).ping();
 
             assertThat(pings).hasValue(1);
         }

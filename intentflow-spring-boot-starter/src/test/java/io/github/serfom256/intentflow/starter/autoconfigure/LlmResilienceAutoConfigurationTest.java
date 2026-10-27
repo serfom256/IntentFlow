@@ -45,8 +45,7 @@ class LlmResilienceAutoConfigurationTest {
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                     return List.of();
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=big", "intentflow.llm.max-retries=0",
+            }).withPropertyValues("intentflow.llm.model=big", "intentflow.llm.max-retries=0",
                     "intentflow.llm.base-url=" + url(primary), "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false", "intentflow.dialect=postgresql");
 
@@ -68,20 +67,18 @@ class LlmResilienceAutoConfigurationTest {
                     assertThat(llm.generateDsl(UserTexts.of("books"), catalog).value()).isEqualTo("books");
 
                     assertThat(primaryCalls).hasSize(1);
-                    assertThat(fallbackCalls).hasSize(2).allSatisfy(body -> assertThat(body)
-                            .contains("\"model\":\"small\""));
+                    assertThat(fallbackCalls).hasSize(2)
+                            .allSatisfy(body -> assertThat(body).contains("\"model\":\"small\""));
                 });
     }
 
     @Test
     void aResilience4jRegistryProvidesTheBreakers() {
-        CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(CircuitBreakerConfig.custom()
-                .slidingWindowSize(2).minimumNumberOfCalls(2).failureRateThreshold(50).build());
+        CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(CircuitBreakerConfig.custom().slidingWindowSize(2)
+                .minimumNumberOfCalls(2).failureRateThreshold(50).build());
 
-        runner.withBean(CircuitBreakerRegistry.class, () -> registry)
-                .withPropertyValues("intentflow.llm.fallback.base-url=" + url(fallback),
-                        "intentflow.llm.fallback.model=small")
-                .run(ctx -> {
+        runner.withBean(CircuitBreakerRegistry.class, () -> registry).withPropertyValues(
+                "intentflow.llm.fallback.base-url=" + url(fallback), "intentflow.llm.fallback.model=small").run(ctx -> {
                     LlmClient llm = ctx.getBean(LlmClient.class);
                     ServiceCatalog catalog = ctx.getBean(ServiceCatalog.class);
 
@@ -100,8 +97,8 @@ class LlmResilienceAutoConfigurationTest {
 
     @Test
     void anOpenResilience4jCircuitIsUnavailable() {
-        CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(CircuitBreakerConfig.custom()
-                .slidingWindowSize(1).minimumNumberOfCalls(1).build());
+        CircuitBreakerRegistry registry = CircuitBreakerRegistry
+                .of(CircuitBreakerConfig.custom().slidingWindowSize(1).minimumNumberOfCalls(1).build());
 
         runner.withBean(CircuitBreakerRegistry.class, () -> registry).run(ctx -> {
             LlmClient llm = ctx.getBean(LlmClient.class);
@@ -110,8 +107,7 @@ class LlmResilienceAutoConfigurationTest {
             assertThatThrownBy(() -> llm.generateDsl(UserTexts.of("books"), catalog))
                     .hasMessage("LLM returned HTTP 503");
             assertThatThrownBy(() -> llm.generateDsl(UserTexts.of("books"), catalog))
-                    .isInstanceOf(LlmUnavailableException.class)
-                    .hasMessage("LLM circuit 'intentflow-llm' is open");
+                    .isInstanceOf(LlmUnavailableException.class).hasMessage("LLM circuit 'intentflow-llm' is open");
             assertThat(primaryCalls).hasSize(1);
         });
     }
@@ -133,9 +129,8 @@ class LlmResilienceAutoConfigurationTest {
 
     @Test
     void anUnknownProviderIsReported() {
-        runner.withPropertyValues("intentflow.llm.provider=watsonx")
-                .run(ctx -> assertThat(ctx).hasFailed().getFailure()
-                        .rootCause().hasMessageContaining("intentflow.llm.provider=watsonx"));
+        runner.withPropertyValues("intentflow.llm.provider=watsonx").run(ctx -> assertThat(ctx).hasFailed().getFailure()
+                .rootCause().hasMessageContaining("intentflow.llm.provider=watsonx"));
     }
 
     @Test
@@ -147,15 +142,13 @@ class LlmResilienceAutoConfigurationTest {
     void aConcurrencyLimitCanBeSetAndTheBreakerTurnedOff() {
         runner.withPropertyValues("intentflow.llm.concurrency.max-calls=4",
                 "intentflow.llm.circuit-breaker.failure-threshold=0")
-                .run(ctx -> assertThat(ctx.getBean(LlmClient.class))
-                        .isInstanceOf(ConcurrencyLimitedLlmClient.class));
+                .run(ctx -> assertThat(ctx.getBean(LlmClient.class)).isInstanceOf(ConcurrencyLimitedLlmClient.class));
     }
 
     @Test
     void withEverythingOffTheClientIsThePlainOne() {
         runner.withPropertyValues("intentflow.llm.circuit-breaker.failure-threshold=0")
-                .run(ctx -> assertThat(ctx.getBean(LlmClient.class))
-                        .isInstanceOf(OpenAiCompatibleLlmClient.class));
+                .run(ctx -> assertThat(ctx.getBean(LlmClient.class)).isInstanceOf(OpenAiCompatibleLlmClient.class));
     }
 
     private static HttpServer server(int status, List<String> calls) {

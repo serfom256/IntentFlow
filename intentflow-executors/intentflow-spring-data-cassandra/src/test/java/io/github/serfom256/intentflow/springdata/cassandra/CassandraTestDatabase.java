@@ -37,9 +37,8 @@ final class CassandraTestDatabase {
             contactPoint = new InetSocketAddress("localhost", ComposeDatabases.port("CASSANDRA_PORT", 19042));
             datacenter = "datacenter1";
         } else {
-            CassandraContainer c = new CassandraContainer(
-                    DockerImageName.parse("mirror.gcr.io/library/cassandra:5.0")
-                            .asCompatibleSubstituteFor("cassandra"));
+            CassandraContainer c = new CassandraContainer(DockerImageName.parse("mirror.gcr.io/library/cassandra:5.0")
+                    .asCompatibleSubstituteFor("cassandra"));
             c.start();
             contactPoint = c.getContactPoint();
             datacenter = c.getLocalDatacenter();
@@ -51,8 +50,6 @@ final class CassandraTestDatabase {
     }
 
     private static CqlSessionBuilder builder() {
-        return CqlSession.builder()
-                .addContactPoint(contactPoint)
-                .withLocalDatacenter(datacenter);
+        return CqlSession.builder().addContactPoint(contactPoint).withLocalDatacenter(datacenter);
     }
 }

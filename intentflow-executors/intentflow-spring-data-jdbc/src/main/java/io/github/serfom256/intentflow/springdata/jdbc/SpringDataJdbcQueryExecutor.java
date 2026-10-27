@@ -33,8 +33,8 @@ public final class SpringDataJdbcQueryExecutor implements QueryExecutor {
         JdbcMappingContext context = new JdbcMappingContext();
         context.setSimpleTypeHolder(conversions.getSimpleTypeHolder());
         MappingJdbcConverter converter = new MappingJdbcConverter(context, (identifier, path) -> {
-            throw new UnsupportedOperationException("IntentFlow reads single-table entities; "
-                    + path.toDotPath() + " needs a relation");
+            throw new UnsupportedOperationException(
+                    "IntentFlow reads single-table entities; " + path.toDotPath() + " needs a relation");
         }, conversions, JdbcTypeFactory.unsupported());
         return new SpringDataJdbcQueryExecutor(JdbcClient.create(dataSource), converter);
     }
@@ -44,9 +44,7 @@ public final class SpringDataJdbcQueryExecutor implements QueryExecutor {
         @SuppressWarnings("unchecked")
         RelationalPersistentEntity<T> entity = (RelationalPersistentEntity<T>) converter.getMappingContext()
                 .getRequiredPersistentEntity(resultType);
-        return jdbcClient.sql(query.sql())
-                .params(query.values())
-                .query(new EntityRowMapper<>(entity, converter))
+        return jdbcClient.sql(query.sql()).params(query.values()).query(new EntityRowMapper<>(entity, converter))
                 .list();
     }
 

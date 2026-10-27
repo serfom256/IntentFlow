@@ -2,9 +2,9 @@ package io.github.serfom256.intentflow.core.ast;
 
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Parsed DSL query: service, optional filter, sort and pagination. Results are
@@ -14,30 +14,26 @@ public interface AstQuery {
 
     ServiceName service();
 
-    @Nullable
-    FilterExpr filter();
+    Optional<FilterExpr> filter();
 
     List<SortKey> sort();
 
-    @Nullable
-    Skip skip();
+    Optional<Skip> skip();
 
-    @Nullable
-    Take take();
+    Optional<Take> take();
 
     /**
-     * Grouping and aggregate function; {@code null} when the query returns
-     * entities.
+     * Grouping and aggregate function; empty when the query returns entities.
      */
-    default @Nullable Aggregate aggregate() {
-        return null;
+    default Optional<Aggregate> aggregate() {
+        return Optional.empty();
     }
 
     /**
      * Keeps only the first rows of each partition, as in "top 3 products per
-     * category"; {@code null} when unused.
+     * category"; empty when unused.
      */
-    default @Nullable TopN top() {
-        return null;
+    default Optional<TopN> top() {
+        return Optional.empty();
     }
 }

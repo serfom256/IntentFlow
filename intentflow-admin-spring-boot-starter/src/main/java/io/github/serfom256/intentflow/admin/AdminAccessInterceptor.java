@@ -38,24 +38,25 @@ final class AdminAccessInterceptor implements HandlerInterceptor {
         }
         AdminAccess.Decision decision = access.check(request);
         switch (decision.outcome()) {
-            case ALLOWED -> {
-                if (!decision.editor() && api && writes(request, uri)) {
-                    problem(response, 403, "read-only", decision.user() + " may read the catalog and explain "
-                            + "questions, but not change overrides", true);
-                    return false;
-                }
-                request.setAttribute(USER, decision.user());
-                request.setAttribute(EDITOR, decision.editor());
-                return true;
+        case ALLOWED -> {
+            if (!decision.editor() && api && writes(request, uri)) {
+                problem(response, 403, "read-only",
+                        decision.user() + " may read the catalog and explain " + "questions, but not change overrides",
+                        true);
+                return false;
             }
-            case UNAUTHENTICATED -> {
-                if (decision.challenge() != null) {
-                    response.setHeader("WWW-Authenticate", decision.challenge());
-                }
-                problem(response, 401, "unauthenticated", "Sign in to use the IntentFlow admin", api);
+            request.setAttribute(USER, decision.user());
+            request.setAttribute(EDITOR, decision.editor());
+            return true;
+        }
+        case UNAUTHENTICATED -> {
+            if (decision.challenge() != null) {
+                response.setHeader("WWW-Authenticate", decision.challenge());
             }
-            case FORBIDDEN -> problem(response, 403, "forbidden", "The IntentFlow admin needs one of the authorities "
-                    + authorities + "; " + decision.user() + " has none of them", api);
+            problem(response, 401, "unauthenticated", "Sign in to use the IntentFlow admin", api);
+        }
+        case FORBIDDEN -> problem(response, 403, "forbidden", "The IntentFlow admin needs one of the authorities "
+                + authorities + "; " + decision.user() + " has none of them", api);
         }
         return false;
     }
@@ -86,18 +87,18 @@ final class AdminAccessInterceptor implements HandlerInterceptor {
         StringBuilder sb = new StringBuilder("\"");
         for (char c : value.toCharArray()) {
             switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
+            case '"' -> sb.append("\\\"");
+            case '\\' -> sb.append("\\\\");
+            case '\n' -> sb.append("\\n");
+            case '\r' -> sb.append("\\r");
+            case '\t' -> sb.append("\\t");
+            default -> {
+                if (c < 0x20) {
+                    sb.append(String.format("\\u%04x", (int) c));
+                } else {
+                    sb.append(c);
                 }
+            }
             }
         }
         return sb.append('"').toString();

@@ -87,11 +87,10 @@ class GigaChatLlmClientsTest {
         assertThat(llm.generateDsl(UserTexts.of("books"), CATALOG).value()).isEqualTo("books");
         llm.generateDsl(UserTexts.of("books"), CATALOG);
 
-        assertThat(oauthRequests).singleElement().asString()
-                .contains("Basic Y2xpZW50OnNlY3JldA==").contains("scope=GIGACHAT_API_CORP").contains("rquid=true");
-        assertThat(chatRequests).hasSize(2).allSatisfy(request -> assertThat(request)
-                .startsWith("Bearer token-1").contains("\"model\":\"GigaChat-2-Max\"")
-                .doesNotContain("temperature"));
+        assertThat(oauthRequests).singleElement().asString().contains("Basic Y2xpZW50OnNlY3JldA==")
+                .contains("scope=GIGACHAT_API_CORP").contains("rquid=true");
+        assertThat(chatRequests).hasSize(2).allSatisfy(request -> assertThat(request).startsWith("Bearer token-1")
+                .contains("\"model\":\"GigaChat-2-Max\"").doesNotContain("temperature"));
     }
 
     @Test
@@ -110,8 +109,7 @@ class GigaChatLlmClientsTest {
     void aRejectedKeyIsAnLlmException() {
         oauthStatus = 401;
 
-        assertThatThrownBy(() -> client().generateDsl(UserTexts.of("books"), CATALOG))
-                .isInstanceOf(LlmException.class)
+        assertThatThrownBy(() -> client().generateDsl(UserTexts.of("books"), CATALOG)).isInstanceOf(LlmException.class)
                 .hasMessage("GigaChat OAuth returned HTTP 401");
     }
 

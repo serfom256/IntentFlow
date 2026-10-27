@@ -75,8 +75,7 @@ class LexerTest {
 
     @Test
     void trailingDotIsRejected() {
-        assertThatThrownBy(() -> lex("3."))
-                .isInstanceOf(DslParseException.class)
+        assertThatThrownBy(() -> lex("3.")).isInstanceOf(DslParseException.class)
                 .hasMessageContaining("digit after '.'");
     }
 
@@ -97,8 +96,7 @@ class LexerTest {
     @Test
     void stringWithBackslashEscape() {
         List<Token> t = lex("\"a\\\\b\"");
-        assertThat(t.get(0)).isInstanceOfSatisfying(StringToken.class,
-                s -> assertThat(s.value()).isEqualTo("a\\b"));
+        assertThat(t.get(0)).isInstanceOfSatisfying(StringToken.class, s -> assertThat(s.value()).isEqualTo("a\\b"));
     }
 
     @Test
@@ -117,22 +115,19 @@ class LexerTest {
 
     @Test
     void unterminatedStringIsRejected() {
-        assertThatThrownBy(() -> lex("\"unterminated"))
-                .isInstanceOf(DslParseException.class)
+        assertThatThrownBy(() -> lex("\"unterminated")).isInstanceOf(DslParseException.class)
                 .hasMessageContaining("unterminated string");
     }
 
     @Test
     void invalidEscapeIsRejected() {
-        assertThatThrownBy(() -> lex("\"bad\\xescape\""))
-                .isInstanceOf(DslParseException.class)
+        assertThatThrownBy(() -> lex("\"bad\\xescape\"")).isInstanceOf(DslParseException.class)
                 .hasMessageContaining("invalid escape");
     }
 
     @Test
     void rawNewlineInStringIsRejected() {
-        assertThatThrownBy(() -> lex("\"line1\nline2\""))
-                .isInstanceOf(DslParseException.class)
+        assertThatThrownBy(() -> lex("\"line1\nline2\"")).isInstanceOf(DslParseException.class)
                 .hasMessageContaining("unterminated string");
     }
 
@@ -171,15 +166,13 @@ class LexerTest {
 
     @Test
     void bareEqualsIsRejected() {
-        assertThatThrownBy(() -> lex("a = b"))
-                .isInstanceOf(DslParseException.class)
+        assertThatThrownBy(() -> lex("a = b")).isInstanceOf(DslParseException.class)
                 .hasMessageContaining("unexpected character '='");
     }
 
     @Test
     void bareBangIsRejected() {
-        assertThatThrownBy(() -> lex("!a"))
-                .isInstanceOf(DslParseException.class)
+        assertThatThrownBy(() -> lex("!a")).isInstanceOf(DslParseException.class)
                 .hasMessageContaining("unexpected character '!'");
     }
 
@@ -208,8 +201,7 @@ class LexerTest {
 
     @Test
     void fullPipelineQuery() {
-        List<Token> t = lex(
-                "books | filter author == \"Doe\" and year >= 2000 | sort year desc | take 20");
+        List<Token> t = lex("books | filter author == \"Doe\" and year >= 2000 | sort year desc | take 20");
         assertThat(t).hasSize(18);
         assertThat(t.get(0)).isInstanceOfSatisfying(IdentifierToken.class,
                 id -> assertThat(id.name()).isEqualTo("books"));
@@ -227,8 +219,7 @@ class LexerTest {
                 kw -> assertThat(kw.keyword()).isEqualTo(Keyword.IN));
         assertThat(t.get(2)).isInstanceOfSatisfying(PunctuationToken.class,
                 p -> assertThat(p.punctuation()).isEqualTo(Punctuation.LPAREN));
-        assertThat(t.get(3)).isInstanceOfSatisfying(StringToken.class,
-                s -> assertThat(s.value()).isEqualTo("a"));
+        assertThat(t.get(3)).isInstanceOfSatisfying(StringToken.class, s -> assertThat(s.value()).isEqualTo("a"));
         assertThat(t.get(4)).isInstanceOfSatisfying(PunctuationToken.class,
                 p -> assertThat(p.punctuation()).isEqualTo(Punctuation.COMMA));
     }
@@ -281,22 +272,18 @@ class LexerTest {
 
     @Test
     void errorMessageMentionsLineAndColumn() {
-        assertThatThrownBy(() -> lex("a\n!b"))
-                .isInstanceOf(DslParseException.class)
-                .hasMessageContaining("line 2")
+        assertThatThrownBy(() -> lex("a\n!b")).isInstanceOf(DslParseException.class).hasMessageContaining("line 2")
                 .hasMessageContaining("column 1");
     }
 
     @Test
     void emptyDslSourceRejectedAtConstruction() {
-        assertThatThrownBy(() -> DslSources.of(""))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DslSources.of("")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void whitespaceOnlyDslSourceRejectedAtConstruction() {
-        assertThatThrownBy(() -> DslSources.of("   "))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DslSources.of("   ")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -323,9 +310,9 @@ class LexerTest {
 
     @Test
     void minusAfterAValueIsSubtractionAndOtherwiseANegativeNumber() {
-        assertThat(lex("x - 5")).extracting(t -> t.getClass().getSimpleName())
-                .containsExactly("IdentifierToken", "PunctuationToken", "NumberToken", "EofToken");
-        assertThat(lex("x == -5")).extracting(t -> t.getClass().getSimpleName())
-                .containsExactly("IdentifierToken", "OperatorToken", "NumberToken", "EofToken");
+        assertThat(lex("x - 5")).extracting(t -> t.getClass().getSimpleName()).containsExactly("IdentifierToken",
+                "PunctuationToken", "NumberToken", "EofToken");
+        assertThat(lex("x == -5")).extracting(t -> t.getClass().getSimpleName()).containsExactly("IdentifierToken",
+                "OperatorToken", "NumberToken", "EofToken");
     }
 }

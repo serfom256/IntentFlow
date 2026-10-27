@@ -92,7 +92,7 @@ class RedisRateLimiterTest {
 
     private RedisRateLimiter limiter(StringRedisTemplate redis, int questions, boolean failOpen) {
         return new RedisRateLimiter(redis, "intentflow:rate-limit:", questions, Duration.ofMinutes(1),
-                caller -> String.valueOf(caller.principal()), failOpen, clock);
+                caller -> caller.principal().orElse("anonymous"), failOpen, clock);
     }
 
     @ParameterizedTest

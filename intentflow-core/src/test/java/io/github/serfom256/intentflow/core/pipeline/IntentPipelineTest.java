@@ -52,28 +52,22 @@ class IntentPipelineTest {
     private static final ServiceName BOOKS = ServiceNames.of("books");
     private static final ServiceName AUTHORS = ServiceNames.of("authors");
 
-    private static final ServiceDescriptor BOOKS_SERVICE = ServiceDescriptors.of(
-            BOOKS, null, TableNames.of("book"),
-            List.of(
-                    FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true),
+    private static final ServiceDescriptor BOOKS_SERVICE = ServiceDescriptors.of(BOOKS, null, TableNames.of("book"),
+            List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true),
                     FieldMappings.of(LogicalFieldNames.of("title"), ColumnNames.of("title"), true)),
-            List.of(SortKeys.of(LogicalFieldNames.of("id"), SortKey.Direction.ASC)),
-            MaxTakes.of(50),
-            UriTemplates.of("/books/{{id}}"),
-            Book.class);
+            List.of(SortKeys.of(LogicalFieldNames.of("id"), SortKey.Direction.ASC)), MaxTakes.of(50),
+            UriTemplates.of("/books/{{id}}"), Book.class);
 
-    private static final ServiceDescriptor AUTHORS_SERVICE = ServiceDescriptors.of(
-            AUTHORS, null, TableNames.of("author"),
-            List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true)),
+    private static final ServiceDescriptor AUTHORS_SERVICE = ServiceDescriptors.of(AUTHORS, null,
+            TableNames.of("author"), List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true)),
             List.of(), MaxTakes.of(50), UriTemplates.of("/authors/{{id}}"), Author.class);
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(BOOKS_SERVICE, AUTHORS_SERVICE);
 
     static final class RecordingExecutor implements QueryExecutor {
         final List<BoundQuery> queries = new ArrayList<>();
-        final Map<Class<?>, List<?>> rows = new ConcurrentHashMap<>(Map.of(
-                Book.class, List.of(new Book(42, "Dune"), new Book(7, "Emma")),
-                Author.class, List.of(new Author(3, "Herbert"))));
+        final Map<Class<?>, List<?>> rows = new ConcurrentHashMap<>(Map.of(Book.class,
+                List.of(new Book(42, "Dune"), new Book(7, "Emma")), Author.class, List.of(new Author(3, "Herbert"))));
 
         @Override
         public synchronized <T> List<T> execute(BoundQuery query, Class<T> resultType) {
@@ -106,13 +100,8 @@ class IntentPipelineTest {
     private final RecordingExecutor executor = new RecordingExecutor();
 
     private IntentPipeline pipeline(LlmClient llm) {
-        return IntentPipelines.builder()
-                .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(executor)
-                .catalog(CATALOG)
-                .cache(DslCaches.create(Duration.ofMinutes(5), 100))
-                .build();
+        return IntentPipelines.builder().llm(llm).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(executor)
+                .catalog(CATALOG).cache(DslCaches.create(Duration.ofMinutes(5), 100)).build();
     }
 
     @Test
@@ -157,8 +146,7 @@ class IntentPipelineTest {
         IntentPipeline pipe = pipeline(new ScriptedLlm(Map.of("sneaky", "authors")));
 
         assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("sneaky"), Book.class))
-                .isInstanceOf(ServiceNotFoundException.class)
-                .hasMessageContaining("authors");
+                .isInstanceOf(ServiceNotFoundException.class).hasMessageContaining("authors");
         assertThat(executor.queries).isEmpty();
     }
 
@@ -167,8 +155,7 @@ class IntentPipelineTest {
         IntentPipeline pipe = pipeline(new ScriptedLlm(Map.of()));
 
         assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("x"), String.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("java.lang.String");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("java.lang.String");
     }
 
     @Test
@@ -219,17 +206,15 @@ class IntentPipelineTest {
 
     @Test
     void propagatesLlmParseValidationAndUnsupportedFailures() {
-        IntentPipeline pipe = pipeline(new ScriptedLlm(Map.of(
-                "garbage", "books |",
-                "bad field", "books | filter ghost == 1",
-                "declined", "unsupported \"books have no publisher field\"")));
+        IntentPipeline pipe = pipeline(new ScriptedLlm(Map.of("garbage", "books |", "bad field",
+                "books | filter ghost == 1", "declined", "unsupported \"books have no publisher field\"")));
 
         assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("unscripted"))).isInstanceOf(LlmException.class);
         assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("garbage"))).isInstanceOf(DslParseException.class);
         assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("bad field"))).isInstanceOf(ValidationException.class);
-        assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("declined")))
-                .isInstanceOfSatisfying(UnsupportedRequestException.class,
-                        e -> assertThat(e.reason()).isEqualTo("books have no publisher field"));
+        assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("declined"))).isInstanceOfSatisfying(
+                UnsupportedRequestException.class,
+                e -> assertThat(e.reason()).isEqualTo("books have no publisher field"));
         assertThat(executor.queries).isEmpty();
     }
 
@@ -242,12 +227,8 @@ class IntentPipelineTest {
                 return (List<T>) List.of("not a book");
             }
         };
-        IntentPipeline pipe = IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of("books"))
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(broken)
-                .catalog(CATALOG)
-                .build();
+        IntentPipeline pipe = IntentPipelines.builder().llm((text, catalog) -> DslSources.of("books"))
+                .sqlBuilder(SqlBuilders.create(new TestDialect())).executor(broken).catalog(CATALOG).build();
 
         assertThatThrownBy(() -> pipe.resolve(IntentRequests.of("x"), Book.class))
                 .hasMessageContaining("java.lang.String");

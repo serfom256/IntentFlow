@@ -42,8 +42,7 @@ class DateLiteralTest {
             "created_at < \"2026-10-10\"  | \"created_at\" < ? | 2026-10-10T00:00",
             "created_at >= \"2026-10-10\" | \"created_at\" >= ? | 2026-10-10T00:00",
             "created_at == \"2026-10-10T12:00:00\" | \"created_at\" = ? | 2026-10-10T12:00",
-            "created_at == \"2026-12-31\" | (\"created_at\" >= ? AND \"created_at\" < ?) | 2026-12-31T00:00,2027-01-01T00:00",
-    })
+            "created_at == \"2026-12-31\" | (\"created_at\" >= ? AND \"created_at\" < ?) | 2026-12-31T00:00,2027-01-01T00:00", })
     void aDateWithoutTimeMeansTheWholeDay(String filter, String where, String binds) {
         BoundQuery query = sql(filter);
 
@@ -53,8 +52,7 @@ class DateLiteralTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-            "created_at in (\"2026-10-10\", \"2026-10-12T08:00:00\") | ((\"created_at\" >= ? AND \"created_at\" < ?) OR \"created_at\" = ?)",
-    })
+            "created_at in (\"2026-10-10\", \"2026-10-12T08:00:00\") | ((\"created_at\" >= ? AND \"created_at\" < ?) OR \"created_at\" = ?)", })
     void inWithDatesMatchesAnyOfTheDays(String filter, String where) {
         assertThat(sql(filter).sql()).isEqualTo("SELECT * FROM \"order\" WHERE " + where + " LIMIT 50");
     }

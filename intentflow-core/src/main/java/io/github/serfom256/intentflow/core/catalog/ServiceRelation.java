@@ -3,8 +3,8 @@ package io.github.serfom256.intentflow.core.catalog;
 /**
  * A link from one service to another, e.g. {@code orders.customer → customers}.
  * Filters address the target's fields as {@code <name>.<field>}; a row matches
- * when
- * some target row with {@code target.to == this.from} satisfies the condition.
+ * when some target row with {@code target.to == this.from} satisfies the
+ * condition.
  */
 public interface ServiceRelation {
 

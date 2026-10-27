@@ -72,8 +72,7 @@ class AzureOpenAiLlmClientsTest {
     void withoutAKeyOrAzureIdentityTheErrorSaysWhatToAdd() {
         assertThatThrownBy(() -> AzureOpenAiLlmClients.of(URI.create("https://res.openai.azure.com"), "gpt-dsl", "",
                 Duration.ofSeconds(5), Clock.systemUTC(), LlmHttpOptions.DEFAULTS))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("com.azure:azure-identity");
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("com.azure:azure-identity");
     }
 
     private HttpServer server() {

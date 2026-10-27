@@ -1,12 +1,14 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
+import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
 import io.github.serfom256.intentflow.core.pipeline.factories.SqlBuilders;
+import io.github.serfom256.intentflow.core.pipeline.factories.ValidatedQueries;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.testing.TestDialect;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,10 @@ class RelatedRowsTest {
 
     @IntentService(value = "orders", table = "order", uri = "/orders/{{id}}", defaultSort = "id")
     record Order(@IntentField long id, @IntentField long customerId) {
+    }
+
+    @IntentService(value = "open_orders", table = "order", uri = "/orders/{{id}}", restriction = "status <> 'CANCELLED'")
+    record OpenOrder(@IntentField long id) {
     }
 
     private static final ServiceDescriptor ORDERS = ServiceDescriptors.fromAnnotated(Order.class);
@@ -39,10 +45,19 @@ class RelatedRowsTest {
         List<BoundQuery> queries = related(List.of(1L, 2L, 3L), restricted());
 
         assertThat(queries).singleElement().satisfies(q -> {
-            assertThat(q.sql()).isEqualTo(
-                    "SELECT * FROM \"order\" WHERE \"customer_id\" IN (?, ?, ?, ?) AND (deleted = FALSE)");
+            assertThat(q.sql())
+                    .isEqualTo("SELECT * FROM \"order\" WHERE \"customer_id\" IN (?, ?, ?, ?) AND (deleted = FALSE)");
             assertThat(q.values()).containsExactly(1L, 2L, 3L, 3L);
         });
+    }
+
+    @Test
+    void appliesTheDeclaredRestrictionWithoutSchemaFacts() {
+        BoundQuery query = SqlBuilders.create(new TestDialect())
+                .build(ValidatedQueries.of(ServiceDescriptors.fromAnnotated(OpenOrder.class),
+                        AstQueries.of(ServiceNames.of("open_orders"), null, List.of(), null, null)));
+
+        assertThat(query.sql()).contains("WHERE (status <> 'CANCELLED')");
     }
 
     @Test

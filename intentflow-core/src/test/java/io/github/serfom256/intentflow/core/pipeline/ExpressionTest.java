@@ -1,7 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.ast.AstQuery;
-import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.CastExpr;
 import io.github.serfom256.intentflow.core.ast.CastType;
 import io.github.serfom256.intentflow.core.ast.ExprCompare;
@@ -49,8 +48,7 @@ class ExpressionTest {
 
     private static String rendered(String dsl) {
         return SqlBuilders.create(new TestDialect(), SchemaFacts.none(), FUNCTIONS_AS_WRITTEN)
-                .build(AstValidators.create().validate(parse(dsl), CATALOG))
-                .sql();
+                .build(AstValidators.create().validate(parse(dsl), CATALOG)).sql();
     }
 
     private static String declared(String dsl) {
@@ -64,32 +62,28 @@ class ExpressionTest {
     void postgresStyleCastsParseLikeCastCalls() {
         assertThat(parse("orders | filter code::bigint > 1000").filter())
                 .isEqualTo(parse("orders | filter cast(code as integer) > 1000").filter());
-        assertThat(((ExprCompare) parse("orders | filter \"1234\"::bigint == total").filter()).left())
-                .isInstanceOf(CastExpr.class)
-                .extracting(e -> ((CastExpr) e).type()).isEqualTo(CastType.INTEGER);
+        assertThat(((ExprCompare) parse("orders | filter \"1234\"::bigint == total").filter().orElseThrow()).left())
+                .isInstanceOf(CastExpr.class).extracting(e -> ((CastExpr) e).type()).isEqualTo(CastType.INTEGER);
     }
 
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {
-            "coalesce(discount, 0) > 10 | COALESCE(CAST(\"discount\" AS NUMERIC), ?) > ?",
+    @CsvSource(delimiter = '|', value = { "coalesce(discount, 0) > 10 | COALESCE(CAST(\"discount\" AS NUMERIC), ?) > ?",
             "total / discount > 2 | (CAST(\"total\" AS NUMERIC) / NULLIF(\"discount\", 0)) > ?",
             "(total - discount) * 2 >= 100 | ((\"total\" - \"discount\") * ?) >= ?",
             "year(created_at) == 2025 | EXTRACT(YEAR FROM \"created_at\") = ?",
             "month(created_at) in (1, 2) | EXTRACT(MONTH FROM \"created_at\") IN (?, ?)",
             "date_trunc(\"month\", created_at) == \"2026-10-01\" | (DATE_TRUNC('month', \"created_at\") >= CAST(? AS TIMESTAMP) AND DATE_TRUNC('month', \"created_at\") < CAST(? AS TIMESTAMP))",
             "created_at::date == \"2026-10-10\" | CAST(\"created_at\" AS DATE) = CAST(CAST(? AS TIMESTAMP) AS DATE)",
-            "code::bigint > 1000 | CAST(\"code\" AS BIGINT) > ?",
-            "length(code) > 3 | CHAR_LENGTH(\"code\") > ?",
+            "code::bigint > 1000 | CAST(\"code\" AS BIGINT) > ?", "length(code) > 3 | CHAR_LENGTH(\"code\") > ?",
             "round(total, 1) == 9.5 | ROUND(CAST(\"total\" AS NUMERIC), 1) = ?",
             "coalesce(code, \"none\") == \"A1\" | LOWER(COALESCE(\"code\", ?)) = LOWER(?)",
             "lower(code) ~ \"x\" | LOWER(LOWER(\"code\")) LIKE LOWER(?) ESCAPE '!'",
             "coalesce(discount, total) == null | COALESCE(\"discount\", \"total\") IS NULL",
             "total > discount | \"total\" > \"discount\"",
-            "coalesce(created_at, \"2020-01-01T00:00:00\") < \"2021-01-01T00:00:00\" | COALESCE(\"created_at\", CAST(? AS TIMESTAMP)) < CAST(? AS TIMESTAMP)",
-    })
+            "coalesce(created_at, \"2020-01-01T00:00:00\") < \"2021-01-01T00:00:00\" | COALESCE(\"created_at\", CAST(? AS TIMESTAMP)) < CAST(? AS TIMESTAMP)", })
     void expressionsRender(String filter, String where) {
-        assertThat(rendered("orders | filter " + filter)).isEqualTo(
-                "SELECT * FROM \"order\" WHERE " + where + " ORDER BY \"id\" ASC LIMIT 50");
+        assertThat(rendered("orders | filter " + filter))
+                .isEqualTo("SELECT * FROM \"order\" WHERE " + where + " ORDER BY \"id\" ASC LIMIT 50");
     }
 
     @Test
@@ -104,18 +98,13 @@ class ExpressionTest {
     }
 
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {
-            "year(code) == 2025 | year needs a timestamp",
-            "code + 1 > 2 | arithmetic needs a number",
-            "paid::text == \"true\" | cannot cast boolean to text",
+    @CsvSource(delimiter = '|', value = { "year(code) == 2025 | year needs a timestamp",
+            "code + 1 > 2 | arithmetic needs a number", "paid::text == \"true\" | cannot cast boolean to text",
             "coalesce(code, 1) == 1 | coalesce mixes text and number",
             "date_trunc(\"week\", created_at) == \"2026-01-01\" | date_trunc takes",
             "round(total, 9) > 1 | round takes a whole number of digits",
-            "coalesce(total) > 1 | coalesce takes at least 2",
-            "length(code) ~ \"x\" | '~' needs text",
-            "total * 2 == \"x\" | cannot compare number with text",
-            "secret(total) > 1 | unknown function 'secret'",
-    })
+            "coalesce(total) > 1 | coalesce takes at least 2", "length(code) ~ \"x\" | '~' needs text",
+            "total * 2 == \"x\" | cannot compare number with text", "secret(total) > 1 | unknown function 'secret'", })
     void invalidExpressionsAreRejectedWithAReason(String filter, String message) {
         assertThatThrownBy(() -> rendered("orders | filter " + filter)).hasMessageContaining(message);
     }

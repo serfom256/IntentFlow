@@ -10,8 +10,8 @@ import java.util.List;
 
 /**
  * A value in a {@link Select}: a column, a bound parameter or a computation
- * over them. Nodes say what is computed;
- * the renderer and the {@code SqlDialect} decide how it is spelled.
+ * over them. Nodes say what is computed; the renderer and the
+ * {@code SqlDialect} decide how it is spelled.
  */
 public sealed interface SqlExpr {
 

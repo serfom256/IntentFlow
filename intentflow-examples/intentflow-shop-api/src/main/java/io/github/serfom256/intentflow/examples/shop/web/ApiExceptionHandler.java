@@ -83,8 +83,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @Override
-    protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
-            MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+    protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         Map<String, String> errors = new LinkedHashMap<>();
         for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
             errors.putIfAbsent(fe.getField(), fe.getDefaultMessage());
@@ -98,10 +98,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     protected @Nullable ResponseEntity<Object> handleHandlerMethodValidationException(
             HandlerMethodValidationException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         ProblemDetail body = problem(HttpStatus.BAD_REQUEST, "Invalid request",
-                ex.getParameterValidationResults().stream()
-                        .flatMap(r -> r.getResolvableErrors().stream())
-                        .map(err -> err.getDefaultMessage())
-                        .findFirst().orElse("Invalid parameters."));
+                ex.getParameterValidationResults().stream().flatMap(r -> r.getResolvableErrors().stream())
+                        .map(err -> err.getDefaultMessage()).findFirst().orElse("Invalid parameters."));
         return handleExceptionInternal(ex, body, headers, HttpStatus.BAD_REQUEST, request);
     }
 

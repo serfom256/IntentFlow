@@ -5,10 +5,9 @@ import java.util.Optional;
 
 /**
  * Runtime changes to the declared catalog: service descriptions, field
- * descriptions and URI templates that replace
- * what annotations or builders declared, e.g. edited in the admin UI.
- * Implementations decide where they are kept
- * (memory, a database table) and must be safe for concurrent use.
+ * descriptions and URI templates that replace what annotations or builders
+ * declared, e.g. edited in the admin UI. Implementations decide where they are
+ * kept (memory, a database table) and must be safe for concurrent use.
  */
 public interface CatalogOverrides {
 

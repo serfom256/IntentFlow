@@ -1,7 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
 import io.github.serfom256.intentflow.core.ErrorCode;
-import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
@@ -115,7 +114,7 @@ record PageCursor(String question, String dsl, int offset, @Nullable List<Object
         List<Object> values = new ArrayList<>(keys.size());
         for (SortKey key : keys) {
             String property = service.fields().stream().filter(f -> f.logical().equals(key.field()))
-                    .map(FieldMapping::property).findFirst().orElse(null);
+                    .flatMap(f -> f.property().stream()).findFirst().orElse(null);
             if (property == null || !EntityProperties.has(entity.getClass(), property)) {
                 return null;
             }
@@ -130,28 +129,28 @@ record PageCursor(String question, String dsl, int offset, @Nullable List<Object
 
     private static @Nullable String tag(Object value) {
         return switch (value) {
-            case String s -> "s";
-            case Long l -> "l";
-            case Integer i -> "l";
-            case Short s -> "l";
-            case BigDecimal d -> "d";
-            case BigInteger i -> "i";
-            case Boolean b -> "b";
-            case LocalDate d -> "ld";
-            case LocalDateTime t -> "lt";
-            case OffsetDateTime t -> "ot";
-            case ZonedDateTime t -> "ot";
-            case Instant i -> "ot";
-            case UUID u -> "u";
-            default -> null;
+        case String s -> "s";
+        case Long l -> "l";
+        case Integer i -> "l";
+        case Short s -> "l";
+        case BigDecimal d -> "d";
+        case BigInteger i -> "i";
+        case Boolean b -> "b";
+        case LocalDate d -> "ld";
+        case LocalDateTime t -> "lt";
+        case OffsetDateTime t -> "ot";
+        case ZonedDateTime t -> "ot";
+        case Instant i -> "ot";
+        case UUID u -> "u";
+        default -> null;
         };
     }
 
     private static String value(Object value) {
         String text = switch (value) {
-            case ZonedDateTime t -> t.toOffsetDateTime().toString();
-            case Instant i -> i.atOffset(ZoneOffset.UTC).toString();
-            default -> value.toString();
+        case ZonedDateTime t -> t.toOffsetDateTime().toString();
+        case Instant i -> i.atOffset(ZoneOffset.UTC).toString();
+        default -> value.toString();
         };
         return tag(value) + ":" + base64(text);
     }
@@ -163,16 +162,16 @@ record PageCursor(String question, String dsl, int offset, @Nullable List<Object
         }
         String text = text(value.substring(colon + 1));
         return switch (value.substring(0, colon)) {
-            case "s" -> text;
-            case "l" -> Long.parseLong(text);
-            case "d" -> new BigDecimal(text);
-            case "i" -> new BigInteger(text);
-            case "b" -> Boolean.parseBoolean(text);
-            case "ld" -> LocalDate.parse(text);
-            case "lt" -> LocalDateTime.parse(text);
-            case "ot" -> OffsetDateTime.parse(text);
-            case "u" -> UUID.fromString(text);
-            default -> throw invalid();
+        case "s" -> text;
+        case "l" -> Long.parseLong(text);
+        case "d" -> new BigDecimal(text);
+        case "i" -> new BigInteger(text);
+        case "b" -> Boolean.parseBoolean(text);
+        case "ld" -> LocalDate.parse(text);
+        case "lt" -> LocalDateTime.parse(text);
+        case "ot" -> OffsetDateTime.parse(text);
+        case "u" -> UUID.fromString(text);
+        default -> throw invalid();
         };
     }
 }

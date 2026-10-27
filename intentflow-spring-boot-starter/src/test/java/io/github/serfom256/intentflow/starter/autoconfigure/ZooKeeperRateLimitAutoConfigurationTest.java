@@ -44,8 +44,7 @@ class ZooKeeperRateLimitAutoConfigurationTest {
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                     return List.of();
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
+            }).withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false", "intentflow.dialect=postgresql",
                     "intentflow.llm.rate-limit.questions=1", "intentflow.llm.rate-limit.store=zookeeper");
 
@@ -80,8 +79,7 @@ class ZooKeeperRateLimitAutoConfigurationTest {
         own.start();
         try {
             runner.withBean(CuratorFramework.class, () -> own)
-                    .withPropertyValues("intentflow.llm.rate-limit.zookeeper.path=/shop/limits")
-                    .run(ctx -> {
+                    .withPropertyValues("intentflow.llm.rate-limit.zookeeper.path=/shop/limits").run(ctx -> {
                         ctx.getBean(IntentPipeline.class).resolve(IntentRequests.of("books", ANN), Book.class);
 
                         assertThat(own.getChildren().forPath("/shop/limits")).hasSize(1);
@@ -107,9 +105,9 @@ class ZooKeeperRateLimitAutoConfigurationTest {
 
     @Test
     void theMemoryStoreNeedsNoModule() {
-        runner.withClassLoader(new FilteredClassLoader("io.github.serfom256.intentflow.ratelimit.zookeeper",
-                "org.apache.curator")).withPropertyValues("intentflow.llm.rate-limit.store=memory")
-                .run(ctx -> assertThat(ctx).hasNotFailed().getBean(LlmRateLimiter.class)
-                        .isNotInstanceOf(ZooKeeperRateLimiter.class));
+        runner.withClassLoader(
+                new FilteredClassLoader("io.github.serfom256.intentflow.ratelimit.zookeeper", "org.apache.curator"))
+                .withPropertyValues("intentflow.llm.rate-limit.store=memory").run(ctx -> assertThat(ctx).hasNotFailed()
+                        .getBean(LlmRateLimiter.class).isNotInstanceOf(ZooKeeperRateLimiter.class));
     }
 }

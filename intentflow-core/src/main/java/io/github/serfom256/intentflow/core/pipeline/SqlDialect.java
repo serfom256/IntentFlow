@@ -38,9 +38,9 @@ public interface SqlDialect {
 
     /**
      * Case-insensitive "value contains text" for an expression, such as
-     * {@code lower(name)} or the name of an enum stored as a number;
-     * {@code value} writes it. The default uses {@code LIKE} with {@code '!'} as
-     * the escape character.
+     * {@code lower(name)} or the name of an enum stored as a number; {@code value}
+     * writes it. The default uses {@code LIKE} with {@code '!'} as the escape
+     * character.
      */
     default void contains(SqlWriter sql, Runnable value, String text) {
         StringBuilder pattern = new StringBuilder(text.length() + 2).append('%');
@@ -78,10 +78,9 @@ public interface SqlDialect {
     void timestamp(SqlWriter sql, DslLiteral value);
 
     /**
-     * A timestamp the planner already converted to a Java value, such as the
-     * bounds of a whole day: a {@code LocalDateTime}, or an
-     * {@code OffsetDateTime} for a column that stores an instant. The default
-     * binds it as is.
+     * A timestamp the planner already converted to a Java value, such as the bounds
+     * of a whole day: a {@code LocalDateTime}, or an {@code OffsetDateTime} for a
+     * column that stores an instant. The default binds it as is.
      */
     default void timestamp(SqlWriter sql, DslLiteral value, Object bound) {
         sql.param(value, bound);
@@ -114,9 +113,8 @@ public interface SqlDialect {
 
     /**
      * A timestamp that stores an instant, converted to the wall-clock time of
-     * {@code zone} before a calendar part
-     * is taken from it. The default leaves it unchanged, so the database session's
-     * zone applies.
+     * {@code zone} before a calendar part is taken from it. The default leaves it
+     * unchanged, so the database session's zone applies.
      */
     default void inZone(SqlWriter sql, ZoneId zone, Runnable value) {
         value.run();
@@ -131,8 +129,8 @@ public interface SqlDialect {
 
     /**
      * A text value compared byte for byte, for case-sensitive fields. Databases
-     * whose default collation ignores case,
-     * like MySQL, override it; elsewhere the value is written as is.
+     * whose default collation ignores case, like MySQL, override it; elsewhere the
+     * value is written as is.
      */
     default void exactText(SqlWriter sql, Runnable value) {
         value.run();
@@ -140,16 +138,14 @@ public interface SqlDialect {
 
     /**
      * What the database supports. The planner checks it before building SQL, so a
-     * query the database cannot run
-     * fails with a clear {@code ValidationException} instead of an SQL error:
-     * {@code top} needs window functions, sorting by a field of a related service
-     * needs a correlated subquery in {@code ORDER BY}, grouping by a computed
-     * value goes through a derived table when {@code GROUP BY} cannot name a
-     * select-list alias, keyset paging and joins for sorting trust primary and
-     * unique keys only where the database enforces them,
+     * query the database cannot run fails with a clear {@code ValidationException}
+     * instead of an SQL error: {@code top} needs window functions, sorting by a
+     * field of a related service needs a correlated subquery in {@code ORDER BY},
+     * grouping by a computed value goes through a derived table when
+     * {@code GROUP BY} cannot name a select-list alias, keyset paging and joins for
+     * sorting trust primary and unique keys only where the database enforces them,
      * {@code in (...)} lists and the number of bound parameters are capped, and
-     * without native booleans boolean
-     * values are bound as 1 and 0.
+     * without native booleans boolean values are bound as 1 and 0.
      */
     default SqlCapabilities capabilities() {
         return SqlCapabilities.STANDARD;

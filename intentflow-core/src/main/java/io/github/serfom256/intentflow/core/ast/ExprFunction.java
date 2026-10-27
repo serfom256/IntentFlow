@@ -4,17 +4,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 public enum ExprFunction {
-    COALESCE,
-    YEAR,
-    MONTH,
-    DAY,
-    HOUR,
-    DATE_TRUNC,
-    LENGTH,
-    LOWER,
-    UPPER,
-    ROUND,
-    ABS;
+    COALESCE, YEAR, MONTH, DAY, HOUR, DATE_TRUNC, LENGTH, LOWER, UPPER, ROUND, ABS;
 
     public String keyword() {
         return name().toLowerCase(Locale.ROOT);

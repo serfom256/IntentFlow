@@ -46,11 +46,8 @@ class MySqlDialectTest {
     private static final LogicalFieldName RATING = LogicalFieldNames.of("rating");
     private static final LogicalFieldName PUBLISHED = LogicalFieldNames.of("published_at");
 
-    private static final ServiceDescriptor SERVICE = ServiceDescriptors.of(
-            BOOKS, null, TableNames.of("book`s"),
-            List.of(
-                    new DefaultFieldMapping(TITLE, ColumnNames.of("title"), true, FieldType.TEXT, null, List.of(),
-                            "title"),
+    private static final ServiceDescriptor SERVICE = ServiceDescriptors.of(BOOKS, null, TableNames.of("book`s"), List
+            .of(new DefaultFieldMapping(TITLE, ColumnNames.of("title"), true, FieldType.TEXT, null, List.of(), "title"),
                     new DefaultFieldMapping(RATING, ColumnNames.of("rating"), true, FieldType.NUMBER, null, List.of(),
                             "rating"),
                     new DefaultFieldMapping(PUBLISHED, ColumnNames.of("published_at"), true, FieldType.TIMESTAMP, null,
@@ -80,16 +77,12 @@ class MySqlDialectTest {
 
     @Test
     void timestampLiteralsAreBoundAsLocalDateTimes() {
-        BoundQuery q = build(new In(PUBLISHED, List.of(
-                new TextLiteral("2026-07-01T10:15"),
-                new TextLiteral("2026-07-01 10:15:30.5"),
-                new TextLiteral("2026-07-01T10:15:30+02:00"))), List.of());
+        BoundQuery q = build(new In(PUBLISHED, List.of(new TextLiteral("2026-07-01T10:15"),
+                new TextLiteral("2026-07-01 10:15:30.5"), new TextLiteral("2026-07-01T10:15:30+02:00"))), List.of());
 
         assertThat(q.sql()).contains("`published_at` IN (?, ?, ?)");
-        assertThat(q.values()).containsExactly(
-                LocalDateTime.parse("2026-07-01T10:15"),
-                LocalDateTime.parse("2026-07-01T10:15:30.5"),
-                LocalDateTime.parse("2026-07-01T08:15:30"));
+        assertThat(q.values()).containsExactly(LocalDateTime.parse("2026-07-01T10:15"),
+                LocalDateTime.parse("2026-07-01T10:15:30.5"), LocalDateTime.parse("2026-07-01T08:15:30"));
     }
 
     @Test
@@ -103,11 +96,10 @@ class MySqlDialectTest {
 
     @Test
     void sortPutsNullsLastInBothDirections() {
-        BoundQuery q = build(null, List.of(
-                SortKeys.of(RATING, SortKey.Direction.DESC), SortKeys.of(TITLE, SortKey.Direction.ASC)));
+        BoundQuery q = build(null,
+                List.of(SortKeys.of(RATING, SortKey.Direction.DESC), SortKeys.of(TITLE, SortKey.Direction.ASC)));
 
-        assertThat(q.sql()).contains(
-                "ORDER BY `rating` IS NULL, `rating` DESC, `title` IS NULL, `title` ASC LIMIT 50");
+        assertThat(q.sql()).contains("ORDER BY `rating` IS NULL, `rating` DESC, `title` IS NULL, `title` ASC LIMIT 50");
     }
 
     @Test

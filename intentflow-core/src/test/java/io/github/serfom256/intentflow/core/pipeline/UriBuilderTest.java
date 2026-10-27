@@ -35,8 +35,8 @@ class UriBuilderTest {
         SCI_FI
     }
 
-    record Book(long id, String title, String authorName, BigDecimal price, boolean inStock,
-            Instant publishedAt, Genre genre, String isbn) {
+    record Book(long id, String title, String authorName, BigDecimal price, boolean inStock, Instant publishedAt,
+            Genre genre, String isbn) {
     }
 
     static class BeanBook {
@@ -64,14 +64,13 @@ class UriBuilderTest {
     }
 
     private static FieldMapping field(String logical, String property) {
-        return new DefaultFieldMapping(LogicalFieldNames.of(logical), ColumnNames.of(logical), true,
-                FieldType.ANY, null, List.of(), property);
+        return new DefaultFieldMapping(LogicalFieldNames.of(logical), ColumnNames.of(logical), true, FieldType.ANY,
+                null, List.of(), property);
     }
 
     private static ValidatedQuery query(String template, Class<?> type, FieldMapping... fields) {
-        ServiceDescriptor svc = ServiceDescriptors.of(
-                BOOKS, null, TableNames.of("book"), List.of(fields), List.of(), MaxTakes.of(50),
-                UriTemplates.of(template), type);
+        ServiceDescriptor svc = ServiceDescriptors.of(BOOKS, null, TableNames.of("book"), List.of(fields), List.of(),
+                MaxTakes.of(50), UriTemplates.of(template), type);
         return ValidatedQueries.of(svc, AstQueries.of(BOOKS, null, List.of(), null, null));
     }
 
@@ -97,16 +96,16 @@ class UriBuilderTest {
 
     @Test
     void readsGettersAndBooleanIsGetters() {
-        ValidatedQuery q = query("/books/{{id}}?featured={{featured}}", BeanBook.class,
-                field("id", "id"), field("featured", "featured"));
+        ValidatedQuery q = query("/books/{{id}}?featured={{featured}}", BeanBook.class, field("id", "id"),
+                field("featured", "featured"));
 
         assertThat(uriBuilder.build(q, List.of(new BeanBook(5))).value()).isEqualTo("/books/5?featured=true");
     }
 
     @Test
     void readsInheritedNonPublicFields() {
-        ValidatedQuery q = query("/books/{{id}}/{{title}}", FieldBook.class,
-                field("id", "id"), field("title", "title"));
+        ValidatedQuery q = query("/books/{{id}}/{{title}}", FieldBook.class, field("id", "id"),
+                field("title", "title"));
 
         assertThat(uriBuilder.build(q, List.of(new FieldBook())).value()).isEqualTo("/books/99/Dune");
     }
@@ -114,8 +113,8 @@ class UriBuilderTest {
     @Test
     void rendersValuesByType() {
         ValidatedQuery q = query("/x/{{price}}/{{in_stock}}/{{published_at}}/{{genre}}", Book.class,
-                field("price", "price"), field("in_stock", "inStock"),
-                field("published_at", "publishedAt"), field("genre", "genre"));
+                field("price", "price"), field("in_stock", "inStock"), field("published_at", "publishedAt"),
+                field("genre", "genre"));
 
         assertThat(uriBuilder.build(q, List.of(book(1))).value())
                 .isEqualTo("/x/9.50/true/2026-01-31T10%3A15%3A30Z/SCI_FI");
@@ -147,12 +146,13 @@ class UriBuilderTest {
     void emptyResultDropsPlaceholderPartsOfTemplate() {
         assertThat(uriBuilder.build(query("/books/{{id}}", Book.class, field("id", "id")), List.of()).value())
                 .isEqualTo("/books");
-        assertThat(uriBuilder.build(query("/authors/{{author}}/books/{{id}}", Book.class,
-                field("id", "id"), field("author", "authorName")), List.of()).value()).isEqualTo("/authors");
-        assertThat(uriBuilder.build(query("/books?id={{id}}&view=list", Book.class, field("id", "id")),
-                List.of()).value()).isEqualTo("/books?view=list");
-        assertThat(uriBuilder.build(query("/{{id}}", Book.class, field("id", "id")), List.of()).value())
-                .isEqualTo("/");
+        assertThat(uriBuilder.build(
+                query("/authors/{{author}}/books/{{id}}", Book.class, field("id", "id"), field("author", "authorName")),
+                List.of()).value()).isEqualTo("/authors");
+        assertThat(
+                uriBuilder.build(query("/books?id={{id}}&view=list", Book.class, field("id", "id")), List.of()).value())
+                .isEqualTo("/books?view=list");
+        assertThat(uriBuilder.build(query("/{{id}}", Book.class, field("id", "id")), List.of()).value()).isEqualTo("/");
         assertThat(uriBuilder.build(query("/books", Book.class, field("id", "id")), List.of()).value())
                 .isEqualTo("/books");
     }
@@ -161,19 +161,17 @@ class UriBuilderTest {
     void unknownPlaceholderIsRejectedEvenWhenEmpty() {
         ValidatedQuery q = query("/books/{{nope}}", Book.class, field("id", "id"));
 
-        assertThatThrownBy(() -> uriBuilder.build(q, List.of(book(1))))
-                .isInstanceOf(UriBuildException.class).hasMessageContaining("nope");
-        assertThatThrownBy(() -> uriBuilder.build(q, List.of()))
-                .isInstanceOf(UriBuildException.class).hasMessageContaining("nope");
+        assertThatThrownBy(() -> uriBuilder.build(q, List.of(book(1)))).isInstanceOf(UriBuildException.class)
+                .hasMessageContaining("nope");
+        assertThatThrownBy(() -> uriBuilder.build(q, List.of())).isInstanceOf(UriBuildException.class)
+                .hasMessageContaining("nope");
     }
 
     @Test
     void missingPropertyOnEntityIsReported() {
         ValidatedQuery q = query("/books/{{sku}}", Book.class, field("sku", "sku"));
 
-        assertThatThrownBy(() -> uriBuilder.build(q, List.of(book(1))))
-                .isInstanceOf(UriBuildException.class)
-                .hasMessageContaining("no property 'sku'")
-                .hasMessageContaining("{{sku}}");
+        assertThatThrownBy(() -> uriBuilder.build(q, List.of(book(1)))).isInstanceOf(UriBuildException.class)
+                .hasMessageContaining("no property 'sku'").hasMessageContaining("{{sku}}");
     }
 }

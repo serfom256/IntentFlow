@@ -23,8 +23,7 @@ public final class TestDialect implements SqlDialect {
 
     @Override
     public void contains(SqlWriter sql, String column, String text) {
-        sql.text(column).text(" ILIKE ").param(new TextLiteral(containing(text)))
-                .text(" ESCAPE '\\'");
+        sql.text(column).text(" ILIKE ").param(new TextLiteral(containing(text))).text(" ESCAPE '\\'");
     }
 
     @Override
@@ -57,11 +56,11 @@ public final class TestDialect implements SqlDialect {
         sql.text("CAST(");
         value.run();
         sql.text(switch (type) {
-            case NUMBER -> " AS NUMERIC)";
-            case INTEGER -> " AS BIGINT)";
-            case TEXT -> " AS TEXT)";
-            case TIMESTAMP -> " AS TIMESTAMP)";
-            case DATE -> " AS DATE)";
+        case NUMBER -> " AS NUMERIC)";
+        case INTEGER -> " AS BIGINT)";
+        case TEXT -> " AS TEXT)";
+        case TIMESTAMP -> " AS TIMESTAMP)";
+        case DATE -> " AS DATE)";
         });
     }
 

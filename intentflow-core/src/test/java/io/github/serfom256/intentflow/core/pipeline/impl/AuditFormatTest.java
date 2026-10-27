@@ -34,9 +34,8 @@ class AuditFormatTest {
 
     @Test
     void bindValuesAreNotWrittenAndNewlinesCannotForgeALine() {
-        QuestionAudit audit = new QuestionAudit(AT, null, null, "books\nquestion principal=admin", null,
-                Outcome.FAILED, null, false, null, List.of("secret"), 0, TokenUsage.NONE, Duration.ZERO,
-                "database is down");
+        QuestionAudit audit = new QuestionAudit(AT, null, null, "books\nquestion principal=admin", null, Outcome.FAILED,
+                null, false, null, List.of("secret"), 0, TokenUsage.NONE, Duration.ZERO, "database is down");
 
         String line = Slf4jAuditLog.format(audit);
 
@@ -50,8 +49,9 @@ class AuditFormatTest {
                 CatalogChangeAudit.Action.UPDATED, ServiceOverride.NONE,
                 new ServiceOverride("Items in stock", null, Map.of()));
 
-        assertThat(Slf4jAuditLog.format(audit)).startsWith("catalog-change at=2026-10-21T12:00:00Z user=admin "
-                + "service=products action=updated before=\"description=null")
+        assertThat(Slf4jAuditLog.format(audit))
+                .startsWith("catalog-change at=2026-10-21T12:00:00Z user=admin "
+                        + "service=products action=updated before=\"description=null")
                 .contains("after=\"description=Items in stock, uri=null, fields={}\"");
     }
 

@@ -15,13 +15,12 @@ class DslParserTest {
 
     @Test
     void parsesEndToEnd() {
-        AstQuery q = dslParser.parse(DslSources.of(
-                "books | filter author == \"Doe\" | sort id desc | take 5"));
+        AstQuery q = dslParser.parse(DslSources.of("books | filter author == \"Doe\" | sort id desc | take 5"));
 
         assertThat(q.service().value()).isEqualTo("books");
-        assertThat(q.filter()).isInstanceOf(Compare.class);
+        assertThat(q.filter().orElseThrow()).isInstanceOf(Compare.class);
         assertThat(q.sort()).hasSize(1);
-        assertThat(q.take().value()).isEqualTo(5);
+        assertThat(q.take().orElseThrow().value()).isEqualTo(5);
     }
 
     @Test

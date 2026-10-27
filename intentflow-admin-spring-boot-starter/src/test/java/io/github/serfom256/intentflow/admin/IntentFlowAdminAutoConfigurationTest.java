@@ -37,8 +37,8 @@ class IntentFlowAdminAutoConfigurationTest {
     }
 
     private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class,
-                    IntentFlowAdminAutoConfiguration.class))
+            .withConfiguration(
+                    AutoConfigurations.of(IntentFlowAutoConfiguration.class, IntentFlowAdminAutoConfiguration.class))
             .withUserConfiguration(Mvc.class)
             .withPropertyValues("intentflow.catalog.packages=io.github.serfom256.intentflow.admin",
                     "intentflow.admin.security.enabled=false")
@@ -68,21 +68,18 @@ class IntentFlowAdminAutoConfigurationTest {
 
     @Test
     void keepsOverridesInATableWhenADataSourceExists() {
-        runner
-                .withBean(DataSource.class, () -> new DriverManagerDataSource(
-                        "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""))
+        runner.withBean(DataSource.class,
+                () -> new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""))
                 .run(ctx -> assertThat(ctx.getBean(CatalogOverrides.class)).isInstanceOf(JdbcCatalogOverrides.class));
-        runner.withPropertyValues("intentflow.admin.storage=memory")
-                .withBean(DataSource.class, () -> new DriverManagerDataSource(
-                        "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""))
+        runner.withPropertyValues("intentflow.admin.storage=memory").withBean(DataSource.class,
+                () -> new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""))
                 .run(ctx -> assertThat(ctx.getBean(CatalogOverrides.class))
                         .isInstanceOf(InMemoryCatalogOverrides.class));
     }
 
     @Test
     void jdbcStorageWithoutADataSourceFailsStartup() {
-        runner.withPropertyValues("intentflow.admin.storage=jdbc")
-                .run(ctx -> assertThat(ctx).hasFailed());
+        runner.withPropertyValues("intentflow.admin.storage=jdbc").run(ctx -> assertThat(ctx).hasFailed());
     }
 
     @Test
@@ -92,8 +89,7 @@ class IntentFlowAdminAutoConfigurationTest {
             mvc.perform(get("/ops/catalog/api/services")).andExpect(status().isOk());
             mvc.perform(get("/ops/catalog")).andExpect(redirectedUrl("/ops/catalog/"));
             mvc.perform(get("/ops/catalog/")).andExpect(forwardedUrl("/ops/catalog/index.html"));
-            mvc.perform(get("/ops/catalog/index.html"))
-                    .andExpect(status().isOk())
+            mvc.perform(get("/ops/catalog/index.html")).andExpect(status().isOk())
                     .andExpect(content().string(containsString("IntentFlow Admin")));
             mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isNotFound());
         });
@@ -108,12 +104,10 @@ class IntentFlowAdminAutoConfigurationTest {
     void servesTheApiAndTheUi() {
         runner.run(ctx -> {
             MockMvc mvc = MockMvcBuilders.webAppContextSetup(ctx).build();
-            mvc.perform(get("/intentflow-admin/api/services"))
-                    .andExpect(status().isOk())
+            mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].name").value("books"));
             mvc.perform(get("/intentflow-admin/")).andExpect(forwardedUrl("/intentflow-admin/index.html"));
-            mvc.perform(get("/intentflow-admin/index.html"))
-                    .andExpect(status().isOk())
+            mvc.perform(get("/intentflow-admin/index.html")).andExpect(status().isOk())
                     .andExpect(content().string(containsString("IntentFlow Admin")));
         });
     }

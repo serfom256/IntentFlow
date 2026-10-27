@@ -73,8 +73,7 @@ final class QueryExecutorConfigurations {
             return new JpaNameResolver(() -> {
                 EntityManagerFactory factory = entityManagerFactory.getIfAvailable();
                 return factory == null ? List.of()
-                        : factory.getMetamodel().getEntities().stream().<Class<?>>map(EntityType::getJavaType)
-                                .toList();
+                        : factory.getMetamodel().getEntities().stream().<Class<?>>map(EntityType::getJavaType).toList();
             });
         }
 

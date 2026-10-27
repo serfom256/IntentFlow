@@ -74,8 +74,7 @@ final class OpenAiProviders {
     static class GigaChat {
 
         @Bean
-        LlmClientFactory intentFlowGigaChatClientFactory(IntentFlowProperties properties,
-                ObjectProvider<Clock> clock) {
+        LlmClientFactory intentFlowGigaChatClientFactory(IntentFlowProperties properties, ObjectProvider<Clock> clock) {
             IntentFlowProperties.Llm llm = properties.llm();
             IntentFlowProperties.Llm.GigaChat gigachat = llm.gigachat();
             LlmHttpOptions options = httpOptions(properties);

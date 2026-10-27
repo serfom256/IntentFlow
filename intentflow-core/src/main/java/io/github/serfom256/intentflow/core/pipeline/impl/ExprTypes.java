@@ -58,61 +58,61 @@ final class ExprTypes {
 
     Type type(ValueExpr expr) {
         return switch (expr) {
-            case FieldRef f -> {
-                if (f.field().value().contains(".")) {
-                    throw new ValidationException(ErrorCode.UNSUPPORTED, "related field '" + f.field().value()
-                            + "' cannot be used inside an expression", Map.of());
-                }
-                yield of(fields.apply(f.field().value()));
+        case FieldRef f -> {
+            if (f.field().value().contains(".")) {
+                throw new ValidationException(ErrorCode.UNSUPPORTED,
+                        "related field '" + f.field().value() + "' cannot be used inside an expression", Map.of());
             }
-            case LiteralExpr l -> switch (l.value()) {
-                case TextLiteral t -> Type.TEXT;
-                case NumberLiteral n -> Type.NUMBER;
-                case BoolLiteral b -> Type.BOOLEAN;
-                case NullLiteral n -> Type.NULL;
+            yield of(fields.apply(f.field().value()));
+        }
+        case LiteralExpr l -> switch (l.value()) {
+        case TextLiteral t -> Type.TEXT;
+        case NumberLiteral n -> Type.NUMBER;
+        case BoolLiteral b -> Type.BOOLEAN;
+        case NullLiteral n -> Type.NULL;
+        };
+        case Call c -> call(c);
+        case Arith a -> {
+            require(a.left(), Type.NUMBER, "arithmetic");
+            require(a.right(), Type.NUMBER, "arithmetic");
+            yield Type.NUMBER;
+        }
+        case CastExpr c -> {
+            Type source = type(c.value());
+            boolean ok = switch (c.type()) {
+            case NUMBER, INTEGER -> is(source, Type.NUMBER, Type.TEXT);
+            case TEXT -> is(source, Type.TEXT, Type.NUMBER);
+            case TIMESTAMP, DATE -> is(source, Type.TEXT, Type.TIMESTAMP, Type.DATE);
             };
-            case Call c -> call(c);
-            case Arith a -> {
-                require(a.left(), Type.NUMBER, "arithmetic");
-                require(a.right(), Type.NUMBER, "arithmetic");
-                yield Type.NUMBER;
+            if (!ok) {
+                throw new ValidationException(ErrorCode.TYPE_MISMATCH,
+                        "cannot cast " + name(source) + " to " + c.type().keyword() + " in " + Expressions.print(c),
+                        Map.of());
             }
-            case CastExpr c -> {
-                Type source = type(c.value());
-                boolean ok = switch (c.type()) {
-                    case NUMBER, INTEGER -> is(source, Type.NUMBER, Type.TEXT);
-                    case TEXT -> is(source, Type.TEXT, Type.NUMBER);
-                    case TIMESTAMP, DATE -> is(source, Type.TEXT, Type.TIMESTAMP, Type.DATE);
-                };
-                if (!ok) {
-                    throw new ValidationException(ErrorCode.TYPE_MISMATCH, "cannot cast " + name(source) + " to "
-                            + c.type().keyword() + " in " + Expressions.print(c), Map.of());
-                }
-                if (c.value() instanceof LiteralExpr l && l.value() instanceof TextLiteral t
-                        && (c.type() == CastType.TIMESTAMP
-                                || c.type() == CastType.DATE)
-                        && !Timestamps.isValid(t.value())) {
-                    throw new ValidationException("'" + t.value() + "' is not a date or timestamp");
-                }
-                yield switch (c.type()) {
-                    case NUMBER, INTEGER -> Type.NUMBER;
-                    case TEXT -> Type.TEXT;
-                    case TIMESTAMP -> Type.TIMESTAMP;
-                    case DATE -> Type.DATE;
-                };
+            if (c.value() instanceof LiteralExpr l && l.value() instanceof TextLiteral t
+                    && (c.type() == CastType.TIMESTAMP || c.type() == CastType.DATE)
+                    && !Timestamps.isValid(t.value())) {
+                throw new ValidationException("'" + t.value() + "' is not a date or timestamp");
             }
+            yield switch (c.type()) {
+            case NUMBER, INTEGER -> Type.NUMBER;
+            case TEXT -> Type.TEXT;
+            case TIMESTAMP -> Type.TIMESTAMP;
+            case DATE -> Type.DATE;
+            };
+        }
         };
     }
 
     private Type call(Call c) {
         return switch (c.function()) {
-            case COALESCE -> coalesce(c);
-            case YEAR, MONTH, DAY, HOUR -> unary(c, Type.NUMBER, Type.TIMESTAMP, Type.DATE);
-            case DATE_TRUNC -> dateTrunc(c);
-            case LENGTH -> unary(c, Type.NUMBER, Type.TEXT);
-            case LOWER, UPPER -> unary(c, Type.TEXT, Type.TEXT);
-            case ROUND -> round(c);
-            case ABS -> unary(c, Type.NUMBER, Type.NUMBER);
+        case COALESCE -> coalesce(c);
+        case YEAR, MONTH, DAY, HOUR -> unary(c, Type.NUMBER, Type.TIMESTAMP, Type.DATE);
+        case DATE_TRUNC -> dateTrunc(c);
+        case LENGTH -> unary(c, Type.NUMBER, Type.TEXT);
+        case LOWER, UPPER -> unary(c, Type.TEXT, Type.TEXT);
+        case ROUND -> round(c);
+        case ABS -> unary(c, Type.NUMBER, Type.NUMBER);
         };
     }
 
@@ -185,8 +185,9 @@ final class ExprTypes {
         if (actual == Type.ANY || actual == wanted || Set.of(alternatives).contains(actual)) {
             return;
         }
-        throw new ValidationException(ErrorCode.TYPE_MISMATCH, where + " needs a " + name(wanted) + ", got "
-                + name(actual) + " in " + Expressions.print(arg), Map.of());
+        throw new ValidationException(ErrorCode.TYPE_MISMATCH,
+                where + " needs a " + name(wanted) + ", got " + name(actual) + " in " + Expressions.print(arg),
+                Map.of());
     }
 
     private static void exactly(Call c, int n) {
@@ -205,11 +206,11 @@ final class ExprTypes {
 
     static Type of(FieldMapping fm) {
         return switch (fm.type()) {
-            case TEXT -> Type.TEXT;
-            case NUMBER -> Type.NUMBER;
-            case BOOLEAN -> Type.BOOLEAN;
-            case TIMESTAMP -> Type.TIMESTAMP;
-            case ANY -> Type.ANY;
+        case TEXT -> Type.TEXT;
+        case NUMBER -> Type.NUMBER;
+        case BOOLEAN -> Type.BOOLEAN;
+        case TIMESTAMP -> Type.TIMESTAMP;
+        case ANY -> Type.ANY;
         };
     }
 
@@ -219,11 +220,11 @@ final class ExprTypes {
 
     private static int size(ValueExpr e) {
         return switch (e) {
-            case FieldRef f -> 1;
-            case LiteralExpr l -> 1;
-            case Call c -> 1 + c.args().stream().mapToInt(ExprTypes::size).sum();
-            case Arith a -> 1 + size(a.left()) + size(a.right());
-            case CastExpr c -> 1 + size(c.value());
+        case FieldRef f -> 1;
+        case LiteralExpr l -> 1;
+        case Call c -> 1 + c.args().stream().mapToInt(ExprTypes::size).sum();
+        case Arith a -> 1 + size(a.left()) + size(a.right());
+        case CastExpr c -> 1 + size(c.value());
         };
     }
 }

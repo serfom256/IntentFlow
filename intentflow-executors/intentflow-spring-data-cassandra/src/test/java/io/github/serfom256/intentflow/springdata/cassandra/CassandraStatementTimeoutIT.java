@@ -43,8 +43,7 @@ class CassandraStatementTimeoutIT {
     @BeforeAll
     void fillTable() {
         session = CassandraTestDatabase.session(DriverConfigLoader.programmaticBuilder()
-                .withDuration(DefaultDriverOption.NETTY_TIMER_TICK_DURATION, Duration.ofMillis(1))
-                .build());
+                .withDuration(DefaultDriverOption.NETTY_TIMER_TICK_DURATION, Duration.ofMillis(1)).build());
         session.execute("DROP TABLE IF EXISTS log_line");
         session.execute("CREATE TABLE log_line (id bigint PRIMARY KEY, text text)");
         PreparedStatement insert = session.prepare("INSERT INTO log_line (id, text) VALUES (?, ?)");
@@ -80,7 +79,7 @@ class CassandraStatementTimeoutIT {
     }
 
     private static CassandraQuery everyLine() {
-        return new CassandraQuery(List.of("SELECT * FROM intentflow.log_line"), List.of(), List.of(), row -> true,
-                null, 0, ROWS);
+        return new CassandraQuery(List.of("SELECT * FROM intentflow.log_line"), List.of(), List.of(), row -> true, null,
+                0, ROWS);
     }
 }

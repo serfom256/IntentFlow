@@ -107,8 +107,7 @@ class CassandraQueryBuilderIT {
         session.execute("INSERT INTO item (code, label, owner_id) VALUES ('A1', 'Lamp', 1)");
         session.execute("INSERT INTO item (code, label, owner_id) VALUES ('a1', 'lamp', 2)");
         List<CassandraNameResolver> resolvers = List.of(new CassandraNameResolver());
-        catalog = ServiceCatalogs.of(
-                ServiceDescriptors.fromAnnotated(Reading.class, List.copyOf(resolvers)),
+        catalog = ServiceCatalogs.of(ServiceDescriptors.fromAnnotated(Reading.class, List.copyOf(resolvers)),
                 ServiceDescriptors.fromAnnotated(Plain.class, List.copyOf(resolvers)),
                 ServiceDescriptors.fromAnnotated(Item.class, List.copyOf(resolvers)));
         builder = new CassandraQueryBuilder(session, ZoneOffset.UTC);
@@ -126,11 +125,11 @@ class CassandraQueryBuilderIT {
 
     @Test
     void exactConditionsOnRegularColumnsArePushedDown() {
-        CassandraQuery q = build("readings | filter value >= 1.5 and value < 9 and ok == true "
-                + "and taken_at > \"2026-01-01\"");
+        CassandraQuery q = build(
+                "readings | filter value >= 1.5 and value < 9 and ok == true " + "and taken_at > \"2026-01-01\"");
 
-        assertThat(q.cql()).isEqualTo("SELECT * FROM intentflow.reading WHERE value >= ? AND value < ? AND ok = ? "
-                + "ALLOW FILTERING");
+        assertThat(q.cql()).isEqualTo(
+                "SELECT * FROM intentflow.reading WHERE value >= ? AND value < ? AND ok = ? " + "ALLOW FILTERING");
         assertThat(q.bindValues()).containsExactly(new BigDecimal("1.5"), new BigDecimal("9"), true);
         session.execute(SimpleStatement.newInstance(q.cql(), q.bindValues().toArray()));
     }
@@ -172,8 +171,7 @@ class CassandraQueryBuilderIT {
 
     @Test
     void relationsAreRejectedBecauseCassandraHasNoJoins() {
-        assertThatThrownBy(() -> build("items | filter owner.score > 1"))
-                .isInstanceOf(ValidationException.class)
+        assertThatThrownBy(() -> build("items | filter owner.score > 1")).isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Cassandra has no joins");
     }
 
@@ -203,8 +201,7 @@ class CassandraQueryBuilderIT {
         CassandraQuery q = build("plains | filter score > 0 | sort score desc | take 3");
 
         assertThatThrownBy(() -> new CassandraQueryExecutor(session, converter(), 10).execute(q, Plain.class))
-                .isInstanceOf(ScanLimitExceededException.class)
-                .hasMessageContaining("more than 10 rows");
+                .isInstanceOf(ScanLimitExceededException.class).hasMessageContaining("more than 10 rows");
         assertThat(new CassandraQueryExecutor(session, converter(), 30).execute(q, Plain.class))
                 .extracting(p -> p.score).containsExactly(6, 6, 6);
     }
@@ -212,25 +209,19 @@ class CassandraQueryBuilderIT {
     @Test
     void rejectsQueriesFromOtherBuilders() {
         assertThatThrownBy(() -> CassandraQueryExecutor.of(session).execute(BoundQueries.of("SELECT 1"), Plain.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("CassandraQueryBuilder");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("CassandraQueryBuilder");
     }
 
     @Test
     void unknownTableFailsWithItsName() {
         CassandraQueryBuilder other = new CassandraQueryBuilder(session, ZoneOffset.UTC);
-        ServiceCatalog missing = ServiceCatalogs.of(ServiceDescriptors.of(
-                ServiceNames.of("ghosts"), null,
-                TableNames.of("ghost"),
-                catalog.find(ServiceNames.of("plains"))
-                        .orElseThrow().fields(),
-                List.of(), MaxTakes.of(10),
-                UriTemplates.of("/g"), Plain.class));
+        ServiceCatalog missing = ServiceCatalogs.of(ServiceDescriptors.of(ServiceNames.of("ghosts"), null,
+                TableNames.of("ghost"), catalog.find(ServiceNames.of("plains")).orElseThrow().fields(), List.of(),
+                MaxTakes.of(10), UriTemplates.of("/g"), Plain.class));
         AstQuery ast = DslParsers.create().parse(DslSources.of("ghosts"));
 
         assertThatThrownBy(() -> other.build(AstValidators.create().validate(ast, missing)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("intentflow.ghost");
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("intentflow.ghost");
     }
 
     private CassandraConverter converter() {

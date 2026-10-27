@@ -43,71 +43,71 @@ final class RowFilter implements Predicate<Row> {
 
     private @Nullable Boolean eval(FilterExpr expr, Row row) {
         return switch (expr) {
-            case And a -> {
-                Boolean l = eval(a.left(), row);
-                if (Boolean.FALSE.equals(l)) {
-                    yield false;
-                }
-                Boolean r = eval(a.right(), row);
-                yield Boolean.FALSE.equals(r) ? Boolean.FALSE : l == null || r == null ? null : Boolean.TRUE;
+        case And a -> {
+            Boolean l = eval(a.left(), row);
+            if (Boolean.FALSE.equals(l)) {
+                yield false;
             }
-            case Or o -> {
-                Boolean l = eval(o.left(), row);
-                if (Boolean.TRUE.equals(l)) {
-                    yield true;
-                }
-                Boolean r = eval(o.right(), row);
-                yield Boolean.TRUE.equals(r) ? Boolean.TRUE : l == null || r == null ? null : Boolean.FALSE;
+            Boolean r = eval(a.right(), row);
+            yield Boolean.FALSE.equals(r) ? Boolean.FALSE : l == null || r == null ? null : Boolean.TRUE;
+        }
+        case Or o -> {
+            Boolean l = eval(o.left(), row);
+            if (Boolean.TRUE.equals(l)) {
+                yield true;
             }
-            case Not n -> {
-                if (nullOperand(n.inner(), row)) {
-                    yield true;
-                }
-                Boolean v = eval(n.inner(), row);
-                yield v == null ? null : !v;
+            Boolean r = eval(o.right(), row);
+            yield Boolean.TRUE.equals(r) ? Boolean.TRUE : l == null || r == null ? null : Boolean.FALSE;
+        }
+        case Not n -> {
+            if (nullOperand(n.inner(), row)) {
+                yield true;
             }
-            case IsNull n -> value(row, n.field()) == null;
-            case IsNotNull n -> value(row, n.field()) != null;
-            case In in -> {
-                Comparable<?> value = value(row, in.field());
-                if (value == null) {
-                    yield null;
-                }
-                boolean unknown = false;
-                for (DslLiteral literal : in.values()) {
-                    if (value instanceof LocalDateTime
-                            && literal instanceof TextLiteral t && CqlValues.dateOnly(t.value()).isPresent()) {
-                        Boolean sameDay = compare(new Compare(in.field(), ComparisonOp.EQ, literal), row);
-                        if (Boolean.TRUE.equals(sameDay)) {
-                            yield true;
-                        }
-                        unknown |= sameDay == null;
-                        continue;
-                    }
-                    Integer c = CqlValues.compare(value, literal, true, caseSensitive.contains(in.field().value()));
-                    if (c == null) {
-                        unknown = true;
-                    } else if (c == 0) {
+            Boolean v = eval(n.inner(), row);
+            yield v == null ? null : !v;
+        }
+        case IsNull n -> value(row, n.field()) == null;
+        case IsNotNull n -> value(row, n.field()) != null;
+        case In in -> {
+            Comparable<?> value = value(row, in.field());
+            if (value == null) {
+                yield null;
+            }
+            boolean unknown = false;
+            for (DslLiteral literal : in.values()) {
+                if (value instanceof LocalDateTime && literal instanceof TextLiteral t
+                        && CqlValues.dateOnly(t.value()).isPresent()) {
+                    Boolean sameDay = compare(new Compare(in.field(), ComparisonOp.EQ, literal), row);
+                    if (Boolean.TRUE.equals(sameDay)) {
                         yield true;
                     }
+                    unknown |= sameDay == null;
+                    continue;
                 }
-                yield unknown ? null : Boolean.FALSE;
+                Integer c = CqlValues.compare(value, literal, true, caseSensitive.contains(in.field().value()));
+                if (c == null) {
+                    unknown = true;
+                } else if (c == 0) {
+                    yield true;
+                }
             }
-            case Compare c -> compare(c, row);
-            case ExprCompare c -> expressions.compare(c, row);
-            case ExprIn i -> expressions.in(i, row);
+            yield unknown ? null : Boolean.FALSE;
+        }
+        case Compare c -> compare(c, row);
+        case ExprCompare c -> expressions.compare(c, row);
+        case ExprIn i -> expressions.in(i, row);
         };
     }
 
     private boolean nullOperand(FilterExpr inner, Row row) {
         return switch (inner) {
-            case Compare c when c.op() != ComparisonOp.NE -> value(row, c.field()) == null;
-            case In i -> value(row, i.field()) == null;
-            case ExprCompare c when c.op() != ComparisonOp.NE
-                    && !(c.right() instanceof LiteralExpr l && l.value() instanceof NullLiteral) ->
-                expressions.eval(c.left(), row) == null;
-            case ExprIn i -> expressions.eval(i.value(), row) == null;
-            default -> false;
+        case Compare c when c.op() != ComparisonOp.NE -> value(row, c.field()) == null;
+        case In i -> value(row, i.field()) == null;
+        case ExprCompare c when c.op() != ComparisonOp.NE
+                && !(c.right() instanceof LiteralExpr l && l.value() instanceof NullLiteral) ->
+            expressions.eval(c.left(), row) == null;
+        case ExprIn i -> expressions.eval(i.value(), row) == null;
+        default -> false;
         };
     }
 
@@ -127,32 +127,32 @@ final class RowFilter implements Predicate<Row> {
                 LocalDateTime start = day.get().atStartOfDay();
                 LocalDateTime end = start.plusDays(1);
                 return switch (c.op()) {
-                    case EQ -> !at.isBefore(start) && at.isBefore(end);
-                    case NE -> at.isBefore(start) || !at.isBefore(end);
-                    case LT -> at.isBefore(start);
-                    case GE -> !at.isBefore(start);
-                    case GT -> !at.isBefore(end);
-                    case LE -> at.isBefore(end);
-                    case CONTAINS -> null;
+                case EQ -> !at.isBefore(start) && at.isBefore(end);
+                case NE -> at.isBefore(start) || !at.isBefore(end);
+                case LT -> at.isBefore(start);
+                case GE -> !at.isBefore(start);
+                case GT -> !at.isBefore(end);
+                case LE -> at.isBefore(end);
+                case CONTAINS -> null;
                 };
             }
         }
         boolean equality = switch (c.op()) {
-            case EQ, NE -> true;
-            default -> false;
+        case EQ, NE -> true;
+        default -> false;
         };
         Integer cmp = CqlValues.compare(value, c.value(), equality, caseSensitive.contains(c.field().value()));
         if (cmp == null) {
             return null;
         }
         return switch (c.op()) {
-            case EQ -> cmp == 0;
-            case NE -> cmp != 0;
-            case LT -> cmp < 0;
-            case LE -> cmp <= 0;
-            case GT -> cmp > 0;
-            case GE -> cmp >= 0;
-            case CONTAINS -> throw new IllegalStateException("handled above");
+        case EQ -> cmp == 0;
+        case NE -> cmp != 0;
+        case LT -> cmp < 0;
+        case LE -> cmp <= 0;
+        case GT -> cmp > 0;
+        case GE -> cmp >= 0;
+        case CONTAINS -> throw new IllegalStateException("handled above");
         };
     }
 

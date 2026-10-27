@@ -52,8 +52,7 @@ public final class OpenMapperNameResolver implements NameResolver {
         if (model == null || model.primaryKey().isEmpty()) {
             return TableFacts.UNKNOWN;
         }
-        return column(type, model.primaryKey()).map(c -> TableFacts.primaryKey(List.of(c)))
-                .orElse(TableFacts.UNKNOWN);
+        return column(type, model.primaryKey()).map(c -> TableFacts.primaryKey(List.of(c))).orElse(TableFacts.UNKNOWN);
     }
 
     private Optional<String> column(Class<?> type, String javaField) {

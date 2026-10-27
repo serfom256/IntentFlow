@@ -26,20 +26,11 @@ import java.util.Map;
 
 public final class DefaultLexer implements Lexer {
 
-    private static final Map<String, Keyword> KEYWORDS = Map.ofEntries(
-            Map.entry("filter", Keyword.FILTER),
-            Map.entry("sort", Keyword.SORT),
-            Map.entry("skip", Keyword.SKIP),
-            Map.entry("take", Keyword.TAKE),
-            Map.entry("and", Keyword.AND),
-            Map.entry("or", Keyword.OR),
-            Map.entry("not", Keyword.NOT),
-            Map.entry("in", Keyword.IN),
-            Map.entry("null", Keyword.NULL),
-            Map.entry("asc", Keyword.ASC),
-            Map.entry("desc", Keyword.DESC),
-            Map.entry("true", Keyword.TRUE),
-            Map.entry("false", Keyword.FALSE),
+    private static final Map<String, Keyword> KEYWORDS = Map.ofEntries(Map.entry("filter", Keyword.FILTER),
+            Map.entry("sort", Keyword.SORT), Map.entry("skip", Keyword.SKIP), Map.entry("take", Keyword.TAKE),
+            Map.entry("and", Keyword.AND), Map.entry("or", Keyword.OR), Map.entry("not", Keyword.NOT),
+            Map.entry("in", Keyword.IN), Map.entry("null", Keyword.NULL), Map.entry("asc", Keyword.ASC),
+            Map.entry("desc", Keyword.DESC), Map.entry("true", Keyword.TRUE), Map.entry("false", Keyword.FALSE),
             Map.entry("unsupported", Keyword.UNSUPPORTED));
 
     @Override
@@ -87,8 +78,7 @@ public final class DefaultLexer implements Lexer {
             } else if (c == '"') {
                 string(pos);
             } else if (!symbol(c, pos)) {
-                throw new DslParseException(
-                        "unexpected character '" + c + "' at line " + line + ", column " + column);
+                throw new DslParseException("unexpected character '" + c + "' at line " + line + ", column " + column);
             }
         }
 
@@ -154,11 +144,11 @@ public final class DefaultLexer implements Lexer {
             }
             char next = s.charAt(i);
             return switch (next) {
-                case '"', '\\' -> next;
-                case 'n' -> '\n';
-                case 't' -> '\t';
-                default -> throw new DslParseException(
-                        "invalid escape '\\" + next + "' at line " + line + ", column " + column);
+            case '"', '\\' -> next;
+            case 'n' -> '\n';
+            case 't' -> '\t';
+            default ->
+                throw new DslParseException("invalid escape '\\" + next + "' at line " + line + ", column " + column);
             };
         }
 
@@ -198,35 +188,35 @@ public final class DefaultLexer implements Lexer {
 
     private static @Nullable Operator twoCharOperator(String text) {
         return switch (text) {
-            case "==" -> Operator.EQ;
-            case "!=" -> Operator.NE;
-            case "<=" -> Operator.LE;
-            case ">=" -> Operator.GE;
-            default -> null;
+        case "==" -> Operator.EQ;
+        case "!=" -> Operator.NE;
+        case "<=" -> Operator.LE;
+        case ">=" -> Operator.GE;
+        default -> null;
         };
     }
 
     private static @Nullable Operator oneCharOperator(char c) {
         return switch (c) {
-            case '<' -> Operator.LT;
-            case '>' -> Operator.GT;
-            case '~' -> Operator.CONTAINS;
-            default -> null;
+        case '<' -> Operator.LT;
+        case '>' -> Operator.GT;
+        case '~' -> Operator.CONTAINS;
+        default -> null;
         };
     }
 
     private static @Nullable Punctuation punctuation(char c) {
         return switch (c) {
-            case '|' -> Punctuation.PIPE;
-            case '(' -> Punctuation.LPAREN;
-            case ')' -> Punctuation.RPAREN;
-            case ',' -> Punctuation.COMMA;
-            case '.' -> Punctuation.DOT;
-            case '+' -> Punctuation.PLUS;
-            case '-' -> Punctuation.MINUS;
-            case '*' -> Punctuation.STAR;
-            case '/' -> Punctuation.SLASH;
-            default -> null;
+        case '|' -> Punctuation.PIPE;
+        case '(' -> Punctuation.LPAREN;
+        case ')' -> Punctuation.RPAREN;
+        case ',' -> Punctuation.COMMA;
+        case '.' -> Punctuation.DOT;
+        case '+' -> Punctuation.PLUS;
+        case '-' -> Punctuation.MINUS;
+        case '*' -> Punctuation.STAR;
+        case '/' -> Punctuation.SLASH;
+        default -> null;
         };
     }
 
@@ -237,9 +227,8 @@ public final class DefaultLexer implements Lexer {
         Token last = tokens.getLast();
         return last instanceof IdentifierToken || last instanceof NumberToken || last instanceof StringToken
                 || (last instanceof PunctuationToken p && p.punctuation() == Punctuation.RPAREN)
-                || (last instanceof KeywordToken k
-                        && (k.keyword() == Keyword.TRUE || k.keyword() == Keyword.FALSE
-                                || k.keyword() == Keyword.NULL));
+                || (last instanceof KeywordToken k && (k.keyword() == Keyword.TRUE || k.keyword() == Keyword.FALSE
+                        || k.keyword() == Keyword.NULL));
     }
 
     private static boolean isIdentStart(char c) {

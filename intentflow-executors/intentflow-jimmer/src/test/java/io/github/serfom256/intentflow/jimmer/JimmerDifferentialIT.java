@@ -37,10 +37,9 @@ class JimmerDifferentialIT extends ExecutorDifferentialTest {
     @Override
     protected QueryExecutor createExecutor(String jdbcUrl, String user, String password) {
         JSqlClient sqlClient = JSqlClient.newBuilder()
-                .setConnectionManager(ConnectionManager.simpleConnectionManager(
-                        new SingleConnectionDataSource(jdbcUrl, user, password, true)))
-                .setDialect(dialect(database()))
-                .build();
+                .setConnectionManager(ConnectionManager
+                        .simpleConnectionManager(new SingleConnectionDataSource(jdbcUrl, user, password, true)))
+                .setDialect(dialect(database())).build();
         return new JimmerQueryExecutor(sqlClient);
     }
 

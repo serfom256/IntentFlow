@@ -72,14 +72,14 @@ final class AggregatePlanner {
         }
         SqlExpr function = new SqlExpr.CountAll();
         if (aggregate.function() != AggregateFunction.COUNT) {
-            inner.add(new Select.Value(ValuePlanner.plan(Objects.requireNonNull(aggregate.argument()), scope),
-                    ARGUMENT));
+            inner.add(
+                    new Select.Value(ValuePlanner.plan(Objects.requireNonNull(aggregate.argument()), scope), ARGUMENT));
             function = new SqlExpr.Call(aggregate.function().name(), new SqlExpr.Column(null, ARGUMENT));
         }
         renamed.put(function(aggregate, scope), function);
         outer.add(new Select.Value(function, null));
-        order.replaceAll(o -> new Select.Order(renamed.getOrDefault(o.value(), o.value()), o.direction(),
-                o.nullable()));
+        order.replaceAll(
+                o -> new Select.Order(renamed.getOrDefault(o.value(), o.value()), o.direction(), o.nullable()));
         Select rows = Select.from(grouped.from(), inner, grouped.where());
         return Select.from(new Select.Derived(rows, DERIVED), outer, List.of()).withGroupBy(groupBy);
     }

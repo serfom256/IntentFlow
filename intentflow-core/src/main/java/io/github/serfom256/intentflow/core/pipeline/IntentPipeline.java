@@ -18,8 +18,8 @@ public interface IntentPipeline {
     IntentResponse<?> resolve(IntentRequest request);
 
     /**
-     * Answers from the one service whose result type is {@code resultType}:
-     * the LLM only sees that service, and anything else it produces is rejected.
+     * Answers from the one service whose result type is {@code resultType}: the LLM
+     * only sees that service, and anything else it produces is rejected.
      *
      * @throws IllegalArgumentException when no service maps to {@code resultType}
      */
@@ -27,11 +27,9 @@ public interface IntentPipeline {
 
     /**
      * Translates and compiles the request like {@link #resolve(IntentRequest)} but
-     * does not run the query:
-     * the trace holds the DSL, whether it came from the cache, the SQL and its
-     * parameters. A successful
-     * translation is cached, so a following {@code resolve} of the same text does
-     * not call the LLM again.
+     * does not run the query: the trace holds the DSL, whether it came from the
+     * cache, the SQL and its parameters. A successful translation is cached, so a
+     * following {@code resolve} of the same text does not call the LLM again.
      *
      * @throws UnsupportedRequestException when the LLM declines the request
      * @throws ValidationException         when the DSL does not fit the catalog

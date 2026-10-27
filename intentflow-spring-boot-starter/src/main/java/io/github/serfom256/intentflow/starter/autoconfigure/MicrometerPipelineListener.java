@@ -25,8 +25,8 @@ final class MicrometerPipelineListener implements PipelineListener {
     public void cache(boolean hit) {
         MeterRegistry meters = registry.getIfAvailable();
         if (meters != null) {
-            Counter.builder("intentflow.cache").description("DSL cache lookups")
-                    .tag("result", hit ? "hit" : "miss").register(meters).increment();
+            Counter.builder("intentflow.cache").description("DSL cache lookups").tag("result", hit ? "hit" : "miss")
+                    .register(meters).increment();
         }
     }
 
@@ -34,9 +34,8 @@ final class MicrometerPipelineListener implements PipelineListener {
     public void llm(boolean repair, Duration elapsed, boolean failed) {
         MeterRegistry meters = registry.getIfAvailable();
         if (meters != null) {
-            Timer.builder("intentflow.llm").description("Calls to the LLM")
-                    .tag("kind", repair ? "repair" : "generate").tag("outcome", failed ? "error" : "ok")
-                    .register(meters).record(elapsed);
+            Timer.builder("intentflow.llm").description("Calls to the LLM").tag("kind", repair ? "repair" : "generate")
+                    .tag("outcome", failed ? "error" : "ok").register(meters).record(elapsed);
         }
     }
 
@@ -66,8 +65,8 @@ final class MicrometerPipelineListener implements PipelineListener {
                     .register(meters).record(elapsed);
             if (!failed) {
                 DistributionSummary.builder("intentflow.query.rows")
-                        .description("Entities or aggregate groups a query returned")
-                        .tag("service", service.value()).tag("kind", kind).register(meters).record(rows);
+                        .description("Entities or aggregate groups a query returned").tag("service", service.value())
+                        .tag("kind", kind).register(meters).record(rows);
             }
         }
     }

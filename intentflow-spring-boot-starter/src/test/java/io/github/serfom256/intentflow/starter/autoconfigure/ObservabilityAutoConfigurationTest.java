@@ -54,14 +54,12 @@ class ObservabilityAutoConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
-            .withBean(LlmClient.class, () -> llm)
-            .withBean(QueryExecutor.class, () -> new QueryExecutor() {
+            .withBean(LlmClient.class, () -> llm).withBean(QueryExecutor.class, () -> new QueryExecutor() {
                 @Override
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                     return List.of();
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
+            }).withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false", "intentflow.dialect=postgresql");
 
     @Test
@@ -98,8 +96,8 @@ class ObservabilityAutoConfigurationTest {
             assertThat(highCardinality(request)).containsEntry("gen_ai.usage.input_tokens", "300")
                     .doesNotContainKey("gen_ai.response.model");
             assertThat(tags(stopped.getFirst())).doesNotContainKey("gen_ai.usage.input_tokens");
-            assertThat(stopped.subList(0, 4)).allSatisfy(context -> assertThat(
-                    context.getParentObservation().getContextView()).isSameAs(request));
+            assertThat(stopped.subList(0, 4)).allSatisfy(
+                    context -> assertThat(context.getParentObservation().getContextView()).isSameAs(request));
         });
     }
 

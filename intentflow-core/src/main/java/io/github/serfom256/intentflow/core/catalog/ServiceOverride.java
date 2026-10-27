@@ -39,8 +39,8 @@ public record ServiceOverride(@Nullable String description, @Nullable String uri
     }
 
     public List<String> problems(ServiceDescriptor service) {
-        Set<String> fields = service.fields().stream().filter(FieldMapping::queryable)
-                .map(f -> f.logical().value()).collect(Collectors.toSet());
+        Set<String> fields = service.fields().stream().filter(FieldMapping::queryable).map(f -> f.logical().value())
+                .collect(Collectors.toSet());
         Set<String> all = service.fields().stream().map(f -> f.logical().value()).collect(Collectors.toSet());
         List<String> problems = new ArrayList<>();
         text("description", description, MAX_DESCRIPTION_LENGTH, problems);
@@ -58,8 +58,8 @@ public record ServiceOverride(@Nullable String description, @Nullable String uri
             Matcher matcher = PLACEHOLDER.matcher(uri);
             while (matcher.find()) {
                 if (!all.contains(matcher.group(1))) {
-                    problems.add("uri placeholder {{" + matcher.group(1) + "}} is not a field of "
-                            + service.name().value());
+                    problems.add(
+                            "uri placeholder {{" + matcher.group(1) + "}} is not a field of " + service.name().value());
                 }
             }
         }

@@ -107,21 +107,21 @@ public final class JimmerNameResolver implements NameResolver {
         }
         String column = info.getColumnName();
         return switch (info.getAction()) {
-            case LogicalDeletedInfo.Action.Eq eq -> literal(eq.getValue()).map(v -> column + " = " + v).orElse(null);
-            case LogicalDeletedInfo.Action.Ne ne -> literal(ne.getValue()).map(v -> column + " <> " + v).orElse(null);
-            case LogicalDeletedInfo.Action.IsNull n -> column + " IS NULL";
-            case LogicalDeletedInfo.Action.IsNotNull n -> column + " IS NOT NULL";
-            default -> null;
+        case LogicalDeletedInfo.Action.Eq eq -> literal(eq.getValue()).map(v -> column + " = " + v).orElse(null);
+        case LogicalDeletedInfo.Action.Ne ne -> literal(ne.getValue()).map(v -> column + " <> " + v).orElse(null);
+        case LogicalDeletedInfo.Action.IsNull n -> column + " IS NULL";
+        case LogicalDeletedInfo.Action.IsNotNull n -> column + " IS NOT NULL";
+        default -> null;
         };
     }
 
     private static Optional<String> literal(@Nullable Object value) {
         return switch (value) {
-            case Boolean b -> Optional.of(b ? "TRUE" : "FALSE");
-            case Number n -> Optional.of(n.toString());
-            case String s -> Optional.of("'" + s.replace("'", "''") + "'");
-            case Enum<?> e -> Optional.of("'" + e.name() + "'");
-            case null, default -> Optional.empty();
+        case Boolean b -> Optional.of(b ? "TRUE" : "FALSE");
+        case Number n -> Optional.of(n.toString());
+        case String s -> Optional.of("'" + s.replace("'", "''") + "'");
+        case Enum<?> e -> Optional.of("'" + e.name() + "'");
+        case null, default -> Optional.empty();
         };
     }
 

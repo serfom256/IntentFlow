@@ -6,8 +6,7 @@ public record DefaultServiceDescription(String value) implements ServiceDescript
 
     public DefaultServiceDescription {
         if (value.isBlank()) {
-            throw new IllegalArgumentException(
-                    "ServiceDescription must be non-blank — omit (null) instead");
+            throw new IllegalArgumentException("ServiceDescription must be non-blank — omit (null) instead");
         }
     }
 }

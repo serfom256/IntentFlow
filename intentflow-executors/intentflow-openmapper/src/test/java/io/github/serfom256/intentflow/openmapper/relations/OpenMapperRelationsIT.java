@@ -101,8 +101,7 @@ class OpenMapperRelationsIT {
     private OpenMapperQueryExecutor executor(TestDatabase db) {
         ConfigurableApplicationContext context = contexts.computeIfAbsent(db, d -> {
             TestDatabase.Endpoint e = RelationTables.prepare(d);
-            return new SpringApplicationBuilder(App.class)
-                    .web(WebApplicationType.NONE)
+            return new SpringApplicationBuilder(App.class).web(WebApplicationType.NONE)
                     .properties("spring.datasource.url=" + e.url(), "spring.datasource.username=" + e.user(),
                             "spring.datasource.password=" + e.password(),
                             "openmapper.model.packagesToScan=io.github.serfom256.intentflow.openmapper.relations")
@@ -121,12 +120,9 @@ class OpenMapperRelationsIT {
     }
 
     private <T> List<T> resolve(TestDatabase db, SchemaFacts facts, String dsl, Class<T> type) {
-        return IntentPipelines.builder()
-                .llm((t, c) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(db.dialect(), facts))
-                .executor(executor(db))
-                .catalog(CATALOG)
-                .build().resolve(IntentRequests.of("q"), type).items();
+        return IntentPipelines.builder().llm((t, c) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(db.dialect(), facts)).executor(executor(db)).catalog(CATALOG).build()
+                .resolve(IntentRequests.of("q"), type).items();
     }
 
     private static List<Long> orderIds(Customer customer) {

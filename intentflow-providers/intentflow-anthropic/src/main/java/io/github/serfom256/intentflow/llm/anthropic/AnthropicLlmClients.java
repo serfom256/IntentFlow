@@ -17,9 +17,7 @@ public final class AnthropicLlmClients {
 
     public static LlmClient of(@Nullable URI baseUrl, String model, String apiKey, AnthropicSettings settings,
             Duration timeout, int maxRetries, @Nullable Proxy proxy, Clock clock) {
-        AnthropicOkHttpClient.Builder client = AnthropicOkHttpClient.builder()
-                .apiKey(apiKey)
-                .timeout(timeout)
+        AnthropicOkHttpClient.Builder client = AnthropicOkHttpClient.builder().apiKey(apiKey).timeout(timeout)
                 .maxRetries(maxRetries);
         if (baseUrl != null) {
             client.baseUrl(baseUrl.toString());

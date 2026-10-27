@@ -3,7 +3,6 @@ package io.github.serfom256.intentflow.starter.autoconfigure;
 import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
-import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
 import io.github.serfom256.intentflow.core.schema.JdbcSchemaIntrospector;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
@@ -29,18 +28,16 @@ final class SchemaFactsFactory {
         List<ServiceDescriptor> services = catalog.names().stream().map(catalog::get).toList();
         Set<String> tables = services.stream().map(s -> s.table().value()).collect(Collectors.toSet());
         Map<String, TableFacts> facts = new LinkedHashMap<>(introspected(dataSource, introspect, tables));
-        Map<ServiceName, String> restrictions = new LinkedHashMap<>();
         for (ServiceDescriptor service : services) {
             TableFacts declared = ServiceDescriptors.factsOf(service.resultType(), resolvers);
             facts.merge(service.table().value(), declared, TableFacts::merge);
-            ServiceDescriptors.restrictionOf(service.resultType(), resolvers)
-                    .ifPresent(sql -> restrictions.put(service.name(), sql));
         }
-        if (!restrictions.isEmpty()) {
-            log.info("IntentFlow applies row restrictions to {}", restrictions.keySet().stream()
-                    .map(ServiceName::value).sorted().toList());
+        List<String> restricted = services.stream().filter(s -> s.restriction().isPresent()).map(s -> s.name().value())
+                .sorted().toList();
+        if (!restricted.isEmpty()) {
+            log.info("IntentFlow applies row restrictions to {}", restricted);
         }
-        return SchemaFacts.of(facts, restrictions);
+        return SchemaFacts.of(facts);
     }
 
     private static Map<String, TableFacts> introspected(@Nullable DataSource dataSource, boolean introspect,

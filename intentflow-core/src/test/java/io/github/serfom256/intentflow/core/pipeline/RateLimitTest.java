@@ -71,7 +71,7 @@ class RateLimitTest {
     }
 
     private LlmRateLimiter perPrincipal(int questions, Duration period) {
-        return LlmRateLimiters.of(questions, period, caller -> String.valueOf(caller.principal()), clock);
+        return LlmRateLimiters.of(questions, period, caller -> caller.principal().orElse("anonymous"), clock);
     }
 
     private IntentPipeline pipeline(LlmRateLimiter limiter) {
@@ -81,22 +81,15 @@ class RateLimitTest {
                 outcomes.add(outcome);
             }
         };
-        return IntentPipelines.builder()
-                .llm((text, catalog) -> {
-                    llmCalls.incrementAndGet();
-                    return DslSources.of("books");
-                })
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(new QueryExecutor() {
-                    @Override
-                    public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
-                        return List.of();
-                    }
-                })
-                .catalog(CATALOG)
-                .listener(listener)
-                .rateLimiter(limiter)
-                .build();
+        return IntentPipelines.builder().llm((text, catalog) -> {
+            llmCalls.incrementAndGet();
+            return DslSources.of("books");
+        }).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(new QueryExecutor() {
+            @Override
+            public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
+                return List.of();
+            }
+        }).catalog(CATALOG).listener(listener).rateLimiter(limiter).build();
     }
 
     @Test
@@ -105,8 +98,9 @@ class RateLimitTest {
         limiter.acquire(ANN);
         limiter.acquire(ANN);
 
-        assertThatThrownBy(() -> limiter.acquire(ANN)).isInstanceOfSatisfying(RateLimitExceededException.class,
-                e -> assertThat(e.retryAfter()).isEqualTo(Duration.ofSeconds(30)))
+        assertThatThrownBy(() -> limiter.acquire(ANN))
+                .isInstanceOfSatisfying(RateLimitExceededException.class,
+                        e -> assertThat(e.retryAfter()).isEqualTo(Duration.ofSeconds(30)))
                 .hasMessage("Rate limit of 2 questions per PT1M reached");
         clock.advance(Duration.ofSeconds(30));
         limiter.acquire(ANN);
@@ -151,7 +145,6 @@ class RateLimitTest {
         assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("every book", ANN)))
                 .isInstanceOf(RateLimitExceededException.class);
         assertThat(llmCalls).hasValue(1);
-        assertThat(outcomes).containsExactly(Outcome.ANSWERED, Outcome.ANSWERED, Outcome.ANSWERED,
-                Outcome.LIMITED);
+        assertThat(outcomes).containsExactly(Outcome.ANSWERED, Outcome.ANSWERED, Outcome.ANSWERED, Outcome.LIMITED);
     }
 }

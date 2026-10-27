@@ -21,8 +21,8 @@ public final class GeminiLlmClients {
         return new GeminiLlmClient(client, model, maxTokens, clock);
     }
 
-    public static LlmClient apiKey(@Nullable URI baseUrl, String apiKey, String model, int maxTokens,
-            Duration timeout, Clock clock) {
+    public static LlmClient apiKey(@Nullable URI baseUrl, String apiKey, String model, int maxTokens, Duration timeout,
+            Clock clock) {
         Client client = Client.builder().apiKey(apiKey).httpOptions(httpOptions(baseUrl, timeout)).build();
         return new GeminiLlmClient(client, model, maxTokens, clock);
     }

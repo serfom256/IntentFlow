@@ -15,13 +15,8 @@ import java.time.LocalDateTime;
 class JdbcDifferentialIT extends ExecutorDifferentialTest {
 
     @IntentService(value = "gadgets", table = "gadget", uri = "/gadgets/{{id}}", maxTake = 500, defaultSort = "id")
-    record Gadget(
-            @IntentField long id,
-            @IntentField String name,
-            @IntentField(caseSensitive = true) GadgetKind kind,
-            @IntentField BigDecimal price,
-            @IntentField Integer stock,
-            @IntentField Boolean active,
+    record Gadget(@IntentField long id, @IntentField String name, @IntentField(caseSensitive = true) GadgetKind kind,
+            @IntentField BigDecimal price, @IntentField Integer stock, @IntentField Boolean active,
             @IntentField LocalDateTime createdAt) {
     }
 

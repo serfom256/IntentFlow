@@ -57,7 +57,7 @@ enum ClickHouseDatabase implements TestDatabase {
 
     @Override
     public String ddl(String createTable) {
-        return createTable.replace(" PRIMARY KEY", " NOT NULL PRIMARY KEY")
-                .replace("TIMESTAMP WITH TIME ZONE", "DateTime64(6, 'UTC')");
+        return createTable.replace(" PRIMARY KEY", " NOT NULL PRIMARY KEY").replace("TIMESTAMP WITH TIME ZONE",
+                "DateTime64(6, 'UTC')");
     }
 }

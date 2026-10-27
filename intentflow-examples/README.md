@@ -101,12 +101,19 @@ and 3,000 orders, so answers go beyond the 50-row page like on real data. Produc
 ./gradlew :intentflow-shop-api:test        # API tests with a scripted LLM, on OpenMapper
 ./gradlew :intentflow-shop-api:check       # the same tests on OpenMapper, JPA, Jimmer and JDBC
 ./gradlew :intentflow-shop-api:llmTest     # questions to the live LLM, results checked against the data
+./gradlew :intentflow-shop-api:performanceTest   # plans of generated SQL against hand-written SQL
 ./gradlew :intentflow-shop-ui:assemble     # type check and production build of the UI
 ```
 
 `llmTest` asks 32 English questions on PostgreSQL and MySQL, and 576 questions in English, Russian, Chinese and
 Japanese on PostgreSQL (`MultilingualLlmEvaluationTest`). Each answer is compared with results computed from the
 data; every language must reach 80%.
+
+`performanceTest` adds 200,000 customers, 2 million orders and 100,000 products to PostgreSQL and MySQL, then runs
+each case twice: the SQL IntentFlow generates for a DSL query and the SQL a developer would write for it. Both must
+return the same rows. A case fails when the generated SQL scans a table the hand-written SQL reads through an index,
+takes more than twice as long (plus 5 ms), or, on PostgreSQL, has a planner cost more than 1.5 times higher. The
+task takes about three minutes and is not part of `build` or CI.
 
 Integration tests start their databases with Testcontainers; `INTENTFLOW_TEST_DB=compose` uses the Compose
 databases instead.

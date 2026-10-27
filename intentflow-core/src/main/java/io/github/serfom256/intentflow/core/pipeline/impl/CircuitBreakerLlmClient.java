@@ -77,8 +77,8 @@ public final class CircuitBreakerLlmClient implements LlmClient {
         long left = openUntil - clock.millis();
         if (left > 0 || trialInFlight) {
             Duration retryAfter = Duration.ofMillis(Math.max(left, 0));
-            throw new LlmUnavailableException("LLM circuit is open after repeated failures (threshold "
-                    + failureThreshold + ")", retryAfter);
+            throw new LlmUnavailableException(
+                    "LLM circuit is open after repeated failures (threshold " + failureThreshold + ")", retryAfter);
         }
         trialInFlight = true;
         return true;

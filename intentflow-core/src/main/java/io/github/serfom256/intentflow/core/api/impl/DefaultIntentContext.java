@@ -1,12 +1,12 @@
 package io.github.serfom256.intentflow.core.api.impl;
 
 import io.github.serfom256.intentflow.core.api.IntentContext;
-import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-public record DefaultIntentContext(@Nullable String principal, @Nullable String tenant, Set<String> roles,
+public record DefaultIntentContext(Optional<String> principal, Optional<String> tenant, Set<String> roles,
         Map<String, Object> attributes) implements IntentContext {
 
     public DefaultIntentContext {

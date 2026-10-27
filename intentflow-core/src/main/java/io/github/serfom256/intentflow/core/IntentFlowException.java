@@ -17,8 +17,7 @@ public class IntentFlowException extends RuntimeException {
         this(code, message, details, null);
     }
 
-    public IntentFlowException(ErrorCode code, String message, Map<String, Object> details,
-            @Nullable Throwable cause) {
+    public IntentFlowException(ErrorCode code, String message, Map<String, Object> details, @Nullable Throwable cause) {
         super(message, cause);
         this.code = code;
         this.details = Map.copyOf(details);

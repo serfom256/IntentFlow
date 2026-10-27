@@ -21,8 +21,7 @@ public final class StubLlmClient implements LlmClient {
     public DslSource generateDsl(UserText normalizedText, ServiceCatalog catalog) {
         DslSource result = responses.get(normalizedText);
         if (result == null) {
-            throw new LlmException(
-                    "StubLlmClient has no response for: '" + normalizedText.value() + "'");
+            throw new LlmException("StubLlmClient has no response for: '" + normalizedText.value() + "'");
         }
         return result;
     }

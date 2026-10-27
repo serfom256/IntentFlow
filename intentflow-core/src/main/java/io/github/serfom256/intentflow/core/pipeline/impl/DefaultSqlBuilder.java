@@ -72,8 +72,8 @@ public final class DefaultSqlBuilder implements SqlBuilder {
 
     @Override
     public boolean supportsKeyset(ValidatedQuery query) {
-        return QueryPlanner.keysetEligible(query, new PlanContext(facts, optimizations, ResultShape.ROWS, dialect, zone,
-                type -> List.of()));
+        return QueryPlanner.keysetEligible(query,
+                new PlanContext(facts, optimizations, ResultShape.ROWS, dialect, zone, type -> List.of()));
     }
 
     @Override

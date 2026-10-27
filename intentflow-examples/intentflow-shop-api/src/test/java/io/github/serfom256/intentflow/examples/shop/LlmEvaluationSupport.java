@@ -133,17 +133,19 @@ abstract class LlmEvaluationSupport {
                 Case.set("headphones rated 4.5 or higher",
                         () -> productIds(p -> p.getCategory() == Category.HEADPHONES
                                 && p.getRating().compareTo(new BigDecimal("4.5")) >= 0)),
-                Case.ordered("the 3 most expensive monitors", () -> products.findAll().stream()
-                        .filter(p -> p.getCategory() == Category.MONITOR)
-                        .sorted(Comparator.comparing(Product::getPrice).reversed())
-                        .limit(3).map(Product::getId).toList()),
+                Case.ordered("the 3 most expensive monitors",
+                        () -> products.findAll().stream().filter(p -> p.getCategory() == Category.MONITOR)
+                                .sorted(Comparator.comparing(Product::getPrice).reversed()).limit(3).map(Product::getId)
+                                .toList()),
                 Case.set("products added to the catalog in 2025",
                         () -> productIds(p -> !p.getCreatedAt().isBefore(y2025) && p.getCreatedAt().isBefore(y2026))),
-                Case.set("vip customers from germany or france", () -> customers.findAll().stream()
-                        .filter(c -> c.isVip() && Set.of("DE", "FR").contains(c.getCountry()))
-                        .map(Customer::getId).sorted().limit(PAGE).toList()),
-                Case.set("customers living in the United States", () -> customers.findAll().stream()
-                        .filter(c -> c.getCountry().equals("US")).map(Customer::getId).sorted().limit(PAGE).toList()),
+                Case.set("vip customers from germany or france",
+                        () -> customers.findAll().stream()
+                                .filter(c -> c.isVip() && Set.of("DE", "FR").contains(c.getCountry()))
+                                .map(Customer::getId).sorted().limit(PAGE).toList()),
+                Case.set("customers living in the United States",
+                        () -> customers.findAll().stream().filter(c -> c.getCountry().equals("US")).map(Customer::getId)
+                                .sorted().limit(PAGE).toList()),
                 Case.set("samsung galaxy a56",
                         () -> productIds(p -> p.getName().toLowerCase(Locale.ROOT).contains("galaxy a56"))),
                 Case.set("products with ultra in the name",
@@ -159,20 +161,20 @@ abstract class LlmEvaluationSupport {
                     Set<Long> german = customers.findAll().stream().filter(c -> c.getCountry().equals("DE"))
                             .map(Customer::getId).collect(Collectors.toSet());
                     return orderIds(o -> german.contains(o.getCustomerId()) && o.getStatus() == OrderStatus.DELIVERED);
-                }),
-                Case.set("customers who have a cancelled order", () -> {
+                }), Case.set("customers who have a cancelled order", () -> {
                     Set<Long> cancelled = orders.findAll().stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED)
                             .map(Order::getCustomerId).collect(Collectors.toSet());
                     return customers.findAll().stream().map(Customer::getId).filter(cancelled::contains).sorted()
-                            .limit(PAGE)
-                            .toList();
+                            .limit(PAGE).toList();
                 }),
-                Case.groups("how many orders are there per status?", () -> orders.findAll().stream()
-                        .collect(Collectors.groupingBy(o -> o.getStatus().name(),
-                                Collectors.collectingAndThen(Collectors.counting(), BigDecimal::valueOf)))),
-                Case.groups("average order total", () -> Map.of("", orders.findAll().stream().map(Order::getTotal)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add)
-                        .divide(BigDecimal.valueOf(orders.findAll().size()), 2, RoundingMode.HALF_UP))),
+                Case.groups("how many orders are there per status?",
+                        () -> orders.findAll().stream()
+                                .collect(Collectors.groupingBy(o -> o.getStatus().name(),
+                                        Collectors.collectingAndThen(Collectors.counting(), BigDecimal::valueOf)))),
+                Case.groups("average order total",
+                        () -> Map.of("",
+                                orders.findAll().stream().map(Order::getTotal).reduce(BigDecimal.ZERO, BigDecimal::add)
+                                        .divide(BigDecimal.valueOf(orders.findAll().size()), 2, RoundingMode.HALF_UP))),
                 Case.set("orders where the average price per item is above 1000 dollars",
                         () -> orderIds(o -> o.getTotal().compareTo(BigDecimal.valueOf(1000L * o.getItemsCount())) > 0)),
                 Case.set("orders whose total with 20% tax exceeds 5000", () -> orderIds(
@@ -180,37 +182,37 @@ abstract class LlmEvaluationSupport {
                 Case.set("phones under 500 after discount",
                         () -> productIds(p -> p.getCategory() == Category.PHONE
                                 && effectivePrice(p).compareTo(new BigDecimal("500")) < 0)),
-                Case.groups("how many discounted products are there per category?", () -> products.findAll().stream()
-                        .filter(p -> p.getDiscount() != null)
-                        .collect(Collectors.groupingBy(p -> p.getCategory().name(),
-                                Collectors.collectingAndThen(Collectors.counting(), BigDecimal::valueOf)))),
-                Case.set("the best rated product in each category", () -> products.findAll().stream()
-                        .collect(Collectors.groupingBy(Product::getCategory, Collectors.minBy(
-                                Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId))))
-                        .values().stream().map(p -> p.orElseThrow().getId()).sorted().toList()),
+                Case.groups("how many discounted products are there per category?",
+                        () -> products.findAll().stream().filter(p -> p.getDiscount() != null)
+                                .collect(Collectors.groupingBy(p -> p.getCategory().name(),
+                                        Collectors.collectingAndThen(Collectors.counting(), BigDecimal::valueOf)))),
+                Case.set("the best rated product in each category",
+                        () -> products.findAll().stream()
+                                .collect(Collectors.groupingBy(Product::getCategory,
+                                        Collectors.minBy(Comparator.comparing(Product::getRating).reversed()
+                                                .thenComparing(Product::getId))))
+                                .values().stream().map(p -> p.orElseThrow().getId()).sorted().toList()),
                 Case.set("the latest order of every vip customer", () -> {
                     Set<Long> vip = customers.findAll().stream().filter(Customer::isVip).map(Customer::getId)
                             .collect(Collectors.toSet());
                     Comparator<Order> newest = Comparator.comparing(Order::getCreatedAt).reversed()
                             .thenComparing(Order::getId, Comparator.reverseOrder());
                     return orders.findAll().stream().filter(o -> vip.contains(o.getCustomerId()))
-                            .collect(Collectors.groupingBy(Order::getCustomerId, Collectors.minBy(newest)))
-                            .values().stream().map(o -> o.orElseThrow()).sorted(newest).map(Order::getId)
-                            .limit(PAGE).toList();
+                            .collect(Collectors.groupingBy(Order::getCustomerId, Collectors.minBy(newest))).values()
+                            .stream().map(o -> o.orElseThrow()).sorted(newest).map(Order::getId).limit(PAGE).toList();
                 }),
-                Case.ordered("customers with an order over 5000, biggest order first", () -> orders.findAll().stream()
-                        .collect(Collectors.toMap(Order::getCustomerId, Order::getTotal, BigDecimal::max))
-                        .entrySet().stream()
-                        .filter(e -> e.getValue().compareTo(new BigDecimal("5000")) > 0)
-                        .sorted(Map.Entry.<Long, BigDecimal>comparingByValue().reversed()
-                                .thenComparing(Map.Entry.comparingByKey()))
-                        .map(Map.Entry::getKey).limit(PAGE).toList()),
+                Case.ordered("customers with an order over 5000, biggest order first",
+                        () -> orders.findAll().stream()
+                                .collect(Collectors.toMap(Order::getCustomerId, Order::getTotal, BigDecimal::max))
+                                .entrySet().stream().filter(e -> e.getValue().compareTo(new BigDecimal("5000")) > 0)
+                                .sorted(Map.Entry.<Long, BigDecimal>comparingByValue().reversed()
+                                        .thenComparing(Map.Entry.comparingByKey()))
+                                .map(Map.Entry::getKey).limit(PAGE).toList()),
                 Case.ordered("paid orders sorted by customer name", () -> jdbc.sql(
                         "SELECT o.id FROM orders o JOIN customer c ON c.id = o.customer_id WHERE o.status = 'PAID' "
                                 + "ORDER BY c.full_name, o.created_at DESC, o.id DESC LIMIT " + PAGE)
                         .query(Long.class).list()),
-                Case.declined("my orders"),
-                Case.declined("my orders for October 10"),
+                Case.declined("my orders"), Case.declined("my orders for October 10"),
                 Case.declined("products sorted by supplier cost"),
                 Case.declined("customers whose email ends with example.com"),
                 Case.declined("which employees work in the warehouse?"));
@@ -243,8 +245,7 @@ abstract class LlmEvaluationSupport {
             } else {
                 List<Long> expected = c.expectedIds().get();
                 List<Number> ids = JsonPath.read(body(r), "$.items[*].id");
-                List<Long> got = ids.stream()
-                        .map(Number::longValue).toList();
+                List<Long> got = ids.stream().map(Number::longValue).toList();
                 boolean ok = c.ordered() ? got.equals(expected)
                         : Set.copyOf(got).equals(Set.copyOf(expected)) && got.size() == expected.size();
                 verdict = ok ? "PASS" : "FAIL (expected " + expected + ", got " + got + ")";
@@ -258,9 +259,8 @@ abstract class LlmEvaluationSupport {
             report.add("%-3s %-60s %6d ms  %s".formatted(c.language(), c.question(), ms, verdict));
         }
         double accuracy = (double) passed / all.size();
-        String summary = perLanguage.entrySet().stream()
-                .map(e -> "%s %d/%d (%d%%)".formatted(e.getKey(), e.getValue()[0], e.getValue()[1],
-                        Math.round(100.0 * e.getValue()[0] / e.getValue()[1])))
+        String summary = perLanguage.entrySet().stream().map(e -> "%s %d/%d (%d%%)".formatted(e.getKey(),
+                e.getValue()[0], e.getValue()[1], Math.round(100.0 * e.getValue()[0] / e.getValue()[1])))
                 .collect(Collectors.joining(", "));
         log.info("LLM evaluation: {}/{} ({}%): {}\n{}", passed, all.size(), Math.round(accuracy * 100), summary,
                 String.join("\n", report));
@@ -290,10 +290,8 @@ abstract class LlmEvaluationSupport {
     }
 
     List<Long> orderIds(Predicate<Order> p) {
-        return orders.findAll().stream().filter(p)
-                .sorted(Comparator.comparing(Order::getCreatedAt).reversed()
-                        .thenComparing(Order::getId, Comparator.reverseOrder()))
-                .map(Order::getId).limit(PAGE).toList();
+        return orders.findAll().stream().filter(p).sorted(Comparator.comparing(Order::getCreatedAt).reversed()
+                .thenComparing(Order::getId, Comparator.reverseOrder())).map(Order::getId).limit(PAGE).toList();
     }
 
     private static String body(MvcTestResult r) {

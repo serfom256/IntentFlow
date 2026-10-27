@@ -18,9 +18,8 @@ class IntentResponseTest {
 
     @Test
     void carriesServiceTypeItemsAndUri() {
-        IntentResponse<Book> response = IntentResponses.of(
-                ServiceNames.of("books"), Book.class, List.of(new Book(1), new Book(2)),
-                MicroFrontendUris.of("/books/1"));
+        IntentResponse<Book> response = IntentResponses.of(ServiceNames.of("books"), Book.class,
+                List.of(new Book(1), new Book(2)), MicroFrontendUris.of("/books/1"));
 
         assertThat(response.service().value()).isEqualTo("books");
         assertThat(response.type()).isEqualTo(Book.class);
@@ -31,8 +30,8 @@ class IntentResponseTest {
     @Test
     void itemsAreCopiedAndImmutable() {
         List<Book> source = new ArrayList<>(List.of(new Book(1)));
-        IntentResponse<Book> response = IntentResponses.of(
-                ServiceNames.of("books"), Book.class, source, MicroFrontendUris.of("/books/1"));
+        IntentResponse<Book> response = IntentResponses.of(ServiceNames.of("books"), Book.class, source,
+                MicroFrontendUris.of("/books/1"));
         source.add(new Book(2));
 
         assertThat(response.items()).hasSize(1);
@@ -43,9 +42,8 @@ class IntentResponseTest {
     @SuppressWarnings({ "unchecked", "rawtypes" })
     void rejectsItemsOfAnotherType() {
         List raw = List.of("not a book");
-        assertThatThrownBy(() -> IntentResponses.of(
-                ServiceNames.of("books"), Book.class, raw, MicroFrontendUris.of("/books")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("java.lang.String");
+        assertThatThrownBy(
+                () -> IntentResponses.of(ServiceNames.of("books"), Book.class, raw, MicroFrontendUris.of("/books")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("java.lang.String");
     }
 }

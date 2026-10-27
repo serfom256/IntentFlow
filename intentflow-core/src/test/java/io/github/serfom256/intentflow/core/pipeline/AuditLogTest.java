@@ -54,17 +54,13 @@ class AuditLogTest {
                 return DslSources.of(queue.poll(), new TokenUsage(110, 6), "m");
             }
         };
-        return IntentPipelines.builder()
-                .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
+        return IntentPipelines.builder().llm(llm).sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         return List.of();
                     }
-                })
-                .catalog(CATALOG)
-                .audit(new AuditLog() {
+                }).catalog(CATALOG).audit(new AuditLog() {
                     @Override
                     public void question(QuestionAudit audit) {
                         audits.add(audit);
@@ -92,11 +88,10 @@ class AuditLogTest {
 
     @Test
     void aRejectedQuestionRecordsTheLastDslAndTheError() {
-        IntentPipeline pipeline = pipeline("books | filter author == \"x\"", "books | filter pages > 1")
-                .maxRepairs(1).build();
+        IntentPipeline pipeline = pipeline("books | filter author == \"x\"", "books | filter pages > 1").maxRepairs(1)
+                .build();
 
-        assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("q", ANN)))
-                .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("q", ANN))).isInstanceOf(ValidationException.class);
 
         QuestionAudit audit = audits.getFirst();
         assertThat(audit.outcome()).isEqualTo(Outcome.REJECTED);

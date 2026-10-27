@@ -37,9 +37,7 @@ final class IntentServiceScanner extends ClassPathScanningCandidateComponentProv
                 classNames.add(candidate.getBeanClassName());
             }
         }
-        return classNames.stream()
-                .sorted(Comparator.naturalOrder())
-                .<Class<?>>map(name -> ClassUtils.resolveClassName(name, classLoader))
-                .toList();
+        return classNames.stream().sorted(Comparator.naturalOrder())
+                .<Class<?>>map(name -> ClassUtils.resolveClassName(name, classLoader)).toList();
     }
 }

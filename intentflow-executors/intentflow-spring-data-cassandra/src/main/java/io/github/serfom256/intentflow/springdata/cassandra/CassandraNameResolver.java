@@ -37,8 +37,7 @@ public final class CassandraNameResolver implements NameResolver {
         }
         CassandraPersistentEntity<?> entity = mappingContext.getRequiredPersistentEntity(owner);
         CassandraPersistentProperty property = entity.getPersistentProperty(field.getName());
-        return property == null || property.getColumnName() == null
-                ? Optional.empty()
+        return property == null || property.getColumnName() == null ? Optional.empty()
                 : Optional.of(property.getRequiredColumnName().asInternal());
     }
 }

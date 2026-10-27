@@ -34,14 +34,8 @@ public final class GigaChatLlmClients {
         }
         GigaChatAuthorizer authorizer = new GigaChatAuthorizer(http.build(), settings.oauthUrl(), authorizationKey,
                 settings.scope(), timeout, clock);
-        return OpenAiCompatibleLlmClient.builder(settings.baseUrl(), model)
-                .authorizer(authorizer)
-                .temperature(null)
-                .sslContext(settings.sslContext())
-                .timeout(timeout)
-                .clock(clock)
-                .options(options)
-                .build();
+        return OpenAiCompatibleLlmClient.builder(settings.baseUrl(), model).authorizer(authorizer).temperature(null)
+                .sslContext(settings.sslContext()).timeout(timeout).clock(clock).options(options).build();
     }
 
     public static SSLContext trustStore(Path path, String password, String type) {

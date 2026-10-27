@@ -21,13 +21,9 @@ class SpringDataJdbcDifferentialIT extends ExecutorDifferentialTest {
 
     @Table("gadget")
     @IntentService(value = "gadgets", uri = "/gadgets/{{id}}", maxTake = 500, defaultSort = "id")
-    record Gadget(
-            @Id @IntentField Long id,
-            @IntentField String name,
-            @IntentField(caseSensitive = true) GadgetKind kind,
-            @IntentField BigDecimal price,
-            @IntentField Integer stock,
-            @IntentField Boolean active,
+    record Gadget(@Id @IntentField Long id, @IntentField String name,
+            @IntentField(caseSensitive = true) GadgetKind kind, @IntentField BigDecimal price,
+            @IntentField Integer stock, @IntentField Boolean active,
             @Column("created_at") @IntentField LocalDateTime createdAt) {
     }
 

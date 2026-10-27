@@ -47,8 +47,7 @@ class SharedRateLimitAutoConfigurationTest {
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                     return List.of();
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
+            }).withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false", "intentflow.dialect=postgresql",
                     "intentflow.llm.rate-limit.questions=1");
 
@@ -67,8 +66,8 @@ class SharedRateLimitAutoConfigurationTest {
     void theJdbcStoreKeepsTheLimitInTheApplicationsDatabase() {
         DataSource dataSource = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1",
                 "sa", "");
-        runner.withBean(DataSource.class, () -> dataSource)
-                .withPropertyValues("intentflow.llm.rate-limit.store=jdbc").run(ctx -> {
+        runner.withBean(DataSource.class, () -> dataSource).withPropertyValues("intentflow.llm.rate-limit.store=jdbc")
+                .run(ctx -> {
                     assertThat(ctx.getBean(LlmRateLimiter.class)).isInstanceOf(JdbcRateLimiter.class);
                     secondQuestionIsLimited(ctx.getBean(IntentPipeline.class));
                 });
@@ -93,9 +92,8 @@ class SharedRateLimitAutoConfigurationTest {
 
     @Test
     void redisWithoutAConnectionSaysWhatToAdd() {
-        runner.withPropertyValues("intentflow.llm.rate-limit.store=redis")
-                .run(ctx -> assertThat(ctx).hasFailed().getFailure().rootCause()
-                        .hasMessageContaining("spring-boot-starter-data-redis"));
+        runner.withPropertyValues("intentflow.llm.rate-limit.store=redis").run(ctx -> assertThat(ctx).hasFailed()
+                .getFailure().rootCause().hasMessageContaining("spring-boot-starter-data-redis"));
     }
 
     @Test

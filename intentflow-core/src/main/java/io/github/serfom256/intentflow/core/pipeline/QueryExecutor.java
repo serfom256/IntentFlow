@@ -20,10 +20,9 @@ public interface QueryExecutor {
 
     /**
      * What an entity query for {@code resultType} has to select: every column
-     * ({@link ResultShape#ROWS}, the
-     * default), or only the primary key when the executor loads the entities itself
-     * ({@link ResultShape#KEYS}).
-     * A query selects every column anyway when the key is not known.
+     * ({@link ResultShape#ROWS}, the default), or only the primary key when the
+     * executor loads the entities itself ({@link ResultShape#KEYS}). A query
+     * selects every column anyway when the key is not known.
      */
     default ResultShape shape(Class<?> resultType) {
         return ResultShape.ROWS;
@@ -31,8 +30,8 @@ public interface QueryExecutor {
 
     /**
      * Like {@link #execute(BoundQuery, Class)}, for executors that also load
-     * relations of the result: they run the
-     * statements {@code related} builds. The default ignores {@code related}.
+     * relations of the result: they run the statements {@code related} builds. The
+     * default ignores {@code related}.
      */
     default <T> List<T> execute(BoundQuery query, Class<T> resultType, RelatedRows related) {
         return execute(query, resultType);
@@ -40,10 +39,9 @@ public interface QueryExecutor {
 
     /**
      * Conditions that rows of {@code entityType} must meet in the session this
-     * executor runs in, such as the
-     * Hibernate filters enabled on the current session. They are added to every
-     * query of that entity, including
-     * relation subqueries. The default adds none.
+     * executor runs in, such as the Hibernate filters enabled on the current
+     * session. They are added to every query of that entity, including relation
+     * subqueries. The default adds none.
      */
     default List<RuntimeRestriction> restrictions(Class<?> entityType) {
         return List.of();
@@ -51,8 +49,7 @@ public interface QueryExecutor {
 
     /**
      * Runs an aggregate query and returns its columns as plain values, in select
-     * order: the group
-     * fields, then the aggregated value.
+     * order: the group fields, then the aggregated value.
      */
     default List<List<@Nullable Object>> rows(BoundQuery query) {
         throw new UnsupportedOperationException(getClass().getSimpleName() + " does not run aggregate queries");

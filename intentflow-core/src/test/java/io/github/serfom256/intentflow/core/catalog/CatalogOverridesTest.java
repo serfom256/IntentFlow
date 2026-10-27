@@ -43,20 +43,15 @@ class CatalogOverridesTest {
                 return (List<T>) List.of(new Book(7, "Dune", "978-0441013593"));
             }
         };
-        return IntentPipelines.builder()
-                .llm((text, scope) -> {
-                    promptedDescriptions.add(scope.get(BOOKS).fields().get(1).description());
-                    return DslSources.of("books | take 1");
-                })
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(executor)
-                .catalog(catalog)
-                .build();
+        return IntentPipelines.builder().llm((text, scope) -> {
+            promptedDescriptions.add(scope.get(BOOKS).fields().get(1).description().orElse(null));
+            return DslSources.of("books | take 1");
+        }).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(executor).catalog(catalog).build();
     }
 
     private static String description(ServiceDescriptor service, String field) {
         return service.fields().stream().filter(f -> f.logical().value().equals(field)).findFirst().orElseThrow()
-                .description();
+                .description().orElse(null);
     }
 
     @Test
@@ -65,14 +60,14 @@ class CatalogOverridesTest {
                 Map.of("title", "full title including subtitle")));
 
         ServiceDescriptor books = catalog.get(BOOKS);
-        assertThat(books.description().value()).isEqualTo("Every book we sell");
+        assertThat(books.description().orElseThrow().value()).isEqualTo("Every book we sell");
         assertThat(books.uriTemplate().value()).isEqualTo("/catalog/{{isbn}}");
         assertThat(description(books, "title")).isEqualTo("full title including subtitle");
         assertThat(description(books, "isbn")).isNull();
 
         overrides.remove(BOOKS);
         books = catalog.get(BOOKS);
-        assertThat(books.description().value()).isEqualTo("Books in stock");
+        assertThat(books.description().orElseThrow().value()).isEqualTo("Books in stock");
         assertThat(books.uriTemplate().value()).isEqualTo("/books/{{id}}");
         assertThat(description(books, "title")).isEqualTo("title as printed");
     }
@@ -106,11 +101,9 @@ class CatalogOverridesTest {
                 Map.of("author", "who wrote it", "title", "line one\nline two"));
 
         assertThat(bad.problems(catalog.get(BOOKS))).containsExactlyInAnyOrder(
-                "description is longer than 1000 characters",
-                "'author' is not a queryable field of books",
+                "description is longer than 1000 characters", "'author' is not a queryable field of books",
                 "description of 'title' must be a single line without control characters",
-                "uri must start with '/' or be an absolute URL",
-                "uri placeholder {{author}} is not a field of books");
+                "uri must start with '/' or be an absolute URL", "uri placeholder {{author}} is not a field of books");
         assertThat(
                 new ServiceOverride(null, "https://shop.example/books/{{id}}", Map.of()).problems(catalog.get(BOOKS)))
                 .isEmpty();

@@ -48,14 +48,8 @@ public class ProductService {
     }
 
     private static Product.ProductBuilder apply(Product.ProductBuilder b, ProductRequest r) {
-        return b.name(r.name().strip())
-                .brand(r.brand().strip())
-                .category(r.category())
-                .price(r.price())
-                .discount(r.discount())
-                .rating(r.rating())
-                .stock(r.stock())
-                .active(r.active())
+        return b.name(r.name().strip()).brand(r.brand().strip()).category(r.category()).price(r.price())
+                .discount(r.discount()).rating(r.rating()).stock(r.stock()).active(r.active())
                 .supplierCost(r.supplierCost());
     }
 }

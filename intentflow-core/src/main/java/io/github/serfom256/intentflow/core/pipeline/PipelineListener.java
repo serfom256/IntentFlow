@@ -8,21 +8,17 @@ import java.time.Duration;
 
 /**
  * Hears what the pipeline does, for metrics and monitoring. The Spring Boot
- * starter records these as Micrometer
- * meters when a {@code MeterRegistry} is present. Methods run on the request
- * thread, so they must be cheap and
- * must not throw.
+ * starter records these as Micrometer meters when a {@code MeterRegistry} is
+ * present. Methods run on the request thread, so they must be cheap and must
+ * not throw.
  *
  * <p>
  * A request ends {@code ANSWERED} when rows or an aggregate came back,
- * {@code DECLINED} when the LLM said the
- * catalog cannot answer it, {@code REJECTED} when the query did not parse or
- * validate after the allowed repairs,
- * {@code DENIED} when the caller may not query the service, {@code LIMITED}
- * when
- * the caller hit the LLM rate limit, and {@code FAILED}
- * when the LLM or the database
- * failed.
+ * {@code DECLINED} when the LLM said the catalog cannot answer it,
+ * {@code REJECTED} when the query did not parse or validate after the allowed
+ * repairs, {@code DENIED} when the caller may not query the service,
+ * {@code LIMITED} when the caller hit the LLM rate limit, and {@code FAILED}
+ * when the LLM or the database failed.
  */
 public interface PipelineListener {
 
@@ -46,8 +42,7 @@ public interface PipelineListener {
 
     /**
      * An LLM call reported its token usage; {@code model} is {@code null} when the
-     * client does not say which
-     * model answered.
+     * client does not say which model answered.
      */
     default void tokens(@Nullable String model, boolean repair, TokenUsage usage) {
     }

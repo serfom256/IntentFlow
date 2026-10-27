@@ -29,18 +29,17 @@ public final class OracleDialect implements SqlDialect {
 
     private static final Pattern FOLDED = Pattern.compile("[a-z][a-z0-9_]*|[A-Z][A-Z0-9_]*");
 
-    private static final Set<String> RESERVED = Set.of(
-            "ACCESS", "ADD", "ALL", "ALTER", "AND", "ANY", "AS", "ASC", "AUDIT", "BETWEEN", "BY", "CHAR", "CHECK",
-            "CLUSTER", "COLUMN", "COLUMN_VALUE", "COMMENT", "COMPRESS", "CONNECT", "CREATE", "CURRENT", "DATE",
-            "DECIMAL", "DEFAULT", "DELETE", "DESC", "DISTINCT", "DROP", "ELSE", "EXCLUSIVE", "EXISTS", "FILE",
-            "FLOAT", "FOR", "FROM", "GRANT", "GROUP", "HAVING", "IDENTIFIED", "IMMEDIATE", "IN", "INCREMENT",
-            "INDEX", "INITIAL", "INSERT", "INTEGER", "INTERSECT", "INTO", "IS", "LEVEL", "LIKE", "LOCK", "LONG",
-            "MAXEXTENTS", "MINUS", "MLSLABEL", "MODE", "MODIFY", "NESTED_TABLE_ID", "NOAUDIT", "NOCOMPRESS", "NOT",
-            "NOWAIT", "NULL", "NUMBER", "OF", "OFFLINE", "ON", "ONLINE", "OPTION", "OR", "ORDER", "PCTFREE",
-            "PRIOR", "PUBLIC", "RAW", "RENAME", "RESOURCE", "REVOKE", "ROW", "ROWID", "ROWNUM", "ROWS", "SELECT",
-            "SESSION", "SET", "SHARE", "SIZE", "SMALLINT", "START", "SUCCESSFUL", "SYNONYM", "SYSDATE", "TABLE",
-            "THEN", "TO", "TRIGGER", "UID", "UNION", "UNIQUE", "UPDATE", "USER", "VALIDATE", "VALUES", "VARCHAR",
-            "VARCHAR2", "VIEW", "WHENEVER", "WHERE", "WITH");
+    private static final Set<String> RESERVED = Set.of("ACCESS", "ADD", "ALL", "ALTER", "AND", "ANY", "AS", "ASC",
+            "AUDIT", "BETWEEN", "BY", "CHAR", "CHECK", "CLUSTER", "COLUMN", "COLUMN_VALUE", "COMMENT", "COMPRESS",
+            "CONNECT", "CREATE", "CURRENT", "DATE", "DECIMAL", "DEFAULT", "DELETE", "DESC", "DISTINCT", "DROP", "ELSE",
+            "EXCLUSIVE", "EXISTS", "FILE", "FLOAT", "FOR", "FROM", "GRANT", "GROUP", "HAVING", "IDENTIFIED",
+            "IMMEDIATE", "IN", "INCREMENT", "INDEX", "INITIAL", "INSERT", "INTEGER", "INTERSECT", "INTO", "IS", "LEVEL",
+            "LIKE", "LOCK", "LONG", "MAXEXTENTS", "MINUS", "MLSLABEL", "MODE", "MODIFY", "NESTED_TABLE_ID", "NOAUDIT",
+            "NOCOMPRESS", "NOT", "NOWAIT", "NULL", "NUMBER", "OF", "OFFLINE", "ON", "ONLINE", "OPTION", "OR", "ORDER",
+            "PCTFREE", "PRIOR", "PUBLIC", "RAW", "RENAME", "RESOURCE", "REVOKE", "ROW", "ROWID", "ROWNUM", "ROWS",
+            "SELECT", "SESSION", "SET", "SHARE", "SIZE", "SMALLINT", "START", "SUCCESSFUL", "SYNONYM", "SYSDATE",
+            "TABLE", "THEN", "TO", "TRIGGER", "UID", "UNION", "UNIQUE", "UPDATE", "USER", "VALIDATE", "VALUES",
+            "VARCHAR", "VARCHAR2", "VIEW", "WHENEVER", "WHERE", "WITH");
 
     private static final DateTimeFormatter SQL_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
 
@@ -98,11 +97,11 @@ public final class OracleDialect implements SqlDialect {
     @Override
     public void truncate(SqlWriter sql, String unit, Runnable value) {
         String format = switch (unit) {
-            case "year" -> "YYYY";
-            case "month" -> "MM";
-            case "day" -> "DD";
-            case "hour" -> "HH24";
-            default -> throw new IllegalArgumentException("unsupported date_trunc unit: " + unit);
+        case "year" -> "YYYY";
+        case "month" -> "MM";
+        case "day" -> "DD";
+        case "hour" -> "HH24";
+        default -> throw new IllegalArgumentException("unsupported date_trunc unit: " + unit);
         };
         sql.text("CAST(TRUNC(");
         value.run();
@@ -121,11 +120,11 @@ public final class OracleDialect implements SqlDialect {
         sql.text(type == CastType.DATE ? "TRUNC(CAST(" : "CAST(");
         value.run();
         sql.text(switch (type) {
-            case NUMBER -> " AS NUMBER)";
-            case INTEGER -> " AS NUMBER(19))";
-            case TEXT -> " AS VARCHAR2(4000))";
-            case TIMESTAMP -> " AS TIMESTAMP)";
-            case DATE -> " AS DATE))";
+        case NUMBER -> " AS NUMBER)";
+        case INTEGER -> " AS NUMBER(19))";
+        case TEXT -> " AS VARCHAR2(4000))";
+        case TIMESTAMP -> " AS TIMESTAMP)";
+        case DATE -> " AS DATE))";
         });
     }
 
@@ -138,8 +137,7 @@ public final class OracleDialect implements SqlDialect {
 
     @Override
     public @Nullable Object read(@Nullable Object value) {
-        return value != null && value.getClass().getName().startsWith("oracle.sql.") ? DriverValues.jdbc(value)
-                : value;
+        return value != null && value.getClass().getName().startsWith("oracle.sql.") ? DriverValues.jdbc(value) : value;
     }
 
     private static final class DriverValues {

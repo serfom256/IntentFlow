@@ -14,15 +14,15 @@ final class AggregateValues {
 
     static @Nullable Object normalize(@Nullable Object value) {
         return switch (value) {
-            case null -> null;
-            case BigDecimal n -> n;
-            case BigInteger n -> new BigDecimal(n);
-            case Double n -> Double.isFinite(n) ? BigDecimal.valueOf(n) : n;
-            case Float n -> Float.isFinite(n) ? new BigDecimal(Float.toString(n)) : n;
-            case Number n -> BigDecimal.valueOf(n.longValue());
-            case Timestamp t -> t.toLocalDateTime();
-            case Date d -> d.toLocalDate();
-            default -> value;
+        case null -> null;
+        case BigDecimal n -> n;
+        case BigInteger n -> new BigDecimal(n);
+        case Double n -> Double.isFinite(n) ? BigDecimal.valueOf(n) : n;
+        case Float n -> Float.isFinite(n) ? new BigDecimal(Float.toString(n)) : n;
+        case Number n -> BigDecimal.valueOf(n.longValue());
+        case Timestamp t -> t.toLocalDateTime();
+        case Date d -> d.toLocalDate();
+        default -> value;
         };
     }
 }

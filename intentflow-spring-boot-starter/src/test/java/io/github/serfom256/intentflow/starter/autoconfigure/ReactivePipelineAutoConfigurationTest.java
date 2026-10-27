@@ -38,15 +38,13 @@ class ReactivePipelineAutoConfigurationTest {
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                     return List.of();
                 }
-            })
-            .withBean(AccessPolicy.class, () -> new AccessPolicy() {
+            }).withBean(AccessPolicy.class, () -> new AccessPolicy() {
                 @Override
                 public boolean canQuery(ServiceDescriptor service, IntentContext caller) {
                     seen.set(caller);
                     return true;
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
+            }).withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false", "intentflow.dialect=postgresql");
 
     @Test
@@ -54,12 +52,10 @@ class ReactivePipelineAutoConfigurationTest {
         runner.run(ctx -> {
             ReactiveIntentPipeline pipeline = ctx.getBean(ReactiveIntentPipeline.class);
 
-            pipeline.resolve(IntentRequests.of("books"), Book.class)
-                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(
-                            new TestingAuthenticationToken("ann", "x", "ROLE_CUSTOMER")))
-                    .block();
+            pipeline.resolve(IntentRequests.of("books"), Book.class).contextWrite(ReactiveSecurityContextHolder
+                    .withAuthentication(new TestingAuthenticationToken("ann", "x", "ROLE_CUSTOMER"))).block();
 
-            assertThat(seen.get().principal()).isEqualTo("ann");
+            assertThat(seen.get().principal()).hasValue("ann");
             assertThat(seen.get().roles()).containsExactly("ROLE_CUSTOMER");
         });
     }
@@ -69,7 +65,7 @@ class ReactivePipelineAutoConfigurationTest {
         runner.run(ctx -> {
             ctx.getBean(ReactiveIntentPipeline.class).resolve(IntentRequests.of("books"), Book.class).block();
 
-            assertThat(seen.get().principal()).isNull();
+            assertThat(seen.get().principal()).isEmpty();
         });
     }
 
@@ -85,7 +81,7 @@ class ReactivePipelineAutoConfigurationTest {
             assertThat(ctx).hasNotFailed();
             ctx.getBean(ReactiveIntentPipeline.class).resolve(IntentRequests.of("books"), Book.class).block();
 
-            assertThat(seen.get().principal()).isNull();
+            assertThat(seen.get().principal()).isEmpty();
         });
     }
 

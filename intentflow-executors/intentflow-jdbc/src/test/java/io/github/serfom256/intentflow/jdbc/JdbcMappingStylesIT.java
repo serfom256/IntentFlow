@@ -62,8 +62,8 @@ class JdbcMappingStylesIT {
 
     @BeforeAll
     static void seed() {
-        JdbcClient jdbc = JdbcClient.create(new DriverManagerDataSource(
-                POSTGRES.url(), POSTGRES.user(), POSTGRES.password()));
+        JdbcClient jdbc = JdbcClient
+                .create(new DriverManagerDataSource(POSTGRES.url(), POSTGRES.user(), POSTGRES.password()));
         jdbc.sql("DROP TABLE IF EXISTS item").update();
         jdbc.sql("""
                 CREATE TABLE item (id BIGINT, full_name TEXT, status TEXT, price NUMERIC(8,2),
@@ -109,8 +109,7 @@ class JdbcMappingStylesIT {
     void parametersAreBoundPositionally() {
         BoundQuery query = BoundQueries.of(
                 List.of("SELECT * FROM item WHERE LOWER(full_name) = LOWER(", ") AND id < ", ""),
-                List.of(new TextLiteral("GADGET"),
-                        new NumberLiteral(BigDecimal.TEN)));
+                List.of(new TextLiteral("GADGET"), new NumberLiteral(BigDecimal.TEN)));
         assertThat(executor.execute(query, AsRecord.class)).extracting(AsRecord::id).containsExactly(2L);
     }
 }

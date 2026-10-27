@@ -38,7 +38,7 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform { excludeTags("llm") }
+    useJUnitPlatform { excludeTags("llm", "performance") }
 }
 
 if (orm != null) {
@@ -64,7 +64,7 @@ val ormTests = orms.map { (name, module) ->
         group = "verification"
         testClassesDirs = sourceSets.test.get().output.classesDirs
         classpath = sourceSets.test.get().output + sourceSets.main.get().output + ormRuntime.get()
-        useJUnitPlatform { excludeTags("llm") }
+        useJUnitPlatform { excludeTags("llm", "performance") }
         systemProperty("spring.profiles.active", name)
     }
 }
@@ -83,5 +83,16 @@ tasks.register<Test>("llmTest") {
     systemProperties(System.getProperties()
             .filterKeys { (it as String).startsWith("intentflow.") }
             .mapKeys { it.key as String })
+    testLogging { events("passed", "failed", "skipped"); showStandardStreams = true }
+}
+
+tasks.register<Test>("performanceTest") {
+    description = "Compares the plans of generated SQL with hand-written SQL on a large shop database."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("performance") }
+    maxHeapSize = "1g"
+    systemProperty("user.timezone", "UTC")
     testLogging { events("passed", "failed", "skipped"); showStandardStreams = true }
 }

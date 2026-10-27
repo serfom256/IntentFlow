@@ -145,23 +145,23 @@ public final class DefaultParser implements Parser {
                 throw error("expected stage keyword after '|'", t);
             }
             switch (kw.keyword()) {
-                case FILTER -> {
-                    once(stages, "filter", t);
-                    stages.filter = parseOrExpr();
-                }
-                case SORT -> {
-                    once(stages, "sort", t);
-                    stages.sort = parseSort();
-                }
-                case SKIP -> {
-                    once(stages, "skip", t);
-                    stages.skip = parseSkip();
-                }
-                case TAKE -> {
-                    once(stages, "take", t);
-                    stages.take = parseTake();
-                }
-                default -> throw error("unknown stage keyword '" + kw.keyword() + "'", t);
+            case FILTER -> {
+                once(stages, "filter", t);
+                stages.filter = parseOrExpr();
+            }
+            case SORT -> {
+                once(stages, "sort", t);
+                stages.sort = parseSort();
+            }
+            case SKIP -> {
+                once(stages, "skip", t);
+                stages.skip = parseSkip();
+            }
+            case TAKE -> {
+                once(stages, "take", t);
+                stages.take = parseTake();
+            }
+            default -> throw error("unknown stage keyword '" + kw.keyword() + "'", t);
             }
         }
 
@@ -459,9 +459,8 @@ public final class DefaultParser implements Parser {
                 throw error("expected a type: number, integer, text, timestamp or date", t);
             }
             advance();
-            return CastType.fromName(id.name())
-                    .orElseThrow(() -> error("unknown type '" + id.name()
-                            + "'; use number, integer, text, timestamp or date", id));
+            return CastType.fromName(id.name()).orElseThrow(
+                    () -> error("unknown type '" + id.name() + "'; use number, integer, text, timestamp or date", id));
         }
 
         List<DslLiteral> parseLiteralList() {
@@ -488,20 +487,20 @@ public final class DefaultParser implements Parser {
             }
             if (t instanceof KeywordToken kw) {
                 switch (kw.keyword()) {
-                    case TRUE -> {
-                        advance();
-                        return new BoolLiteral(true);
-                    }
-                    case FALSE -> {
-                        advance();
-                        return new BoolLiteral(false);
-                    }
-                    case NULL -> {
-                        advance();
-                        return new NullLiteral();
-                    }
-                    default -> {
-                    }
+                case TRUE -> {
+                    advance();
+                    return new BoolLiteral(true);
+                }
+                case FALSE -> {
+                    advance();
+                    return new BoolLiteral(false);
+                }
+                case NULL -> {
+                    advance();
+                    return new NullLiteral();
+                }
+                default -> {
+                }
                 }
             }
             throw error("expected value literal (string, number, true, false, null)", t);
@@ -555,13 +554,13 @@ public final class DefaultParser implements Parser {
 
         private static ComparisonOp mapOp(Operator op) {
             return switch (op) {
-                case EQ -> ComparisonOp.EQ;
-                case NE -> ComparisonOp.NE;
-                case LT -> ComparisonOp.LT;
-                case LE -> ComparisonOp.LE;
-                case GT -> ComparisonOp.GT;
-                case GE -> ComparisonOp.GE;
-                case CONTAINS -> ComparisonOp.CONTAINS;
+            case EQ -> ComparisonOp.EQ;
+            case NE -> ComparisonOp.NE;
+            case LT -> ComparisonOp.LT;
+            case LE -> ComparisonOp.LE;
+            case GT -> ComparisonOp.GT;
+            case GE -> ComparisonOp.GE;
+            case CONTAINS -> ComparisonOp.CONTAINS;
             };
         }
 
@@ -569,8 +568,7 @@ public final class DefaultParser implements Parser {
             try {
                 return n.intValueExact();
             } catch (ArithmeticException ex) {
-                throw new DslParseException(
-                        "'" + stage + "' requires an integer value, got " + n);
+                throw new DslParseException("'" + stage + "' requires an integer value, got " + n);
             }
         }
 
@@ -616,8 +614,7 @@ public final class DefaultParser implements Parser {
 
         private static DslParseException error(String message, Token at) {
             Position p = at.position();
-            return new DslParseException(
-                    message + " at line " + p.line() + ", column " + p.column());
+            return new DslParseException(message + " at line " + p.line() + ", column " + p.column());
         }
     }
 }

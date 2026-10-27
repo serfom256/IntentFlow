@@ -88,23 +88,23 @@ public class BulkDemoData implements CustomTaskChange {
 
     private static final List<String> EDITIONS = List.of("", "", "", " (2025)", " (2026)", " Refurbished", " Bundle");
 
-    private static final List<String> FIRST_NAMES = List.of(
-            "Ada", "Alan", "Alice", "Amir", "Ana", "Ben", "Carla", "Chen", "Clara", "Daniel", "Diego", "Elena", "Emma",
-            "Erik", "Fatima", "Felix", "Grace", "Hana", "Hugo", "Ines", "Ivan", "Jack", "Julia", "Kai", "Karin", "Lars",
-            "Laura", "Leo", "Lina", "Lucas", "Maya", "Marco", "Maria", "Mateo", "Mia", "Nadia", "Noah", "Nora", "Olga",
-            "Omar", "Oscar", "Paula", "Pedro", "Priya", "Rafael", "Rosa", "Sam", "Sara", "Sofia", "Sven", "Tara", "Tom",
-            "Uma", "Victor", "Wen", "Yara", "Yuki", "Zoe");
+    private static final List<String> FIRST_NAMES = List.of("Ada", "Alan", "Alice", "Amir", "Ana", "Ben", "Carla",
+            "Chen", "Clara", "Daniel", "Diego", "Elena", "Emma", "Erik", "Fatima", "Felix", "Grace", "Hana", "Hugo",
+            "Ines", "Ivan", "Jack", "Julia", "Kai", "Karin", "Lars", "Laura", "Leo", "Lina", "Lucas", "Maya", "Marco",
+            "Maria", "Mateo", "Mia", "Nadia", "Noah", "Nora", "Olga", "Omar", "Oscar", "Paula", "Pedro", "Priya",
+            "Rafael", "Rosa", "Sam", "Sara", "Sofia", "Sven", "Tara", "Tom", "Uma", "Victor", "Wen", "Yara", "Yuki",
+            "Zoe");
 
-    private static final List<String> LAST_NAMES = List.of(
-            "Anders", "Becker", "Bianchi", "Brown", "Chen", "Costa", "Dubois", "Eriksson", "Fernandez", "Fischer",
-            "Garcia", "Hansen", "Ito", "Jansen", "Kim", "Kowalski", "Larsen", "Lee", "Lopez", "Martin", "Meyer",
-            "Moreau", "Muller", "Nakamura", "Novak", "Nowak", "Olsen", "Patel", "Petrov", "Rossi", "Santos", "Schmidt",
-            "Silva", "Smith", "Tanaka", "Taylor", "Wagner", "Wang", "Weber", "Wilson", "Young", "Zhang");
+    private static final List<String> LAST_NAMES = List.of("Anders", "Becker", "Bianchi", "Brown", "Chen", "Costa",
+            "Dubois", "Eriksson", "Fernandez", "Fischer", "Garcia", "Hansen", "Ito", "Jansen", "Kim", "Kowalski",
+            "Larsen", "Lee", "Lopez", "Martin", "Meyer", "Moreau", "Muller", "Nakamura", "Novak", "Nowak", "Olsen",
+            "Patel", "Petrov", "Rossi", "Santos", "Schmidt", "Silva", "Smith", "Tanaka", "Taylor", "Wagner", "Wang",
+            "Weber", "Wilson", "Young", "Zhang");
 
-    private static final List<Map.Entry<String, String>> CITIES = List.of(
-            Map.entry("Berlin", "DE"), Map.entry("Hamburg", "DE"), Map.entry("Munich", "DE"),
-            Map.entry("Paris", "FR"), Map.entry("Lyon", "FR"), Map.entry("London", "GB"), Map.entry("Manchester", "GB"),
-            Map.entry("Madrid", "ES"), Map.entry("Barcelona", "ES"), Map.entry("Rome", "IT"), Map.entry("Milan", "IT"),
+    private static final List<Map.Entry<String, String>> CITIES = List.of(Map.entry("Berlin", "DE"),
+            Map.entry("Hamburg", "DE"), Map.entry("Munich", "DE"), Map.entry("Paris", "FR"), Map.entry("Lyon", "FR"),
+            Map.entry("London", "GB"), Map.entry("Manchester", "GB"), Map.entry("Madrid", "ES"),
+            Map.entry("Barcelona", "ES"), Map.entry("Rome", "IT"), Map.entry("Milan", "IT"),
             Map.entry("Amsterdam", "NL"), Map.entry("Warsaw", "PL"), Map.entry("Prague", "CZ"),
             Map.entry("Stockholm", "SE"), Map.entry("Oslo", "NO"), Map.entry("Copenhagen", "DK"),
             Map.entry("New York", "US"), Map.entry("San Francisco", "US"), Map.entry("Chicago", "US"),
@@ -112,9 +112,8 @@ public class BulkDemoData implements CustomTaskChange {
             Map.entry("Tokyo", "JP"), Map.entry("Osaka", "JP"), Map.entry("Seoul", "KR"), Map.entry("Singapore", "SG"),
             Map.entry("Sydney", "AU"), Map.entry("Melbourne", "AU"), Map.entry("Sao Paulo", "BR"));
 
-    private static final List<String> STATUSES = List.of(
-            "DELIVERED", "DELIVERED", "DELIVERED", "DELIVERED", "PAID", "PAID", "PAID", "SHIPPED", "SHIPPED", "NEW",
-            "NEW", "CANCELLED");
+    private static final List<String> STATUSES = List.of("DELIVERED", "DELIVERED", "DELIVERED", "DELIVERED", "PAID",
+            "PAID", "PAID", "SHIPPED", "SHIPPED", "NEW", "NEW", "CANCELLED");
 
     @Override
     public void execute(Database database) throws CustomChangeException {
@@ -136,8 +135,7 @@ public class BulkDemoData implements CustomTaskChange {
             for (int i = 0; i < rows; i++) {
                 Line line = LINES.get(rnd.nextInt(LINES.size()));
                 String variant = line.variants().get(rnd.nextInt(line.variants().size()));
-                String name = line.model() + " " + variant
-                        + EDITIONS.get(rnd.nextInt(EDITIONS.size()));
+                String name = line.model() + " " + variant + EDITIONS.get(rnd.nextInt(EDITIONS.size()));
                 BigDecimal price = BigDecimal
                         .valueOf(line.minPrice() + rnd.nextInt(line.maxPrice() - line.minPrice() + 1))
                         .subtract(rnd.nextBoolean() ? BigDecimal.ZERO : new BigDecimal("0.01"));
@@ -148,8 +146,8 @@ public class BulkDemoData implements CustomTaskChange {
                 insert.setBigDecimal(5, BigDecimal.valueOf(25 + rnd.nextInt(26), 1));
                 insert.setInt(6, rnd.nextInt(100) < 15 ? 0 : 1 + rnd.nextInt(200));
                 insert.setBoolean(7, rnd.nextInt(100) < 92);
-                insert.setBigDecimal(8, price.multiply(BigDecimal.valueOf(55 + rnd.nextInt(26), 2))
-                        .setScale(2, RoundingMode.HALF_UP));
+                insert.setBigDecimal(8,
+                        price.multiply(BigDecimal.valueOf(55 + rnd.nextInt(26), 2)).setScale(2, RoundingMode.HALF_UP));
                 insert.setTimestamp(9, timestamp(rnd));
                 insert.addBatch();
                 flush(insert, i);

@@ -157,8 +157,8 @@ public final class IndexAdvisor {
             }
             boolean contains = !lower.group(2).equals("=") && !lower.group(2).equalsIgnoreCase("in");
             if (contains && engine == Engine.POSTGRES) {
-                suggestions.add(new Suggestion(scan.table(), "contains search on " + column
-                        + "; trigram indexes need CREATE EXTENSION pg_trgm",
+                suggestions.add(new Suggestion(scan.table(),
+                        "contains search on " + column + "; trigram indexes need CREATE EXTENSION pg_trgm",
                         "CREATE INDEX " + name(scan.table(), column, "trgm") + " ON " + quote(engine, scan.table())
                                 + " USING gin (lower(" + quote(engine, column) + ") gin_trgm_ops);"));
             } else if (!contains) {
@@ -193,9 +193,9 @@ public final class IndexAdvisor {
             String reason = (filtered.isEmpty() ? "" : "full scan filtering on " + String.join(", ", filtered))
                     + (filtered.isEmpty() || scan.sortKeys().isEmpty() ? "" : ", then ")
                     + (scan.sortKeys().isEmpty() ? "" : "sorted without an index");
-            suggestions.add(new Suggestion(scan.table(), reason, "CREATE INDEX "
-                    + name(scan.table(), String.join("_", indexed), "") + " ON " + quote(engine, scan.table()) + " ("
-                    + String.join(", ", definition) + ");"));
+            suggestions.add(new Suggestion(scan.table(), reason,
+                    "CREATE INDEX " + name(scan.table(), String.join("_", indexed), "") + " ON "
+                            + quote(engine, scan.table()) + " (" + String.join(", ", definition) + ");"));
         }
         return suggestions;
     }
@@ -229,8 +229,8 @@ public final class IndexAdvisor {
         }
         return indexes.values().stream().map(c -> List.copyOf(c.values()))
                 .anyMatch(existing -> existing.size() >= columns.size()
-                        && existing.subList(0, columns.size()).stream().map(c -> c.toLowerCase(Locale.ROOT))
-                                .toList().equals(columns.stream().map(c -> c.toLowerCase(Locale.ROOT)).toList()));
+                        && existing.subList(0, columns.size()).stream().map(c -> c.toLowerCase(Locale.ROOT)).toList()
+                                .equals(columns.stream().map(c -> c.toLowerCase(Locale.ROOT)).toList()));
     }
 
     private static String quote(Engine engine, String identifier) {
@@ -239,8 +239,8 @@ public final class IndexAdvisor {
     }
 
     private static String name(String table, String columns, String suffix) {
-        String name = ("ix_" + table + "_" + columns + (suffix.isEmpty() ? "" : "_" + suffix))
-                .toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
+        String name = ("ix_" + table + "_" + columns + (suffix.isEmpty() ? "" : "_" + suffix)).toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9_]", "_");
         return name.length() > 60 ? name.substring(0, 60) : name;
     }
 }

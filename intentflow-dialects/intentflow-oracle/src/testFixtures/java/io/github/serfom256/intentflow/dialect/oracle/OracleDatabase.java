@@ -30,15 +30,14 @@ public enum OracleDatabase implements TestDatabase {
         Endpoint start() {
             GenericContainer<?> container = new GenericContainer<>("gvenzl/oracle-xe:21.3.0-slim-faststart")
                     .withCreateContainerCmdModifier(cmd -> cmd.withPlatform("linux/amd64"))
-                    .withEnv("ORACLE_PASSWORD", "intentflow")
-                    .withEnv("APP_USER", "intentflow")
-                    .withEnv("APP_USER_PASSWORD", "intentflow")
-                    .withExposedPorts(1521)
+                    .withEnv("ORACLE_PASSWORD", "intentflow").withEnv("APP_USER", "intentflow")
+                    .withEnv("APP_USER_PASSWORD", "intentflow").withExposedPorts(1521)
                     .waitingFor(Wait.forLogMessage(".*DATABASE IS READY TO USE.*", 1)
                             .withStartupTimeout(Duration.ofMinutes(10)));
             container.start();
-            return new Endpoint("jdbc:oracle:thin:@" + container.getHost() + ":" + container.getMappedPort(1521)
-                    + "/XEPDB1", "intentflow", "intentflow");
+            return new Endpoint(
+                    "jdbc:oracle:thin:@" + container.getHost() + ":" + container.getMappedPort(1521) + "/XEPDB1",
+                    "intentflow", "intentflow");
         }
 
         @Override

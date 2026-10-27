@@ -23,8 +23,7 @@ final class HibernateFilters {
             if (filter == null) {
                 continue;
             }
-            String condition = declared.condition().isBlank()
-                    ? filter.getFilterDefinition().getDefaultFilterCondition()
+            String condition = declared.condition().isBlank() ? filter.getFilterDefinition().getDefaultFilterCondition()
                     : declared.condition();
             if (condition != null && !condition.isBlank()) {
                 restrictions.add(bind(condition.replace("{alias}.", "").replace("{alias}", ""), filter));

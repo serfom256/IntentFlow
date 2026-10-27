@@ -25,8 +25,8 @@ final class OpenMapperProcedures {
         QueryExecutor executor = factory.getBeanProvider(QueryExecutor.class).getIfUnique();
         EntityResultSetHandler entities = factory.getBeanProvider(EntityResultSetHandler.class).getIfUnique();
         IterableResultSetHandler iterables = factory.getBeanProvider(IterableResultSetHandler.class).getIfUnique();
-        if (!timeout.isPositive() || sourceMapper == null || inputMapper == null || executor == null
-                || entities == null || iterables == null) {
+        if (!timeout.isPositive() || sourceMapper == null || inputMapper == null || executor == null || entities == null
+                || iterables == null) {
             return shared;
         }
         ObjectProvider<DataSource> dataSource = factory.getBeanProvider(DataSource.class);

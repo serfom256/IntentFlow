@@ -52,8 +52,8 @@ class EnterpriseAutoConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
             .withBean(DataSource.class, () -> dataSource)
-            .withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books", new TokenUsage(120, 4),
-                    "local-model"))
+            .withBean(LlmClient.class,
+                    () -> (text, catalog) -> DslSources.of("books", new TokenUsage(120, 4), "local-model"))
             .withBean(QueryExecutor.class, () -> new QueryExecutor() {
                 @Override
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
@@ -63,8 +63,7 @@ class EnterpriseAutoConfigurationTest {
                             + " timeout=" + (holder != null && holder.hasTimeout()));
                     return List.of();
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
+            }).withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false");
 
     @AfterEach
@@ -99,12 +98,12 @@ class EnterpriseAutoConfigurationTest {
                 return true;
             }
         }).run(ctx -> {
-            SecurityContextHolder.getContext().setAuthentication(
-                    new TestingAuthenticationToken("ann", "secret", "ROLE_CUSTOMER"));
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new TestingAuthenticationToken("ann", "secret", "ROLE_CUSTOMER"));
 
             ctx.getBean(IntentPipeline.class).resolve(IntentRequests.of("books"), Book.class);
 
-            assertThat(seen.get().principal()).isEqualTo("ann");
+            assertThat(seen.get().principal()).hasValue("ann");
             assertThat(seen.get().roles()).containsExactly("ROLE_CUSTOMER");
         });
     }
@@ -112,8 +111,7 @@ class EnterpriseAutoConfigurationTest {
     @Test
     void anIntentContextProviderBeanReplacesSpringSecurity() {
         AtomicReference<IntentContext> seen = new AtomicReference<>();
-        runner.withBean(IntentContextProvider.class,
-                () -> () -> IntentContexts.of("svc", "acme", Set.of()))
+        runner.withBean(IntentContextProvider.class, () -> () -> IntentContexts.of("svc", "acme", Set.of()))
                 .withBean(AccessPolicy.class, () -> new AccessPolicy() {
                     @Override
                     public boolean canQuery(ServiceDescriptor service, IntentContext caller) {
@@ -123,7 +121,7 @@ class EnterpriseAutoConfigurationTest {
                 }).run(ctx -> {
                     ctx.getBean(IntentPipeline.class).resolve(IntentRequests.of("books"), Book.class);
 
-                    assertThat(seen.get().tenant()).isEqualTo("acme");
+                    assertThat(seen.get().tenant()).hasValue("acme");
                 });
     }
 
@@ -140,8 +138,7 @@ class EnterpriseAutoConfigurationTest {
     @Test
     void transactionsCanBeTurnedOff() {
         runner.withBean(PlatformTransactionManager.class, () -> new DataSourceTransactionManager(dataSource))
-                .withPropertyValues("intentflow.sql.read-only=false", "intentflow.sql.statement-timeout=0")
-                .run(ctx -> {
+                .withPropertyValues("intentflow.sql.read-only=false", "intentflow.sql.statement-timeout=0").run(ctx -> {
                     ctx.getBean(IntentPipeline.class).resolve(IntentRequests.of("books"), Book.class);
 
                     assertThat(executions).containsExactly("readOnly=false timeout=false");
@@ -160,10 +157,10 @@ class EnterpriseAutoConfigurationTest {
             assertThat(meters.get("intentflow.cache").tag("result", "hit").counter().count()).isEqualTo(1);
             assertThat(meters.get("intentflow.llm").tag("kind", "generate").timer().count()).isEqualTo(1);
             assertThat(meters.get("intentflow.query").tag("service", "books").timer().count()).isEqualTo(2);
-            assertThat(meters.get("intentflow.llm.tokens").tag("model", "local-model").tag("type", "prompt")
-                    .counter().count()).isEqualTo(120);
-            assertThat(meters.get("intentflow.llm.tokens").tag("kind", "generate").tag("type", "completion")
-                    .counter().count()).isEqualTo(4);
+            assertThat(meters.get("intentflow.llm.tokens").tag("model", "local-model").tag("type", "prompt").counter()
+                    .count()).isEqualTo(120);
+            assertThat(meters.get("intentflow.llm.tokens").tag("kind", "generate").tag("type", "completion").counter()
+                    .count()).isEqualTo(4);
         });
     }
 

@@ -1,12 +1,10 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.api.IntentContext;
-import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.UserText;
 import io.github.serfom256.intentflow.core.api.factories.IntentContexts;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
-import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
@@ -32,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,10 +79,10 @@ class AccessPolicyTest {
         }
 
         @Override
-        public @Nullable String scope(ServiceDescriptor service, IntentContext caller) {
+        public Optional<String> scope(ServiceDescriptor service, IntentContext caller) {
             return service.name().value().equals("orders") && !caller.hasRole("ROLE_BUYER")
-                    ? "only the current customer's own orders"
-                    : null;
+                    ? Optional.of("only the current customer's own orders")
+                    : Optional.empty();
         }
     };
 
@@ -125,16 +124,9 @@ class AccessPolicyTest {
                 events.add((service == null ? "-" : service.value()) + " " + outcome);
             }
         };
-        return IntentPipelines.builder()
-                .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(executor)
-                .catalog(CATALOG)
-                .maxRepairs(0)
-                .accessPolicy(POLICY)
-                .defaultCaller(() -> defaultCaller)
-                .listener(listener)
-                .build();
+        return IntentPipelines.builder().llm(llm).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(executor)
+                .catalog(CATALOG).maxRepairs(0).accessPolicy(POLICY).defaultCaller(() -> defaultCaller)
+                .listener(listener).build();
     }
 
     @Test
@@ -143,8 +135,8 @@ class AccessPolicyTest {
 
         ServiceCatalog catalog = shown.getFirst();
         assertThat(catalog.names()).extracting(ServiceName::value).containsExactlyInAnyOrder("orders", "customers");
-        assertThat(catalog.find(ServiceNames.of("orders")).orElseThrow().fields())
-                .extracting(f -> f.logical().value()).containsExactly("id", "customer_id", "total");
+        assertThat(catalog.find(ServiceNames.of("orders")).orElseThrow().fields()).extracting(f -> f.logical().value())
+                .containsExactly("id", "customer_id", "total");
     }
 
     @Test
@@ -167,8 +159,7 @@ class AccessPolicyTest {
 
     @Test
     void restrictionsLimitEveryQueryOfTheServiceIncludingRelationSubqueries() {
-        IntentPipeline pipeline = pipeline(ANN, "orders | filter total > 10",
-                "customers | filter orders.total > 10");
+        IntentPipeline pipeline = pipeline(ANN, "orders | filter total > 10", "customers | filter orders.total > 10");
 
         pipeline.resolve(IntentRequests.of("my big orders"));
         pipeline.resolve(IntentRequests.of("customers with big orders"));
@@ -199,7 +190,7 @@ class AccessPolicyTest {
     void theScopeTellsTheLlmWhichRowsTheCallerSees() {
         pipeline(ANN, "orders").resolve(IntentRequests.of("my orders"));
 
-        assertThat(shown.getFirst().find(ServiceNames.of("orders")).orElseThrow().description().value())
+        assertThat(shown.getFirst().find(ServiceNames.of("orders")).orElseThrow().description().orElseThrow().value())
                 .contains("only the current customer's own orders").contains("\"my\"");
     }
 
@@ -222,8 +213,7 @@ class AccessPolicyTest {
         pipeline.resolve(IntentRequests.of("orders", BUYER));
 
         assertThat(shown).hasSize(2);
-        assertThat(events).containsExactly("cache miss", "llm", "query orders 0", "orders ANSWERED",
-                "cache hit", "query orders 0", "orders ANSWERED",
-                "cache miss", "llm", "query orders 0", "orders ANSWERED");
+        assertThat(events).containsExactly("cache miss", "llm", "query orders 0", "orders ANSWERED", "cache hit",
+                "query orders 0", "orders ANSWERED", "cache miss", "llm", "query orders 0", "orders ANSWERED");
     }
 }

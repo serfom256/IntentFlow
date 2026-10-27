@@ -62,18 +62,16 @@ class JdbcRelationsIT {
     }
 
     private static IntentPipeline answering(TestDatabase database, String dsl) {
-        return IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(database.dialect()))
-                .executor(executor(database))
+        return IntentPipelines.builder().llm((text, catalog) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(database.dialect())).executor(executor(database))
                 .catalog(ServiceCatalogs.of(ServiceDescriptors.fromAnnotated(Customer.class),
                         ServiceDescriptors.fromAnnotated(Order.class)))
                 .build();
     }
 
     private static List<Long> customers(TestDatabase db, String dsl) {
-        return answering(db, dsl).resolve(IntentRequests.of("q"), Customer.class).items().stream()
-                .map(Customer::id).toList();
+        return answering(db, dsl).resolve(IntentRequests.of("q"), Customer.class).items().stream().map(Customer::id)
+                .toList();
     }
 
     @ParameterizedTest
@@ -96,8 +94,8 @@ class JdbcRelationsIT {
     @ParameterizedTest
     @MethodSource("databases")
     void notMeansNoRelatedRowMatches(TestDatabase db) {
-        assertThat(customers(db, "customers | filter not (orders.status == \"CANCELLED\")"))
-                .containsExactly(1L, 2L, 4L);
+        assertThat(customers(db, "customers | filter not (orders.status == \"CANCELLED\")")).containsExactly(1L, 2L,
+                4L);
     }
 
     @ParameterizedTest
@@ -115,18 +113,18 @@ class JdbcRelationsIT {
                 .resolve(IntentRequests.of("q"), Order.class);
 
         assertThat(response.items()).isEmpty();
-        assertThat(response.aggregation().rows())
+        assertThat(response.aggregation().orElseThrow().rows())
                 .extracting(AggregateRow::group, r -> ((BigDecimal) r.value()).setScale(2))
-                .containsExactly(
-                        tuple(List.of("PAID"), new BigDecimal("200.00")),
+                .containsExactly(tuple(List.of("PAID"), new BigDecimal("200.00")),
                         tuple(List.of("NEW"), new BigDecimal("150.00")));
     }
 
     @ParameterizedTest
     @MethodSource("databases")
     void sortsByAManyToOneField(TestDatabase db) {
-        assertThat(answering(db, "orders | sort customer.name desc").resolve(IntentRequests.of("q"), Order.class)
-                .items()).extracting(Order::id).containsExactly(13L, 14L, 12L, 10L, 11L);
+        assertThat(
+                answering(db, "orders | sort customer.name desc").resolve(IntentRequests.of("q"), Order.class).items())
+                .extracting(Order::id).containsExactly(13L, 14L, 12L, 10L, 11L);
     }
 
     @ParameterizedTest
@@ -140,14 +138,12 @@ class JdbcRelationsIT {
     @MethodSource("databases")
     void relatedFieldsCannotBeGroupedBy(TestDatabase db) {
         assertThatThrownBy(() -> answering(db, "orders | group customer.country | count")
-                .resolve(IntentRequests.of("q"), Order.class))
-                .isInstanceOf(ValidationException.class)
+                .resolve(IntentRequests.of("q"), Order.class)).isInstanceOf(ValidationException.class)
                 .hasMessageContaining("related field 'customer.country'");
     }
 
     private static List<Long> orders(TestDatabase db, String dsl) {
-        return answering(db, dsl).resolve(IntentRequests.of("q"), Order.class).items().stream()
-                .map(Order::id).toList();
+        return answering(db, dsl).resolve(IntentRequests.of("q"), Order.class).items().stream().map(Order::id).toList();
     }
 
     @ParameterizedTest
@@ -161,7 +157,7 @@ class JdbcRelationsIT {
     @ParameterizedTest
     @MethodSource("databases")
     void topWithoutPartitionBreaksTiesByTheDefaultSort(TestDatabase db) {
-        assertThat(orders(db, "orders | top 2 by total desc")).containsExactly(10L, 14L);
+        assertThat(orders(db, "orders | top 2 by total desc")).containsExactly(14L, 10L);
     }
 
     @ParameterizedTest

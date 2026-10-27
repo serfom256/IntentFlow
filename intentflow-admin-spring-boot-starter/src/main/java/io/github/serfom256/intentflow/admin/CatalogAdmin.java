@@ -5,6 +5,7 @@ import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.catalog.CatalogOverrides;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
+import io.github.serfom256.intentflow.core.catalog.ServiceDescription;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
@@ -36,8 +37,8 @@ public final class CatalogAdmin {
             List<FieldView> fields, List<RelationView> relations) {
     }
 
-    public record ExplainView(String dsl, boolean cached, String sql, List<Object> parameters, int repairs,
-            long tokens, List<String> optimizations, IndexAdvisor.@Nullable Advice advice) {
+    public record ExplainView(String dsl, boolean cached, String sql, List<Object> parameters, int repairs, long tokens,
+            List<String> optimizations, IndexAdvisor.@Nullable Advice advice) {
     }
 
     public static final class InvalidOverrideException extends RuntimeException {
@@ -86,13 +87,13 @@ public final class CatalogAdmin {
         ServiceOverride override = overrides.find(service.name()).orElse(ServiceOverride.NONE);
         List<FieldView> fields = service.fields().stream().filter(FieldMapping::queryable)
                 .map(f -> new FieldView(f.logical().value(), f.column().value(), f.type().name(), f.allowedValues(),
-                        f.description(), override.fieldDescriptions().get(f.logical().value())))
+                        f.description().orElse(null), override.fieldDescriptions().get(f.logical().value())))
                 .toList();
         List<RelationView> relations = service.relations().stream()
                 .map(r -> new RelationView(r.name(), r.target().value()))
                 .sorted(Comparator.comparing(RelationView::name)).toList();
         return new ServiceView(service.name().value(), service.table().value(), service.resultType().getSimpleName(),
-                service.description() == null ? null : service.description().value(), override.description(),
+                service.description().map(ServiceDescription::value).orElse(null), override.description(),
                 service.uriTemplate().value(), override.uri(), fields, relations);
     }
 

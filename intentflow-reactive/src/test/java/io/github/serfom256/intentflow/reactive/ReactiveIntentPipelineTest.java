@@ -39,27 +39,21 @@ class ReactiveIntentPipelineTest {
     private final AtomicReference<IntentContext> seenCaller = new AtomicReference<>();
 
     private IntentPipeline blocking(String dsl) {
-        return IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
-                .executor(new QueryExecutor() {
+        return IntentPipelines.builder().llm((text, catalog) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect())).executor(new QueryExecutor() {
                     @Override
                     @SuppressWarnings("unchecked")
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         queryThread.set(Thread.currentThread().getName());
                         return (List<T>) List.of(new Book(1, "Dune"));
                     }
-                })
-                .catalog(ServiceCatalogs.fromAnnotated(Book.class))
-                .accessPolicy(new AccessPolicy() {
+                }).catalog(ServiceCatalogs.fromAnnotated(Book.class)).accessPolicy(new AccessPolicy() {
                     @Override
                     public boolean canQuery(ServiceDescriptor service, IntentContext caller) {
                         seenCaller.set(caller);
                         return true;
                     }
-                })
-                .maxRepairs(0)
-                .build();
+                }).maxRepairs(0).build();
     }
 
     @Test
@@ -79,8 +73,8 @@ class ReactiveIntentPipelineTest {
 
         pipeline.resolve(IntentRequests.of("books"), Book.class).block();
 
-        assertThat(seenCaller.get().principal()).isEqualTo("ann");
-        assertThat(seenCaller.get().tenant()).isEqualTo("acme");
+        assertThat(seenCaller.get().principal()).hasValue("ann");
+        assertThat(seenCaller.get().tenant()).hasValue("acme");
     }
 
     @Test
@@ -90,7 +84,7 @@ class ReactiveIntentPipelineTest {
 
         pipeline.resolve(IntentRequests.of("books", IntentContexts.of("svc", null, Set.of()))).block();
 
-        assertThat(seenCaller.get().principal()).isEqualTo("svc");
+        assertThat(seenCaller.get().principal()).hasValue("svc");
     }
 
     @Test

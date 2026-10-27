@@ -38,8 +38,8 @@ public interface IntentTrace {
 
     /**
      * Tokens the LLM used for this request, summed over the first answer and any
-     * repairs; {@link TokenUsage#NONE}
-     * when the query came from the cache or the provider did not report usage.
+     * repairs; {@link TokenUsage#NONE} when the query came from the cache or the
+     * provider did not report usage.
      */
     default TokenUsage tokens() {
         return TokenUsage.NONE;

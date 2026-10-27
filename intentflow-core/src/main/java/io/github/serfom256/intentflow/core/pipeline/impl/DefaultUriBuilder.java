@@ -55,8 +55,8 @@ public final class DefaultUriBuilder implements UriBuilder {
     }
 
     private static String propertyOf(FieldMapping fm) {
-        if (fm.property() != null) {
-            return fm.property();
+        if (fm.property().isPresent()) {
+            return fm.property().get();
         }
         String[] parts = fm.logical().value().split("_");
         StringBuilder sb = new StringBuilder(parts[0]);
@@ -70,10 +70,10 @@ public final class DefaultUriBuilder implements UriBuilder {
 
     private static String render(@Nullable Object value) {
         return switch (value) {
-            case null -> "";
-            case BigDecimal bd -> bd.toPlainString();
-            case Enum<?> e -> e.name();
-            default -> value.toString();
+        case null -> "";
+        case BigDecimal bd -> bd.toPlainString();
+        case Enum<?> e -> e.name();
+        default -> value.toString();
         };
     }
 

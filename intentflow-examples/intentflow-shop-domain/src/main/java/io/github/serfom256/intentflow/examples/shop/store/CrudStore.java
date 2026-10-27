@@ -5,8 +5,8 @@ import java.util.Optional;
 
 /**
  * Persistence of one domain type. OpenMapper implements it for products,
- * customers and orders under every profile; the {@code jpa}, {@code jimmer}
- * and {@code jdbc} profiles change only which entities search runs on, so the
+ * customers and orders under every profile; the {@code jpa}, {@code jimmer} and
+ * {@code jdbc} profiles change only which entities search runs on, so the
  * services and the REST API stay the same.
  */
 public interface CrudStore<T> {

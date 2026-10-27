@@ -1,10 +1,5 @@
 package io.github.serfom256.intentflow.core.ast;
 
-import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
-import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
-import io.github.serfom256.intentflow.core.ast.factories.DslSources;
-import io.github.serfom256.intentflow.core.ast.factories.Skips;
-import io.github.serfom256.intentflow.core.ast.factories.Takes;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
 import org.junit.jupiter.api.Test;
@@ -26,36 +21,29 @@ class FilterExprTest {
     void sealedHierarchyIsExhaustiveInSwitch() {
         Compare leaf = new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("Doe"));
 
-        FilterExpr[] variants = {
-                new And(leaf, leaf),
-                new Or(leaf, leaf),
-                new Not(leaf),
-                leaf,
-                new In(YEAR, List.of(new NumberLiteral(new BigDecimal("2020")))),
-                new IsNull(DELETED_AT),
-                new IsNotNull(DELETED_AT),
-                new ExprCompare(new FieldRef(YEAR), ComparisonOp.GT, new FieldRef(YEAR)),
-                new ExprIn(new FieldRef(YEAR), List.of(new NumberLiteral(BigDecimal.ONE))),
-        };
+        FilterExpr[] variants = { new And(leaf, leaf), new Or(leaf, leaf), new Not(leaf), leaf,
+                new In(YEAR, List.of(new NumberLiteral(new BigDecimal("2020")))), new IsNull(DELETED_AT),
+                new IsNotNull(DELETED_AT), new ExprCompare(new FieldRef(YEAR), ComparisonOp.GT, new FieldRef(YEAR)),
+                new ExprIn(new FieldRef(YEAR), List.of(new NumberLiteral(BigDecimal.ONE))), };
 
         List<String> labels = new ArrayList<>();
         for (FilterExpr expr : variants) {
             String label = switch (expr) {
-                case And a -> "and";
-                case Or o -> "or";
-                case Not n -> "not";
-                case Compare c -> "compare";
-                case In i -> "in";
-                case IsNull n -> "isNull";
-                case IsNotNull n -> "isNotNull";
-                case ExprCompare c -> "exprCompare";
-                case ExprIn i -> "exprIn";
+            case And a -> "and";
+            case Or o -> "or";
+            case Not n -> "not";
+            case Compare c -> "compare";
+            case In i -> "in";
+            case IsNull n -> "isNull";
+            case IsNotNull n -> "isNotNull";
+            case ExprCompare c -> "exprCompare";
+            case ExprIn i -> "exprIn";
             };
             labels.add(label);
         }
 
-        assertThat(labels).containsExactly(
-                "and", "or", "not", "compare", "in", "isNull", "isNotNull", "exprCompare", "exprIn");
+        assertThat(labels).containsExactly("and", "or", "not", "compare", "in", "isNull", "isNotNull", "exprCompare",
+                "exprIn");
     }
 
     @Test
@@ -68,8 +56,7 @@ class FilterExprTest {
 
     @Test
     void inRejectsEmptyValues() {
-        assertThatThrownBy(() -> new In(YEAR, List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> new In(YEAR, List.of())).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("non-empty");
     }
 

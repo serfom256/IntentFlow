@@ -12,10 +12,10 @@ class JdbcConfig {
     @Bean
     EntityMapper entityMapper() {
         return entity -> switch (entity) {
-            case ProductRow p -> p.toDomain();
-            case CustomerRow c -> c.toDomain();
-            case OrderRow o -> o.toDomain();
-            default -> entity;
+        case ProductRow p -> p.toDomain();
+        case CustomerRow c -> c.toDomain();
+        case OrderRow o -> o.toDomain();
+        default -> entity;
         };
     }
 }

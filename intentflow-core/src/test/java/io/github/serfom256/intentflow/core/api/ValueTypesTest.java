@@ -1,9 +1,7 @@
 package io.github.serfom256.intentflow.core.api;
 
-import io.github.serfom256.intentflow.core.api.factories.UserTexts;
 import io.github.serfom256.intentflow.core.api.factories.MicroFrontendUris;
-import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
-import io.github.serfom256.intentflow.core.api.factories.IntentResponses;
+import io.github.serfom256.intentflow.core.api.factories.UserTexts;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,8 +16,7 @@ class ValueTypesTest {
 
     @Test
     void userTextRejectsBlank() {
-        assertThatThrownBy(() -> UserTexts.of("   "))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> UserTexts.of("   ")).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("non-blank");
     }
 
@@ -30,7 +27,6 @@ class ValueTypesTest {
 
     @Test
     void microFrontendUriRejectsBlank() {
-        assertThatThrownBy(() -> MicroFrontendUris.of(""))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> MicroFrontendUris.of("")).isInstanceOf(IllegalArgumentException.class);
     }
 }

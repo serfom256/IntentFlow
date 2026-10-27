@@ -13,32 +13,27 @@ class TextNormalizerTest {
 
     @Test
     void trimsLeadingAndTrailingWhitespace() {
-        assertThat(normalizer.normalize(UserTexts.of("  hello  ")).value())
-                .isEqualTo("hello");
+        assertThat(normalizer.normalize(UserTexts.of("  hello  ")).value()).isEqualTo("hello");
     }
 
     @Test
     void collapsesRunsOfSpaces() {
-        assertThat(normalizer.normalize(UserTexts.of("hello    world")).value())
-                .isEqualTo("hello world");
+        assertThat(normalizer.normalize(UserTexts.of("hello    world")).value()).isEqualTo("hello world");
     }
 
     @Test
     void collapsesTabsAndNewlines() {
-        assertThat(normalizer.normalize(UserTexts.of("hello\t\nworld")).value())
-                .isEqualTo("hello world");
+        assertThat(normalizer.normalize(UserTexts.of("hello\t\nworld")).value()).isEqualTo("hello world");
     }
 
     @Test
     void preservesCaseOfProperNouns() {
-        assertThat(normalizer.normalize(UserTexts.of("Find John Doe books")).value())
-                .isEqualTo("Find John Doe books");
+        assertThat(normalizer.normalize(UserTexts.of("Find John Doe books")).value()).isEqualTo("Find John Doe books");
     }
 
     @Test
     void mixedWhitespaceFullyNormalised() {
-        assertThat(normalizer.normalize(UserTexts.of("  find\t  John\n\nDoe  ")).value())
-                .isEqualTo("find John Doe");
+        assertThat(normalizer.normalize(UserTexts.of("  find\t  John\n\nDoe  ")).value()).isEqualTo("find John Doe");
     }
 
     @Test

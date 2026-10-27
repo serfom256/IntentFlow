@@ -147,9 +147,7 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
 
     @Override
     public DslSource repairDsl(UserText normalizedText, ServiceCatalog catalog, DslSource failed, String error) {
-        return complete(catalog, List.of(
-                message("user", normalizedText.value()),
-                message("assistant", failed.value()),
+        return complete(catalog, List.of(message("user", normalizedText.value()), message("assistant", failed.value()),
                 message("user", LlmPrompts.repair(error))));
     }
 
@@ -164,16 +162,12 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
     }
 
     private DslSource complete(ServiceCatalog catalog, List<String> messages) {
-        String body = "{"
-                + "\"model\":" + MiniJson.quote(model) + ","
-                + (temperature == null ? "" : "\"temperature\":" + temperature + ",")
-                + "\"messages\":["
+        String body = "{" + "\"model\":" + MiniJson.quote(model) + ","
+                + (temperature == null ? "" : "\"temperature\":" + temperature + ",") + "\"messages\":["
                 + message("system", LlmPrompts.system(catalog, LocalDate.now(clock)))
-                + messages.stream().map(m -> "," + m).collect(Collectors.joining())
-                + "]}";
+                + messages.stream().map(m -> "," + m).collect(Collectors.joining()) + "]}";
 
-        HttpRequest request = authorized(HttpRequest.newBuilder(endpoint)
-                .header("Content-Type", "application/json")
+        HttpRequest request = authorized(HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))).build();
         HttpResponse<String> response = send(request, options.maxRetries());
 
@@ -216,8 +210,8 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
                 log.debug("LLM returned HTTP {} (attempt {}): {}", status, attempt,
                         options.logBodies() ? abbreviated(response.body()) : response.body().length() + " chars");
                 if (last || !retryable(status)) {
-                    throw new LlmException("LLM returned HTTP " + status
-                            + (attempt > 1 ? " after " + attempt + " attempts" : ""));
+                    throw new LlmException(
+                            "LLM returned HTTP " + status + (attempt > 1 ? " after " + attempt + " attempts" : ""));
                 }
                 wait = retryAfter(response).orElse(backoff);
             } catch (HttpConnectTimeoutException | ConnectException e) {

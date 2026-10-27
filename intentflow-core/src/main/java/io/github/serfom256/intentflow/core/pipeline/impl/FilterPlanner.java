@@ -48,18 +48,19 @@ final class FilterPlanner {
             return exists(relation, List.of(expr), scope);
         }
         return switch (expr) {
-            case And a -> and(List.of(plan(a.left(), scope), plan(a.right(), scope)));
-            case Or o -> or(List.of(plan(o.left(), scope), plan(o.right(), scope)));
-            case Not n -> negate(n, scope);
-            case Compare c -> includeNulls(c, compare(c, scope), scope);
-            case In i -> in(i, scope);
-            case IsNull i -> new SqlPredicate.IsNull(scope.column(i.field()), false);
-            case IsNotNull i -> new SqlPredicate.IsNull(scope.column(i.field()), true);
-            case ExprCompare c -> c.op() == ComparisonOp.NE && scope.types().type(c.right()) != ExprTypes.Type.NULL
+        case And a -> and(List.of(plan(a.left(), scope), plan(a.right(), scope)));
+        case Or o -> or(List.of(plan(o.left(), scope), plan(o.right(), scope)));
+        case Not n -> negate(n, scope);
+        case Compare c -> includeNulls(c, compare(c, scope), scope);
+        case In i -> in(i, scope);
+        case IsNull i -> new SqlPredicate.IsNull(scope.column(i.field()), false);
+        case IsNotNull i -> new SqlPredicate.IsNull(scope.column(i.field()), true);
+        case ExprCompare c ->
+            c.op() == ComparisonOp.NE && scope.types().type(c.right()) != ExprTypes.Type.NULL
                     ? new SqlPredicate.Or(List.of(exprCompare(c, scope),
                             new SqlPredicate.IsNull(ValuePlanner.plan(c.left(), scope), false)))
                     : exprCompare(c, scope);
-            case ExprIn i -> exprIn(i, scope);
+        case ExprIn i -> exprIn(i, scope);
         };
     }
 
@@ -82,13 +83,12 @@ final class FilterPlanner {
 
     private static @Nullable SqlExpr nullableOperand(FilterExpr expr, SqlScope scope) {
         return switch (expr) {
-            case Compare c when c.op() != ComparisonOp.NE && ownNullable(c.field(), scope) -> scope.column(c.field());
-            case In i when ownNullable(i.field(), scope) -> scope.column(i.field());
-            case ExprCompare c when c.op() != ComparisonOp.NE
-                    && scope.types().type(c.right()) != ExprTypes.Type.NULL ->
-                ValuePlanner.plan(c.left(), scope);
-            case ExprIn i -> ValuePlanner.plan(i.value(), scope);
-            default -> null;
+        case Compare c when c.op() != ComparisonOp.NE && ownNullable(c.field(), scope) -> scope.column(c.field());
+        case In i when ownNullable(i.field(), scope) -> scope.column(i.field());
+        case ExprCompare c when c.op() != ComparisonOp.NE && scope.types().type(c.right()) != ExprTypes.Type.NULL ->
+            ValuePlanner.plan(c.left(), scope);
+        case ExprIn i -> ValuePlanner.plan(i.value(), scope);
+        default -> null;
         };
     }
 
@@ -107,8 +107,7 @@ final class FilterPlanner {
         int max = scope.context().capabilities().maxInListSize();
         if (size > max) {
             throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
-                    "'in' takes at most " + max + " values on " + scope.context().dialectName()
-                            + ", got " + size,
+                    "'in' takes at most " + max + " values on " + scope.context().dialectName() + ", got " + size,
                     Map.of("limit", max));
         }
     }
@@ -129,8 +128,7 @@ final class FilterPlanner {
         }
         List<SqlPredicate> planned = new ArrayList<>();
         for (Object item : order) {
-            planned.add(item instanceof String relation
-                    ? exists(relation, byRelation.get(relation), scope)
+            planned.add(item instanceof String relation ? exists(relation, byRelation.get(relation), scope)
                     : plan((FilterExpr) item, scope));
         }
         return and(planned);
@@ -141,8 +139,8 @@ final class FilterPlanner {
         List<SqlPredicate> where = new ArrayList<>();
         where.add(outer.correlation(relation));
         parts.forEach(part -> where.add(plan(RelationPaths.stripRelation(part, relation), inner)));
-        return new SqlPredicate.Exists(Select.from(inner.from(),
-                List.of(new Select.Value(new SqlExpr.Inline(1), null)), inner.where(where)));
+        return new SqlPredicate.Exists(
+                Select.from(inner.from(), List.of(new Select.Value(new SqlExpr.Inline(1), null)), inner.where(where)));
     }
 
     private static SqlPredicate compare(Compare c, SqlScope scope) {
@@ -186,11 +184,10 @@ final class FilterPlanner {
         }
         Integer ordinal = ordinal(names, t);
         return switch (c.op()) {
-            case EQ, NE -> ordinal != null
-                    ? new SqlPredicate.Compare(column, sqlOp(c.op()), ordinalParam(ordinal))
-                    : new SqlPredicate.Compare(lower(name), sqlOp(c.op()), lower(new SqlExpr.Param(t)));
-            case CONTAINS -> new SqlPredicate.ContainsValue(name, t.value());
-            default -> new SqlPredicate.Compare(name, sqlOp(c.op()), new SqlExpr.Param(t));
+        case EQ, NE -> ordinal != null ? new SqlPredicate.Compare(column, sqlOp(c.op()), ordinalParam(ordinal))
+                : new SqlPredicate.Compare(lower(name), sqlOp(c.op()), lower(new SqlExpr.Param(t)));
+        case CONTAINS -> new SqlPredicate.ContainsValue(name, t.value());
+        default -> new SqlPredicate.Compare(name, sqlOp(c.op()), new SqlExpr.Param(t));
         };
     }
 
@@ -223,19 +220,19 @@ final class FilterPlanner {
         FieldMapping fm = scope.field(in.field());
         List<String> ordinals = scope.ordinals(in.field());
         if (!ordinals.isEmpty()) {
-            List<Integer> matched = literals.stream()
-                    .map(v -> v instanceof TextLiteral t ? ordinal(ordinals, t) : null).toList();
+            List<Integer> matched = literals.stream().map(v -> v instanceof TextLiteral t ? ordinal(ordinals, t) : null)
+                    .toList();
             if (!matched.contains(null)) {
                 return new SqlPredicate.In(scope.column(in.field()),
                         matched.stream().map(FilterPlanner::ordinalParam).toList());
             }
-            return new SqlPredicate.Or(literals.stream()
-                    .map(v -> compare(new Compare(in.field(), ComparisonOp.EQ, v), scope)).toList());
+            return new SqlPredicate.Or(
+                    literals.stream().map(v -> compare(new Compare(in.field(), ComparisonOp.EQ, v), scope)).toList());
         }
         if (fm.type() == FieldType.TIMESTAMP
                 && literals.stream().anyMatch(v -> v instanceof TextLiteral t && Timestamps.isDateOnly(t.value()))) {
-            return new SqlPredicate.Or(literals.stream()
-                    .map(v -> compare(new Compare(in.field(), ComparisonOp.EQ, v), scope)).toList());
+            return new SqlPredicate.Or(
+                    literals.stream().map(v -> compare(new Compare(in.field(), ComparisonOp.EQ, v), scope)).toList());
         }
         boolean lower = literals.stream().allMatch(v -> caseInsensitive(fm, v));
         if (lower) {
@@ -301,14 +298,14 @@ final class FilterPlanner {
         SqlExpr start = date.apply(day.strip());
         SqlExpr end = date.apply(Timestamps.nextDay(day));
         return switch (op) {
-            case EQ -> new SqlPredicate.And(List.of(new SqlPredicate.Compare(value, ">=", start),
-                    new SqlPredicate.Compare(value, "<", end)));
-            case NE -> new SqlPredicate.Or(List.of(new SqlPredicate.Compare(value, "<", start),
-                    new SqlPredicate.Compare(value, ">=", end)));
-            case LT, GE -> new SqlPredicate.Compare(value, sqlOp(op), start);
-            case GT -> new SqlPredicate.Compare(value, ">=", end);
-            case LE -> new SqlPredicate.Compare(value, "<", end);
-            case CONTAINS -> throw new IllegalArgumentException("'~' does not apply to timestamps");
+        case EQ -> new SqlPredicate.And(
+                List.of(new SqlPredicate.Compare(value, ">=", start), new SqlPredicate.Compare(value, "<", end)));
+        case NE -> new SqlPredicate.Or(
+                List.of(new SqlPredicate.Compare(value, "<", start), new SqlPredicate.Compare(value, ">=", end)));
+        case LT, GE -> new SqlPredicate.Compare(value, sqlOp(op), start);
+        case GT -> new SqlPredicate.Compare(value, ">=", end);
+        case LE -> new SqlPredicate.Compare(value, "<", end);
+        case CONTAINS -> throw new IllegalArgumentException("'~' does not apply to timestamps");
         };
     }
 
@@ -336,13 +333,13 @@ final class FilterPlanner {
 
     private static String sqlOp(ComparisonOp op) {
         return switch (op) {
-            case EQ -> "=";
-            case NE -> "<>";
-            case LT -> "<";
-            case LE -> "<=";
-            case GT -> ">";
-            case GE -> ">=";
-            case CONTAINS -> throw new IllegalStateException("CONTAINS handled separately");
+        case EQ -> "=";
+        case NE -> "<>";
+        case LT -> "<";
+        case LE -> "<=";
+        case GT -> ">";
+        case GE -> ">=";
+        case CONTAINS -> throw new IllegalStateException("CONTAINS handled separately");
         };
     }
 }

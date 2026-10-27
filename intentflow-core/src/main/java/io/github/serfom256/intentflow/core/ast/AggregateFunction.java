@@ -4,11 +4,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 public enum AggregateFunction {
-    COUNT,
-    SUM,
-    AVG,
-    MIN,
-    MAX;
+    COUNT, SUM, AVG, MIN, MAX;
 
     public String keyword() {
         return name().toLowerCase(Locale.ROOT);

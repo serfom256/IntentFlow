@@ -77,7 +77,7 @@ class ZooKeeperRateLimiterTest {
         client.start();
         clients.add(client);
         return new ZooKeeperRateLimiter(client, "/intentflow/rate-limit", questions, Duration.ofMinutes(1),
-                caller -> String.valueOf(caller.principal()), failOpen, clock);
+                caller -> caller.principal().orElse("anonymous"), failOpen, clock);
     }
 
     @Test

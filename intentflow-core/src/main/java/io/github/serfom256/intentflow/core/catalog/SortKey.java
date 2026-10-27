@@ -7,7 +7,6 @@ public interface SortKey {
     Direction direction();
 
     enum Direction {
-        ASC,
-        DESC
+        ASC, DESC
     }
 }

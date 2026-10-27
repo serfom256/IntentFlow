@@ -1,9 +1,9 @@
 package io.github.serfom256.intentflow.core.api;
 
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The answer to an {@link IntentRequest}: the entities that match, mapped by
@@ -29,8 +29,7 @@ public interface IntentResponse<T> {
      * Grouped or aggregated values when the query used {@code count}, {@code sum}
      * and so on.
      */
-    @Nullable
-    Aggregation aggregation();
+    Optional<Aggregation> aggregation();
 
     /** The DSL and statement behind this response. */
     IntentTrace trace();
@@ -43,12 +42,10 @@ public interface IntentResponse<T> {
 
     /**
      * Where the next page starts, for a {@link IntentRequest#paged() paged} request
-     * whose query found more rows;
-     * {@code null} on the last page and for requests that are not paged. Opaque:
-     * pass it back with the same
-     * question.
+     * whose query found more rows; empty on the last page and for requests that are
+     * not paged. Opaque: pass it back with the same question.
      */
-    default @Nullable String nextCursor() {
-        return null;
+    default Optional<String> nextCursor() {
+        return Optional.empty();
     }
 }

@@ -60,11 +60,8 @@ class InterfaceEntityTest {
     void propertyMethodsOfInterfacesAndTheirParentsBecomeFields() {
         ServiceDescriptor books = ServiceDescriptors.fromAnnotated(Book.class);
 
-        assertThat(books.fields())
-                .extracting(f -> f.logical().value(), f -> f.column().value(), FieldMapping::type,
-                        FieldMapping::property)
-                .containsExactly(
-                        tuple("name", "name", FieldType.TEXT, "name"),
+        assertThat(books.fields()).extracting(f -> f.logical().value(), f -> f.column().value(), FieldMapping::type,
+                f -> f.property().orElse(null)).containsExactly(tuple("name", "name", FieldType.TEXT, "name"),
                         tuple("id", "id", FieldType.NUMBER, "id"),
                         tuple("in_stock", "in_stock", FieldType.BOOLEAN, "inStock"),
                         tuple("price", "price", FieldType.NUMBER, "price"));
@@ -80,8 +77,7 @@ class InterfaceEntityTest {
         };
 
         assertThat(ServiceDescriptors.fromAnnotated(Book.class, List.of(resolver)).fields())
-                .filteredOn(f -> f.logical().value().equals("price"))
-                .extracting(f -> f.column().value())
+                .filteredOn(f -> f.logical().value().equals("price")).extracting(f -> f.column().value())
                 .containsExactly("price_usd");
     }
 

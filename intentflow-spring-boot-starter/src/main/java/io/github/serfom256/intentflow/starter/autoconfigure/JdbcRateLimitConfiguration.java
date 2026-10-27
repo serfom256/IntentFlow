@@ -21,8 +21,7 @@ class JdbcRateLimitConfiguration {
     @Bean
     @ConditionalOnMissingBean
     @DependsOnDatabaseInitialization
-    LlmRateLimiter intentFlowJdbcRateLimiter(ObjectProvider<DataSource> dataSources,
-            IntentFlowProperties properties) {
+    LlmRateLimiter intentFlowJdbcRateLimiter(ObjectProvider<DataSource> dataSources, IntentFlowProperties properties) {
         IntentFlowProperties.Llm.RateLimit limit = properties.llm().rateLimit();
         if (limit.questions() <= 0) {
             return LlmRateLimiter.NONE;

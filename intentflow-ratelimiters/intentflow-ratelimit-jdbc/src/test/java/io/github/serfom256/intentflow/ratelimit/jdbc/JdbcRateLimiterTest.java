@@ -72,10 +72,10 @@ class JdbcRateLimiterTest {
 
     private static DataSource dataSource(String database) {
         TestDatabase.Endpoint endpoint = switch (database) {
-            case "H2" -> new TestDatabase.Endpoint("jdbc:h2:mem:ratelimit;DB_CLOSE_DELAY=-1", "sa", "");
-            case "POSTGRES" -> PostgresDatabase.POSTGRES.endpoint();
-            case "MYSQL" -> MySqlDatabase.MYSQL.endpoint();
-            default -> OracleDatabase.FREE.endpoint();
+        case "H2" -> new TestDatabase.Endpoint("jdbc:h2:mem:ratelimit;DB_CLOSE_DELAY=-1", "sa", "");
+        case "POSTGRES" -> PostgresDatabase.POSTGRES.endpoint();
+        case "MYSQL" -> MySqlDatabase.MYSQL.endpoint();
+        default -> OracleDatabase.FREE.endpoint();
         };
         DataSource dataSource = new DriverManagerDataSource(endpoint);
         try (Connection c = dataSource.getConnection(); Statement s = c.createStatement()) {
@@ -88,7 +88,7 @@ class JdbcRateLimiterTest {
 
     private JdbcRateLimiter limiter(DataSource dataSource, int questions) {
         return new JdbcRateLimiter(dataSource, "intentflow_rate_limit", true, questions, Duration.ofMinutes(1),
-                caller -> String.valueOf(caller.principal()), true, clock);
+                caller -> caller.principal().orElse("anonymous"), true, clock);
     }
 
     @ParameterizedTest
@@ -156,11 +156,11 @@ class JdbcRateLimiterTest {
         DataSource dataSource = dataSource("H2");
         JdbcRateLimiter open = limiter(dataSource, 1);
         JdbcRateLimiter closed = new JdbcRateLimiter(dataSource, "intentflow_rate_limit", false, 1,
-                Duration.ofMinutes(1), caller -> String.valueOf(caller.principal()), false, clock);
-        DataSource missing = new DriverManagerDataSource(new TestDatabase.Endpoint(
-                "jdbc:h2:mem:" + UUID.randomUUID() + ";IFEXISTS=TRUE", "sa", ""));
+                Duration.ofMinutes(1), caller -> caller.principal().orElse("anonymous"), false, clock);
+        DataSource missing = new DriverManagerDataSource(
+                new TestDatabase.Endpoint("jdbc:h2:mem:" + UUID.randomUUID() + ";IFEXISTS=TRUE", "sa", ""));
         JdbcRateLimiter unreachable = new JdbcRateLimiter(missing, "intentflow_rate_limit", false, 1,
-                Duration.ofMinutes(1), caller -> String.valueOf(caller.principal()), false, clock);
+                Duration.ofMinutes(1), caller -> caller.principal().orElse("anonymous"), false, clock);
 
         open.acquire(ANN);
         assertThatThrownBy(() -> closed.acquire(ANN)).isInstanceOf(RateLimitExceededException.class)

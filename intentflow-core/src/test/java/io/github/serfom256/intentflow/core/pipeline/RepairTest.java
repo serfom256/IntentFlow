@@ -55,13 +55,8 @@ class RepairTest {
                 return List.of();
             }
         };
-        return IntentPipelines.builder()
-                .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(executor)
-                .catalog(CATALOG)
-                .maxRepairs(maxRepairs)
-                .build();
+        return IntentPipelines.builder().llm(llm).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(executor)
+                .catalog(CATALOG).maxRepairs(maxRepairs).build();
     }
 
     @Test
@@ -117,7 +112,6 @@ class RepairTest {
         IntentPipeline pipeline = pipeline(1, "books | filter author == \"x\"", "unsupported \"books have no author\"");
 
         assertThatThrownBy(() -> pipeline.resolve(IntentRequests.of("q")))
-                .isInstanceOf(UnsupportedRequestException.class)
-                .hasMessageContaining("no author");
+                .isInstanceOf(UnsupportedRequestException.class).hasMessageContaining("no author");
     }
 }

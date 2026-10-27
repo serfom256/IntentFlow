@@ -112,11 +112,9 @@ class JpaRelationsIT {
             ServiceDescriptors.fromAnnotated(Order.class, List.of(new JpaNameResolver())),
             ServiceDescriptors.fromAnnotated(ActiveOrder.class, List.of(new JpaNameResolver())));
 
-    private static final SchemaFacts FACTS = SchemaFacts.of(Map.of(
-            "rel_order", ServiceDescriptors.factsOf(Order.class, List.of(new JpaNameResolver())),
-            "rel_customer", ServiceDescriptors.factsOf(Customer.class, List.of(new JpaNameResolver()))),
-            Map.of(ServiceNames.of("active_orders"), ServiceDescriptors
-                    .restrictionOf(ActiveOrder.class, List.of(new JpaNameResolver())).orElseThrow()));
+    private static final SchemaFacts FACTS = SchemaFacts
+            .of(Map.of("rel_order", ServiceDescriptors.factsOf(Order.class, List.of(new JpaNameResolver())),
+                    "rel_customer", ServiceDescriptors.factsOf(Customer.class, List.of(new JpaNameResolver()))));
 
     private static synchronized EntityManager manager(TestDatabase db) {
         return MANAGERS.computeIfAbsent(db, d -> {
@@ -133,13 +131,9 @@ class JpaRelationsIT {
 
     private static IntentPipeline answering(TestDatabase db, String dsl, boolean visibleFieldsOnly) {
         manager(db).clear();
-        return IntentPipelines.builder()
-                .llm((t, c) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(db.dialect(), FACTS))
-                .executor(new JpaQueryExecutor(manager(db)))
-                .catalog(CATALOG)
-                .visibleFieldsOnly(visibleFieldsOnly)
-                .build();
+        return IntentPipelines.builder().llm((t, c) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(db.dialect(), FACTS)).executor(new JpaQueryExecutor(manager(db)))
+                .catalog(CATALOG).visibleFieldsOnly(visibleFieldsOnly).build();
     }
 
     @Test
@@ -147,8 +141,8 @@ class JpaRelationsIT {
         ServiceDescriptor orders = CATALOG.get(ServiceNames.of("orders"));
         ServiceDescriptor customers = CATALOG.get(ServiceNames.of("customers"));
 
-        assertThat(orders.relations()).extracting(ServiceRelation::name, r -> r.target().value(),
-                r -> r.from().value(), r -> r.to().value())
+        assertThat(orders.relations())
+                .extracting(ServiceRelation::name, r -> r.target().value(), r -> r.from().value(), r -> r.to().value())
                 .containsExactly(tuple("customer", "customers", "customer_id", "id"));
         assertThat(customers.relations()).extracting(ServiceRelation::name, r -> r.from().value(), r -> r.to().value())
                 .containsExactly(tuple("orders", "id", "customer_id"));
@@ -181,15 +175,15 @@ class JpaRelationsIT {
     void hibernateRestrictionsApplyToListsCountsAndKeys(TestDatabase db) {
         IntentResponse<ActiveOrder> active = answering(db, "active_orders | filter total < 100")
                 .resolve(IntentRequests.of("q"), ActiveOrder.class);
-        IntentResponse<Order> all = answering(db, "orders | filter total < 100")
-                .resolve(IntentRequests.of("q"), Order.class);
+        IntentResponse<Order> all = answering(db, "orders | filter total < 100").resolve(IntentRequests.of("q"),
+                Order.class);
 
         assertThat(active.items()).extracting(o -> o.id).containsExactly(11L);
         assertThat(all.items()).extracting(o -> o.id).containsExactly(11L, 13L);
         assertThat(active.trace().query()).contains("(status <> 'CANCELLED')").doesNotContain("*");
         assertThat(active.trace().optimizations()).contains("key-projection");
         assertThat(answering(db, "active_orders | count").resolve(IntentRequests.of("q"), ActiveOrder.class)
-                .aggregation().rows().getFirst().value()).isEqualTo(new BigDecimal("4"));
+                .aggregation().orElseThrow().rows().getFirst().value()).isEqualTo(new BigDecimal("4"));
     }
 
     @ParameterizedTest

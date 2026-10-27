@@ -116,8 +116,8 @@ final class SqlDialectConfigurations {
             if (value.startsWith("jdbc:h2:") || value.equals("h2")) {
                 return SqlDialects.named("h2", classLoader);
             }
-            if (value.startsWith("jdbc:mysql:") || value.startsWith("jdbc:mariadb:")
-                    || value.equals("mysql") || value.equals("mariadb")) {
+            if (value.startsWith("jdbc:mysql:") || value.startsWith("jdbc:mariadb:") || value.equals("mysql")
+                    || value.equals("mariadb")) {
                 return SqlDialects.named("mysql", classLoader);
             }
             if (value.startsWith("jdbc:oracle:") || value.equals("oracle")) {

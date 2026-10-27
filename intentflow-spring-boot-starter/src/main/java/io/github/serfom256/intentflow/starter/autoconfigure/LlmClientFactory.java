@@ -7,9 +7,8 @@ import java.net.URI;
 
 /**
  * Builds the client of one LLM provider module for a model; the starter calls
- * it for the primary and the
- * fallback model and puts the circuit breaker and concurrency limit around what
- * it returns.
+ * it for the primary and the fallback model and puts the circuit breaker and
+ * concurrency limit around what it returns.
  */
 @FunctionalInterface
 interface LlmClientFactory {

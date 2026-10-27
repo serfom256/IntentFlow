@@ -55,14 +55,10 @@ final class GigaChatAuthorizer implements RequestAuthorizer {
     }
 
     private void refresh() {
-        HttpRequest request = HttpRequest.newBuilder(oauthUrl)
-                .timeout(timeout)
-                .header("Authorization", "Basic " + authorizationKey)
-                .header("RqUID", UUID.randomUUID().toString())
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Accept", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString("scope=" + URLEncoder.encode(scope,
-                        StandardCharsets.UTF_8)))
+        HttpRequest request = HttpRequest.newBuilder(oauthUrl).timeout(timeout)
+                .header("Authorization", "Basic " + authorizationKey).header("RqUID", UUID.randomUUID().toString())
+                .header("Content-Type", "application/x-www-form-urlencoded").header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("scope=" + URLEncoder.encode(scope, StandardCharsets.UTF_8)))
                 .build();
         HttpResponse<String> response;
         try {

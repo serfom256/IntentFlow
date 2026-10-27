@@ -30,18 +30,19 @@ public interface ValidatedQuery {
 
     /**
      * The ordering to apply: the requested sort, or the default one, followed by
-     * tie-breakers so
-     * pages never overlap. Entity queries append the service's {@code defaultSort};
-     * aggregate queries
-     * sort by the aggregated value (descending) and then by every group field.
+     * tie-breakers so pages never overlap. Entity queries append the service's
+     * {@code defaultSort}, and a {@code top} query without {@code per} or a sort
+     * keeps its {@code top} order; aggregate queries sort by the aggregated value
+     * (descending) and then by every group field.
      */
     default List<SortKey> effectiveSort() {
-        Aggregate aggregate = ast().aggregate();
+        Aggregate aggregate = ast().aggregate().orElse(null);
         List<SortKey> sort = new ArrayList<>(ast().sort());
         List<SortKey> tieBreakers;
         if (aggregate == null) {
             if (sort.isEmpty()) {
-                return service().defaultSort();
+                return ast().top().filter(top -> top.partition().isEmpty()).isPresent() ? topOrder()
+                        : service().defaultSort();
             }
             tieBreakers = service().defaultSort();
         } else {
@@ -49,8 +50,7 @@ public interface ValidatedQuery {
                 sort.add(SortKeys.of(valueField(aggregate), SortKey.Direction.DESC));
             }
             tieBreakers = aggregate.groupBy().stream()
-                    .<SortKey>map(g -> g instanceof FieldRef f
-                            ? SortKeys.of(f.field(), SortKey.Direction.ASC)
+                    .<SortKey>map(g -> g instanceof FieldRef f ? SortKeys.of(f.field(), SortKey.Direction.ASC)
                             : new ExprSortKey(g, SortKey.Direction.ASC))
                     .toList();
         }
@@ -69,7 +69,7 @@ public interface ValidatedQuery {
      * by the default sort.
      */
     default List<SortKey> topOrder() {
-        TopN top = ast().top();
+        TopN top = ast().top().orElse(null);
         if (top == null) {
             return List.of();
         }

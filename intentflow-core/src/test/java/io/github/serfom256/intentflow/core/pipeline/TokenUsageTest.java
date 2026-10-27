@@ -56,17 +56,13 @@ class TokenUsageTest {
                 events.add(model + (repair ? " repair " : " generate ") + usage.total());
             }
         };
-        return IntentPipelines.builder()
-                .llm(llm)
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
+        return IntentPipelines.builder().llm(llm).sqlBuilder(SqlBuilders.create(new TestDialect()))
                 .executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         return List.of();
                     }
-                })
-                .catalog(CATALOG)
-                .listener(listener);
+                }).catalog(CATALOG).listener(listener);
     }
 
     @Test

@@ -42,18 +42,14 @@ class JdbcPipelineIT {
 
     private static final ServiceName BOOKS = ServiceNames.of("books");
 
-    private static final ServiceDescriptor BOOKS_SERVICE = ServiceDescriptors.of(
-            BOOKS, null, TableNames.of("book"),
-            List.of(
-                    FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true),
+    private static final ServiceDescriptor BOOKS_SERVICE = ServiceDescriptors.of(BOOKS, null, TableNames.of("book"),
+            List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true),
                     FieldMappings.of(LogicalFieldNames.of("title"), ColumnNames.of("title"), true),
                     FieldMappings.of(LogicalFieldNames.of("author"), ColumnNames.of("author_name"), true),
                     FieldMappings.of(LogicalFieldNames.of("price"), ColumnNames.of("price"), true),
                     FieldMappings.of(LogicalFieldNames.of("in_stock"), ColumnNames.of("in_stock"), true)),
-            List.of(SortKeys.of(LogicalFieldNames.of("id"), SortKey.Direction.ASC)),
-            MaxTakes.of(50),
-            UriTemplates.of("/books/{{id}}"),
-            Book.class);
+            List.of(SortKeys.of(LogicalFieldNames.of("id"), SortKey.Direction.ASC)), MaxTakes.of(50),
+            UriTemplates.of("/books/{{id}}"), Book.class);
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(BOOKS_SERVICE);
 
@@ -61,8 +57,7 @@ class JdbcPipelineIT {
 
     @BeforeAll
     static void seed() {
-        jdbc = JdbcClient.create(new DriverManagerDataSource(
-                POSTGRES.url(), POSTGRES.user(), POSTGRES.password()));
+        jdbc = JdbcClient.create(new DriverManagerDataSource(POSTGRES.url(), POSTGRES.user(), POSTGRES.password()));
         jdbc.sql("DROP TABLE IF EXISTS book").update();
         jdbc.sql("""
                 CREATE TABLE book (
@@ -83,12 +78,9 @@ class JdbcPipelineIT {
     }
 
     private static IntentResponse<Book> resolve(String dsl) {
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(new PostgresDialect()))
-                .executor(new JdbcQueryExecutor(jdbc))
-                .catalog(CATALOG)
-                .build();
+        IntentPipeline pipeline = IntentPipelines.builder().llm((text, catalog) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(new PostgresDialect())).executor(new JdbcQueryExecutor(jdbc))
+                .catalog(CATALOG).build();
         return pipeline.resolve(IntentRequests.of("q"), Book.class);
     }
 
@@ -140,8 +132,8 @@ class JdbcPipelineIT {
 
     @Test
     void textEqualityAndInAreCaseInsensitive() {
-        assertThat(titles(resolve("books | filter author == \"FRANK HERBERT\"")))
-                .containsExactly("Dune", "Dune Messiah");
+        assertThat(titles(resolve("books | filter author == \"FRANK HERBERT\""))).containsExactly("Dune",
+                "Dune Messiah");
         assertThat(titles(resolve("books | filter author in (\"william gibson\", \"anon\")")))
                 .containsExactly("Neuromancer", "100% Pure_Fiction");
     }

@@ -43,8 +43,7 @@ import java.util.function.Supplier;
 
 public final class JpaNameResolver implements NameResolver {
 
-    private static final Map<String, String> RESTRICTIONS = Map.of(
-            "org.hibernate.annotations.SQLRestriction", "value",
+    private static final Map<String, String> RESTRICTIONS = Map.of("org.hibernate.annotations.SQLRestriction", "value",
             "org.hibernate.annotations.Where", "clause");
 
     private final Supplier<Collection<Class<?>>> entities;
@@ -92,8 +91,8 @@ public final class JpaNameResolver implements NameResolver {
                 notNull.add(name);
             }
             if (storedAsOrdinal(field)) {
-                ordinals.put(name, Arrays.stream(field.getType().getEnumConstants())
-                        .map(c -> ((Enum<?>) c).name()).toList());
+                ordinals.put(name,
+                        Arrays.stream(field.getType().getEnumConstants()).map(c -> ((Enum<?>) c).name()).toList());
             }
         }
         return new TableFacts(primaryKey, List.of(), notNull, Map.of(), Set.of(), ordinals);
@@ -183,8 +182,7 @@ public final class JpaNameResolver implements NameResolver {
     private static String entityName(Class<?> entity) {
         Entity annotation = entity.getAnnotation(Entity.class);
         String className = entity.getName();
-        return annotation == null || annotation.name().isEmpty()
-                ? className.substring(className.lastIndexOf('.') + 1)
+        return annotation == null || annotation.name().isEmpty() ? className.substring(className.lastIndexOf('.') + 1)
                 : annotation.name();
     }
 

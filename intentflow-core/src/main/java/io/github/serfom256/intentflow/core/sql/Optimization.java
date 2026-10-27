@@ -4,12 +4,7 @@ import java.util.Arrays;
 import java.util.Locale;
 
 public enum Optimization {
-    NOT_NULL_ORDERING,
-    EXACT_VALUES,
-    DATE_RANGES,
-    TO_ONE_JOIN,
-    KEY_PROJECTION,
-    KEYSET_PAGING;
+    NOT_NULL_ORDERING, EXACT_VALUES, DATE_RANGES, TO_ONE_JOIN, KEY_PROJECTION, KEYSET_PAGING;
 
     public String id() {
         return name().toLowerCase(Locale.ROOT).replace('_', '-');

@@ -46,15 +46,12 @@ class H2DialectTest {
     private static final LogicalFieldName RATING = LogicalFieldNames.of("rating");
     private static final LogicalFieldName PUBLISHED = LogicalFieldNames.of("published_at");
 
-    private static final ServiceDescriptor SERVICE = ServiceDescriptors.of(
-            BOOKS, null, TableNames.of("books"),
-            List.of(
-                    new DefaultFieldMapping(TITLE, ColumnNames.of("title"), true, FieldType.TEXT, null, List.of(),
-                            "title"),
-                    new DefaultFieldMapping(RATING, ColumnNames.of("rating"), true, FieldType.NUMBER, null, List.of(),
-                            "rating"),
-                    new DefaultFieldMapping(PUBLISHED, ColumnNames.of("published_at"), true, FieldType.TIMESTAMP, null,
-                            List.of(), "publishedAt")),
+    private static final ServiceDescriptor SERVICE = ServiceDescriptors.of(BOOKS, null, TableNames.of("books"), List.of(
+            new DefaultFieldMapping(TITLE, ColumnNames.of("title"), true, FieldType.TEXT, null, List.of(), "title"),
+            new DefaultFieldMapping(RATING, ColumnNames.of("rating"), true, FieldType.NUMBER, null, List.of(),
+                    "rating"),
+            new DefaultFieldMapping(PUBLISHED, ColumnNames.of("published_at"), true, FieldType.TIMESTAMP, null,
+                    List.of(), "publishedAt")),
             List.of(), MaxTakes.of(50), UriTemplates.of("/books"), Object.class);
 
     private final SqlBuilder builder = SqlBuilders.create(new H2Dialect(), SchemaFacts.none(),
@@ -99,14 +96,15 @@ class H2DialectTest {
         assertThat(q.sql()).contains("rating > CAST(? AS NUMERIC(3, 1))");
         assertThat(build(new Compare(RATING, ComparisonOp.GT, new NumberLiteral(new BigDecimal("0.005"))), List.of())
                 .sql()).contains("rating > CAST(? AS NUMERIC(3, 3))");
-        assertThat(build(new Compare(RATING, ComparisonOp.GT, new NumberLiteral(new BigDecimal("40.0"))), List.of())
-                .sql()).contains("rating > ?");
+        assertThat(
+                build(new Compare(RATING, ComparisonOp.GT, new NumberLiteral(new BigDecimal("40.0"))), List.of()).sql())
+                .contains("rating > ?");
     }
 
     @Test
     void sortPutsNullsLastInBothDirections() {
-        BoundQuery q = build(null, List.of(
-                SortKeys.of(RATING, SortKey.Direction.DESC), SortKeys.of(TITLE, SortKey.Direction.ASC)));
+        BoundQuery q = build(null,
+                List.of(SortKeys.of(RATING, SortKey.Direction.DESC), SortKeys.of(TITLE, SortKey.Direction.ASC)));
 
         assertThat(q.sql()).contains("ORDER BY rating DESC NULLS LAST, title ASC NULLS LAST FETCH FIRST 50 ROWS ONLY");
     }

@@ -125,7 +125,7 @@ SELECT * FROM (SELECT product.*, ROW_NUMBER() OVER (PARTITION BY category ORDER 
 binds: []
 
 -- products | top 5 by price * stock desc
-SELECT * FROM (SELECT product.*, ROW_NUMBER() OVER (ORDER BY (price * stock) DESC NULLS LAST, id ASC NULLS LAST) AS intentflow_rank FROM product) product WHERE intentflow_rank <= 5 ORDER BY id ASC NULLS LAST FETCH FIRST 50 ROWS ONLY
+SELECT * FROM (SELECT product.*, ROW_NUMBER() OVER (ORDER BY (price * stock) DESC NULLS LAST, id ASC NULLS LAST) AS intentflow_rank FROM product) product WHERE intentflow_rank <= 5 ORDER BY (price * stock) DESC NULLS LAST, id ASC NULLS LAST FETCH FIRST 50 ROWS ONLY
 binds: []
 
 -- orders

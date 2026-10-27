@@ -1,7 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.ErrorCode;
-import io.github.serfom256.intentflow.core.IntentFlowException;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
@@ -40,38 +39,29 @@ class InputLimitsTest {
     }
 
     private IntentPipeline pipeline(String dsl, IntentPipelineBuilder builder) {
-        return builder
-                .llm((text, catalog) -> {
-                    llmCalls.incrementAndGet();
-                    return DslSources.of(dsl);
-                })
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(new QueryExecutor() {
-                    @Override
-                    @SuppressWarnings("unchecked")
-                    public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
-                        return (List<T>) LongStream.rangeClosed(1, 11).mapToObj(id -> new Book(id, "b" + id, id))
-                                .toList();
-                    }
-                })
-                .catalog(ServiceCatalogs.fromAnnotated(Book.class))
-                .validator(AstValidators.create(20))
-                .maxRepairs(0)
-                .build();
+        return builder.llm((text, catalog) -> {
+            llmCalls.incrementAndGet();
+            return DslSources.of(dsl);
+        }).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(new QueryExecutor() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
+                return (List<T>) LongStream.rangeClosed(1, 11).mapToObj(id -> new Book(id, "b" + id, id)).toList();
+            }
+        }).catalog(ServiceCatalogs.fromAnnotated(Book.class)).validator(AstValidators.create(20)).maxRepairs(0).build();
     }
 
     @ParameterizedTest
     @ValueSource(strings = { "(", "not ", "price > 1 and ", "price + " })
     void deeplyNestedOrVeryLongAnswersAreRejectedAsParseErrors(String repeated) {
         String filter = switch (repeated) {
-            case "(" -> "(".repeat(20_000) + "price > 1" + ")".repeat(20_000);
-            case "price + " -> "price + ".repeat(20_000) + "price > 1";
-            default -> repeated.repeat(20_000) + "price > 1";
+        case "(" -> "(".repeat(20_000) + "price > 1" + ")".repeat(20_000);
+        case "price + " -> "price + ".repeat(20_000) + "price > 1";
+        default -> repeated.repeat(20_000) + "price > 1";
         };
 
         assertThatThrownBy(() -> pipeline("books | filter " + filter).resolve(IntentRequests.of("q"), Book.class))
-                .isInstanceOfSatisfying(DslParseException.class,
-                        e -> assertThat(e.code()).isEqualTo(ErrorCode.PARSE));
+                .isInstanceOfSatisfying(DslParseException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.PARSE));
     }
 
     @Test
@@ -99,17 +89,16 @@ class InputLimitsTest {
     void anOffsetCursorCannotSkipFurtherThanMaxSkip() {
         IntentPipeline pipeline = pipeline("books | sort title | take 10");
         IntentResponse<Book> first = pipeline.resolve(IntentRequests.page("q", null), Book.class);
-        String cursor = first.nextCursor();
+        String cursor = first.nextCursor().orElseThrow();
         String[] parts = new String(Base64.getUrlDecoder().decode(cursor.substring(0, cursor.indexOf('.'))),
                 StandardCharsets.UTF_8).split("\\|");
         parts[3] = "1000000";
-        String forged = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(String.join("|", parts).getBytes(StandardCharsets.UTF_8))
-                + cursor.substring(cursor.indexOf('.'));
+        String forged = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                String.join("|", parts).getBytes(StandardCharsets.UTF_8)) + cursor.substring(cursor.indexOf('.'));
 
-        assertThat(pipeline.resolve(IntentRequests.page("q", first.nextCursor()), Book.class).items()).hasSize(10);
-        assertThatThrownBy(() -> pipeline.resolve(IntentRequests.page("q", forged), Book.class))
-                .isInstanceOfSatisfying(ValidationException.class,
-                        e -> assertThat(e.code()).isEqualTo(ErrorCode.LIMIT_EXCEEDED));
+        assertThat(pipeline.resolve(IntentRequests.page("q", first.nextCursor().orElseThrow()), Book.class).items())
+                .hasSize(10);
+        assertThatThrownBy(() -> pipeline.resolve(IntentRequests.page("q", forged), Book.class)).isInstanceOfSatisfying(
+                ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.LIMIT_EXCEEDED));
     }
 }

@@ -32,23 +32,21 @@ class PagingAutoConfigurationTest {
             .withBean(LlmClient.class, () -> (text, catalog) -> {
                 llmCalls.incrementAndGet();
                 return DslSources.of("books | sort title | take 2");
-            })
-            .withBean(QueryExecutor.class, () -> new QueryExecutor() {
+            }).withBean(QueryExecutor.class, () -> new QueryExecutor() {
                 @Override
                 @SuppressWarnings("unchecked")
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
-                    return (List<T>) LongStream.rangeClosed(1, 3)
-                            .mapToObj(id -> new Book(id, "t" + id, BigDecimal.ONE)).toList();
+                    return (List<T>) LongStream.rangeClosed(1, 3).mapToObj(id -> new Book(id, "t" + id, BigDecimal.ONE))
+                            .toList();
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
+            }).withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false", "intentflow.dialect=postgresql");
 
     @Test
     void instancesWithTheConfiguredKeyContinueEachOthersPages() {
         AtomicReference<String> cursor = new AtomicReference<>();
         runner.withPropertyValues(KEY).run(ctx -> cursor.set(ctx.getBean(IntentPipeline.class)
-                .resolve(IntentRequests.page("books", null), Book.class).nextCursor()));
+                .resolve(IntentRequests.page("books", null), Book.class).nextCursor().orElseThrow()));
         llmCalls.set(0);
 
         runner.withPropertyValues(KEY).run(ctx -> {
@@ -62,8 +60,7 @@ class PagingAutoConfigurationTest {
 
     @Test
     void aShortKeyFailsAtStartup() {
-        runner.withPropertyValues("intentflow.paging.cursor-key=short")
-                .run(ctx -> assertThat(ctx).hasFailed().getFailure().rootCause()
-                        .hasMessageContaining("cursorKey must have at least 32 bytes"));
+        runner.withPropertyValues("intentflow.paging.cursor-key=short").run(ctx -> assertThat(ctx).hasFailed()
+                .getFailure().rootCause().hasMessageContaining("cursorKey must have at least 32 bytes"));
     }
 }

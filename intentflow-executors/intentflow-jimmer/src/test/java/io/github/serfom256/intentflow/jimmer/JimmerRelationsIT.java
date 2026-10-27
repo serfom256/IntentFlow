@@ -52,23 +52,18 @@ class JimmerRelationsIT {
         return EXECUTORS.computeIfAbsent(db, d -> {
             TestDatabase.Endpoint e = RelationTables.prepare(d);
             JSqlClient sqlClient = JSqlClient.newBuilder()
-                    .setConnectionManager(ConnectionManager.simpleConnectionManager(
-                            new DriverManagerDataSource(e.url(), e.user(), e.password())))
+                    .setConnectionManager(ConnectionManager
+                            .simpleConnectionManager(new DriverManagerDataSource(e.url(), e.user(), e.password())))
                     .setDialect(d == MySqlDatabase.MYSQL ? new MySqlDialect() : new PostgresDialect())
-                    .setDatabaseNamingStrategy(DefaultDatabaseNamingStrategy.LOWER_CASE)
-                    .build();
-            return new JimmerQueryExecutor(sqlClient, List.of(
-                    JOrderFetcher.$.allScalarFields().customer(JCustomerFetcher.$.allScalarFields())));
+                    .setDatabaseNamingStrategy(DefaultDatabaseNamingStrategy.LOWER_CASE).build();
+            return new JimmerQueryExecutor(sqlClient,
+                    List.of(JOrderFetcher.$.allScalarFields().customer(JCustomerFetcher.$.allScalarFields())));
         });
     }
 
     private static IntentPipeline answering(TestDatabase db, String dsl) {
-        return IntentPipelines.builder()
-                .llm((t, c) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(db.dialect()))
-                .executor(executor(db))
-                .catalog(CATALOG)
-                .build();
+        return IntentPipelines.builder().llm((t, c) -> DslSources.of(dsl)).sqlBuilder(SqlBuilders.create(db.dialect()))
+                .executor(executor(db)).catalog(CATALOG).build();
     }
 
     @Test
@@ -95,16 +90,14 @@ class JimmerRelationsIT {
     void theStatementTimeoutCancelsASlowQuery() {
         TestDatabase.Endpoint e = RelationTables.prepare(PostgresDatabase.POSTGRES);
         JSqlClient sqlClient = JSqlClient.newBuilder()
-                .setConnectionManager(ConnectionManager.simpleConnectionManager(
-                        new DriverManagerDataSource(e.url(), e.user(), e.password())))
-                .setDialect(new PostgresDialect())
-                .build();
+                .setConnectionManager(ConnectionManager
+                        .simpleConnectionManager(new DriverManagerDataSource(e.url(), e.user(), e.password())))
+                .setDialect(new PostgresDialect()).build();
         JimmerQueryExecutor executor = new JimmerQueryExecutor(sqlClient, List.of(), Duration.ofSeconds(1));
         long start = System.nanoTime();
 
-        assertThatThrownBy(() -> executor.execute(
-                BoundQueries.of("SELECT c.id FROM rel_customer c, pg_sleep(5)"), JCustomer.class))
-                .hasMessageContaining("canceling statement");
+        assertThatThrownBy(() -> executor.execute(BoundQueries.of("SELECT c.id FROM rel_customer c, pg_sleep(5)"),
+                JCustomer.class)).hasMessageContaining("canceling statement");
         assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(4));
     }
 
@@ -112,7 +105,7 @@ class JimmerRelationsIT {
     @MethodSource("databases")
     void filtersThroughOneToMany(TestDatabase db) {
         assertThat(answering(db, "customers | filter orders.total > 100 and orders.status == \"PAID\"")
-                .resolve(IntentRequests.of("q"), JCustomer.class).items())
-                .extracting(JCustomer::id).containsExactly(2L, 3L);
+                .resolve(IntentRequests.of("q"), JCustomer.class).items()).extracting(JCustomer::id)
+                .containsExactly(2L, 3L);
     }
 }

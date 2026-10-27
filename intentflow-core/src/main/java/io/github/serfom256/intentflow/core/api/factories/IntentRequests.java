@@ -8,6 +8,8 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Optional;
+
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class IntentRequests {
 
@@ -28,14 +30,14 @@ public final class IntentRequests {
     }
 
     public static IntentRequest page(String text, @Nullable String cursor) {
-        return new DefaultIntentRequest(UserTexts.of(text), null, true, cursor);
+        return new DefaultIntentRequest(UserTexts.of(text), Optional.empty(), true, Optional.ofNullable(cursor));
     }
 
     public static IntentRequest page(String text, IntentContext context, @Nullable String cursor) {
-        return new DefaultIntentRequest(UserTexts.of(text), context, true, cursor);
+        return new DefaultIntentRequest(UserTexts.of(text), Optional.of(context), true, Optional.ofNullable(cursor));
     }
 
     public static IntentRequest withContext(IntentRequest request, IntentContext context) {
-        return new DefaultIntentRequest(request.text(), context, request.paged(), request.cursor());
+        return new DefaultIntentRequest(request.text(), Optional.of(context), request.paged(), request.cursor());
     }
 }

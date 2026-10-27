@@ -111,12 +111,12 @@ public final class JdbcCatalogOverrides implements CatalogOverrides {
             String service = rs.getString(1);
             String[] values = services.computeIfAbsent(service, s -> new String[2]);
             switch (rs.getString(3)) {
-                case DESCRIPTION -> values[0] = rs.getString(4);
-                case URI -> values[1] = rs.getString(4);
-                case FIELD_DESCRIPTION -> fields.computeIfAbsent(service, s -> new LinkedHashMap<>())
-                        .put(rs.getString(2), rs.getString(4));
-                default -> {
-                }
+            case DESCRIPTION -> values[0] = rs.getString(4);
+            case URI -> values[1] = rs.getString(4);
+            case FIELD_DESCRIPTION ->
+                fields.computeIfAbsent(service, s -> new LinkedHashMap<>()).put(rs.getString(2), rs.getString(4));
+            default -> {
+            }
             }
         });
         Map<ServiceName, ServiceOverride> loaded = new LinkedHashMap<>();

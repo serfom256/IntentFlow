@@ -32,8 +32,7 @@ class LlmProviderSelectionTest {
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                     return List.of();
                 }
-            })
-            .withPropertyValues("intentflow.llm.model=m", "intentflow.llm.api-key=k", "intentflow.llm.provider=",
+            }).withPropertyValues("intentflow.llm.model=m", "intentflow.llm.api-key=k", "intentflow.llm.provider=",
                     "intentflow.llm.circuit-breaker.failure-threshold=0", "intentflow.catalog.packages=" + FIXTURES,
                     "intentflow.schema.introspect=false", "intentflow.dialect=postgresql");
 

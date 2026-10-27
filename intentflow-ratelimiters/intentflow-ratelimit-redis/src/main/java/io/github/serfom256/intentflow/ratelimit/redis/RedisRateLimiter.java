@@ -64,8 +64,8 @@ public final class RedisRateLimiter implements LlmRateLimiter {
     public void acquire(IntentContext caller) {
         Long waitMillis;
         try {
-            waitMillis = redis.execute(TAKE, List.of(prefix + hash(key.apply(caller))),
-                    String.valueOf(questions), String.valueOf(period.toMillis()), String.valueOf(clock.millis()));
+            waitMillis = redis.execute(TAKE, List.of(prefix + hash(key.apply(caller))), String.valueOf(questions),
+                    String.valueOf(period.toMillis()), String.valueOf(clock.millis()));
         } catch (RuntimeException e) {
             if (!failOpen) {
                 throw new RateLimitExceededException("The rate limit store is unavailable", Duration.ofSeconds(5));
@@ -74,8 +74,8 @@ public final class RedisRateLimiter implements LlmRateLimiter {
             return;
         }
         if (waitMillis != null && waitMillis > 0) {
-            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period
-                    + " reached", Duration.ofMillis(waitMillis));
+            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period + " reached",
+                    Duration.ofMillis(waitMillis));
         }
     }
 

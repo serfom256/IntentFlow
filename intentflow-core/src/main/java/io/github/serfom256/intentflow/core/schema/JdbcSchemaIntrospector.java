@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
 public final class JdbcSchemaIntrospector {
 
     private static final Pattern UPPER_CASE = Pattern.compile("[A-Z_][A-Z0-9_]*");
-    private static final Pattern ZONED_TYPE = Pattern.compile(
-            "timestamp(\\(\\d+\\))? with (local )?time zone|(nullable\\()?datetime(64)?\\(.*'.+'\\)\\)?");
+    private static final Pattern ZONED_TYPE = Pattern
+            .compile("timestamp(\\(\\d+\\))? with (local )?time zone|(nullable\\()?datetime(64)?\\(.*'.+'\\)\\)?");
 
     private JdbcSchemaIntrospector() {
     }
@@ -50,8 +50,7 @@ public final class JdbcSchemaIntrospector {
             throws SQLException {
         int dot = qualified.lastIndexOf('.');
         String name = dot < 0 ? qualified : qualified.substring(dot + 1);
-        List<String> schemas = dot < 0
-                ? Arrays.asList(currentSchema(connection), null)
+        List<String> schemas = dot < 0 ? Arrays.asList(currentSchema(connection), null)
                 : variants(qualified.substring(0, dot));
         String catalog = connection.getCatalog();
         for (String candidate : variants(name)) {
@@ -125,9 +124,9 @@ public final class JdbcSchemaIntrospector {
 
     private static boolean integer(int dataType, int size, int digits, boolean noDigits) {
         return switch (dataType) {
-            case Types.TINYINT, Types.SMALLINT, Types.INTEGER, Types.BIGINT -> true;
-            case Types.NUMERIC, Types.DECIMAL -> !noDigits && digits == 0 && size > 0;
-            default -> false;
+        case Types.TINYINT, Types.SMALLINT, Types.INTEGER, Types.BIGINT -> true;
+        case Types.NUMERIC, Types.DECIMAL -> !noDigits && digits == 0 && size > 0;
+        default -> false;
         };
     }
 

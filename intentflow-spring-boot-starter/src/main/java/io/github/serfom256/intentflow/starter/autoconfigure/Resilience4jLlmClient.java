@@ -62,11 +62,11 @@ final class Resilience4jLlmClient implements LlmClient {
                 if (registry == null) {
                     return IntentFlowAutoConfiguration.builtInBreaker(client, properties.llm());
                 }
-                return new Resilience4jLlmClient(client, registry.circuitBreaker(name,
-                        () -> CircuitBreakerConfig.from(registry.getDefaultConfig())
-                                .recordExceptions(LlmException.class)
-                                .ignoreExceptions(LlmUnavailableException.class)
-                                .build()));
+                return new Resilience4jLlmClient(client,
+                        registry.circuitBreaker(name,
+                                () -> CircuitBreakerConfig.from(registry.getDefaultConfig())
+                                        .recordExceptions(LlmException.class)
+                                        .ignoreExceptions(LlmUnavailableException.class).build()));
             };
         }
     }

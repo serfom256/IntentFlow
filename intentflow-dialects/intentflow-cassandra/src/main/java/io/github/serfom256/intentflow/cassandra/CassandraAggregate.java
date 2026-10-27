@@ -8,11 +8,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.Function;
 
-public record CassandraAggregate(
-        AggregateFunction function,
-        List<Function<Row, @Nullable Object>> groups,
-        @Nullable Function<Row, @Nullable Object> argument,
-        Comparator<List<@Nullable Object>> order) {
+public record CassandraAggregate(AggregateFunction function, List<Function<Row, @Nullable Object>> groups,
+        @Nullable Function<Row, @Nullable Object> argument, Comparator<List<@Nullable Object>> order) {
 
     public CassandraAggregate {
         groups = List.copyOf(groups);

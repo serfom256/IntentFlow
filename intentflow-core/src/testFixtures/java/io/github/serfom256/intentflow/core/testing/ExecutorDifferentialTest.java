@@ -54,15 +54,19 @@ public abstract class ExecutorDifferentialTest extends DifferentialTestBase {
                     insert.setObject(4, row.get("price"));
                     insert.setObject(5, row.get("stock") == null ? null : ((BigDecimal) row.get("stock")).intValue(),
                             Types.INTEGER);
-                    insert.setObject(6, row.get("active"), Types.BOOLEAN);
+                    if (row.get("active") instanceof Boolean active) {
+                        insert.setBoolean(6, active);
+                    } else {
+                        insert.setNull(6, Types.BIT);
+                    }
                     insert.setObject(7, row.get("created_at"), Types.TIMESTAMP);
                     insert.addBatch();
                 }
                 insert.executeBatch();
             }
         }
-        Map<String, TableFacts> introspected = JdbcSchemaIntrospector.introspect(
-                new DriverManagerDataSource(db), List.of("gadget"));
+        Map<String, TableFacts> introspected = JdbcSchemaIntrospector.introspect(new DriverManagerDataSource(db),
+                List.of("gadget"));
         TableFacts declared = ServiceDescriptors.factsOf(entityType(), nameResolvers());
         facts = SchemaFacts
                 .of(Map.of("gadget", introspected.getOrDefault("gadget", TableFacts.UNKNOWN).merge(declared)));

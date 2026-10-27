@@ -52,9 +52,10 @@ public final class BedrockLlmClient implements LlmClient {
 
     @Override
     public DslSource repairDsl(UserText normalizedText, ServiceCatalog catalog, DslSource failed, String error) {
-        return complete(catalog, List.of(text(ConversationRole.USER, normalizedText.value()),
-                text(ConversationRole.ASSISTANT, failed.value()),
-                text(ConversationRole.USER, LlmPrompts.repair(error))));
+        return complete(catalog,
+                List.of(text(ConversationRole.USER, normalizedText.value()),
+                        text(ConversationRole.ASSISTANT, failed.value()),
+                        text(ConversationRole.USER, LlmPrompts.repair(error))));
     }
 
     @Override
@@ -70,8 +71,8 @@ public final class BedrockLlmClient implements LlmClient {
         List<SystemContentBlock> system = new ArrayList<>();
         system.add(SystemContentBlock.fromText(LlmPrompts.system(catalog, LocalDate.now(clock))));
         if (settings.promptCaching()) {
-            system.add(SystemContentBlock.fromCachePoint(CachePointBlock.builder().type(CachePointType.DEFAULT)
-                    .build()));
+            system.add(
+                    SystemContentBlock.fromCachePoint(CachePointBlock.builder().type(CachePointType.DEFAULT).build()));
         }
         InferenceConfiguration.Builder inference = InferenceConfiguration.builder().maxTokens(settings.maxTokens());
         if (settings.temperature() != null) {
@@ -84,8 +85,8 @@ public final class BedrockLlmClient implements LlmClient {
         } catch (SdkException e) {
             throw new LlmException("Bedrock request failed: " + e.getMessage(), e);
         }
-        String text = response.output().message().content().stream().map(ContentBlock::text)
-                .filter(Objects::nonNull).collect(Collectors.joining());
+        String text = response.output().message().content().stream().map(ContentBlock::text).filter(Objects::nonNull)
+                .collect(Collectors.joining());
         String dsl = LlmPrompts.answer(text);
         if (dsl.isEmpty()) {
             throw new LlmException("LLM returned an empty answer");

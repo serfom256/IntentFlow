@@ -42,7 +42,7 @@ public class SearchService {
         IntentTrace trace = response.trace();
         List<Object> items = response.items().stream().map(mapper::toDomain).map(SearchService::publicView).toList();
         return new SearchResult<>(query, response.service().value(), response.uri().value(), items,
-                response.aggregation(),
+                response.aggregation().orElse(null),
                 debug ? new SearchResult.Trace(trace.dsl(), trace.cached(), trace.query(), trace.parameters()) : null,
                 tookMs);
     }

@@ -171,8 +171,7 @@ public final class IntentPipelineBuilder {
         }
         return new DefaultIntentPipeline(normalizer, cache != null ? cache : DslCaches.create(), client, parser,
                 validator, sql, queries, uriBuilder, services, maxRepairs, maxQuestionLength, accessPolicy,
-                defaultCaller, listener,
-                tracer, rateLimiter, audit, logValues, visibleFieldsOnly, cursorKey.clone());
+                defaultCaller, listener, tracer, rateLimiter, audit, logValues, visibleFieldsOnly, cursorKey.clone());
     }
 
     private static byte[] randomKey() {

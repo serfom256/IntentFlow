@@ -76,11 +76,8 @@ class OpenMapperDifferentialIT extends ExecutorDifferentialTest {
 
     @Override
     protected QueryExecutor createExecutor(String jdbcUrl, String user, String password) {
-        context = new SpringApplicationBuilder(OpenMapperApp.class)
-                .web(WebApplicationType.NONE)
-                .properties(
-                        "spring.datasource.url=" + jdbcUrl,
-                        "spring.datasource.username=" + user,
+        context = new SpringApplicationBuilder(OpenMapperApp.class).web(WebApplicationType.NONE)
+                .properties("spring.datasource.url=" + jdbcUrl, "spring.datasource.username=" + user,
                         "spring.datasource.password=" + password,
                         "openmapper.model.packagesToScan=io.github.serfom256.intentflow.openmapper")
                 .run();

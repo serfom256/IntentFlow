@@ -24,12 +24,9 @@ public final class BedrockLlmClients {
 
     public static LlmClient of(String model, BedrockSettings settings, AwsCredentialsProvider credentials,
             @Nullable URI endpoint, Duration timeout, int maxRetries, Clock clock) {
-        BedrockRuntimeClientBuilder client = BedrockRuntimeClient.builder()
-                .credentialsProvider(credentials)
-                .overrideConfiguration(ClientOverrideConfiguration.builder()
-                        .apiCallAttemptTimeout(timeout)
-                        .retryStrategy(retry -> retry.maxAttempts(maxRetries + 1))
-                        .build());
+        BedrockRuntimeClientBuilder client = BedrockRuntimeClient.builder().credentialsProvider(credentials)
+                .overrideConfiguration(ClientOverrideConfiguration.builder().apiCallAttemptTimeout(timeout)
+                        .retryStrategy(retry -> retry.maxAttempts(maxRetries + 1)).build());
         if (settings.region() != null) {
             client.region(Region.of(settings.region()));
         }

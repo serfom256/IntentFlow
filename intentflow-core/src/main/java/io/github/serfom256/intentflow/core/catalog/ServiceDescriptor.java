@@ -1,15 +1,13 @@
 package io.github.serfom256.intentflow.core.catalog;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.List;
+import java.util.Optional;
 
 public interface ServiceDescriptor {
 
     ServiceName name();
 
-    @Nullable
-    ServiceDescription description();
+    Optional<ServiceDescription> description();
 
     TableName table();
 
@@ -32,5 +30,15 @@ public interface ServiceDescriptor {
      */
     default List<ServiceRelation> relations() {
         return List.of();
+    }
+
+    /**
+     * SQL condition every row of this service satisfies, such as
+     * {@code @IntentService(restriction)} or an ORM soft-delete condition, if any.
+     * It is added to every query on the service and on its relations, whichever way
+     * the pipeline is built.
+     */
+    default Optional<String> restriction() {
+        return Optional.empty();
     }
 }

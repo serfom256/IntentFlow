@@ -32,32 +32,31 @@ class CrudApiTest extends ApiTestSupport {
 
         @Test
         void listIsPagedAndSortable() {
-            assertThat(mvc.get().uri("/api/products?page=0&size=5")).hasStatusOk()
-                    .bodyJson()
+            assertThat(mvc.get().uri("/api/products?page=0&size=5")).hasStatusOk().bodyJson()
                     .hasPathSatisfying("$.items", items -> assertThat(items).asArray().hasSize(5))
                     .hasPathSatisfying("$.size", size -> assertThat(size).asNumber().isEqualTo(5))
-                    .hasPathSatisfying("$.totalItems", t -> assertThat(t).asNumber().satisfies(
-                            n -> assertThat(n.intValue()).isGreaterThanOrEqualTo(40)))
+                    .hasPathSatisfying("$.totalItems",
+                            t -> assertThat(t).asNumber()
+                                    .satisfies(n -> assertThat(n.intValue()).isGreaterThanOrEqualTo(40)))
                     .extractingPath("$.items[0].name").isEqualTo("MacBook Air 13 M3");
         }
 
         @Test
         void getSeededProduct() {
-            assertThat(mvc.get().uri("/api/products/1")).hasStatusOk().bodyJson()
-                    .extractingPath("$.name").isEqualTo("MacBook Air 13 M3");
+            assertThat(mvc.get().uri("/api/products/1")).hasStatusOk().bodyJson().extractingPath("$.name")
+                    .isEqualTo("MacBook Air 13 M3");
         }
 
         @Test
         void createReadUpdateDelete() {
             long id = createdId(post("/api/products", product("Widget " + UUID.randomUUID(), "19.99")));
 
-            assertThat(mvc.get().uri("/api/products/{id}", id)).hasStatusOk().bodyJson()
-                    .extractingPath("$.price").asNumber().satisfies(p -> assertThat(p.doubleValue()).isEqualTo(19.99));
+            assertThat(mvc.get().uri("/api/products/{id}", id)).hasStatusOk().bodyJson().extractingPath("$.price")
+                    .asNumber().satisfies(p -> assertThat(p.doubleValue()).isEqualTo(19.99));
 
             assertThat(put("/api/products/" + id, product("Widget Pro", "24.50"))).hasStatusOk().bodyJson()
                     .extractingPath("$.name").isEqualTo("Widget Pro");
-            assertThat(mvc.get().uri("/api/products/{id}", id)).bodyJson()
-                    .extractingPath("$.createdAt").isNotNull();
+            assertThat(mvc.get().uri("/api/products/{id}", id)).bodyJson().extractingPath("$.createdAt").isNotNull();
 
             assertThat(mvc.delete().uri("/api/products/{id}", id)).hasStatus(HttpStatus.NO_CONTENT);
             assertThat(mvc.get().uri("/api/products/{id}", id)).hasStatus(HttpStatus.NOT_FOUND);
@@ -79,8 +78,7 @@ class CrudApiTest extends ApiTestSupport {
         @Test
         void unknownEnumValueIsABadRequest() {
             assertThat(post("/api/products", product("x", "1").replace("ACCESSORY", "TOASTER")))
-                    .hasStatus(HttpStatus.BAD_REQUEST)
-                    .hasContentTypeCompatibleWith("application/problem+json");
+                    .hasStatus(HttpStatus.BAD_REQUEST).hasContentTypeCompatibleWith("application/problem+json");
         }
 
         @Test
@@ -104,8 +102,8 @@ class CrudApiTest extends ApiTestSupport {
 
             assertThat(mvc.get().uri("/api/customers/{id}", id)).bodyJson()
                     .hasPathSatisfying("$.fullName", n -> assertThat(n).isEqualTo("Ada Lovelace"))
-                    .hasPathSatisfying("$.country", c -> assertThat(c).isEqualTo("GB"))
-                    .extractingPath("$.email").isEqualTo(email.toLowerCase());
+                    .hasPathSatisfying("$.country", c -> assertThat(c).isEqualTo("GB")).extractingPath("$.email")
+                    .isEqualTo(email.toLowerCase());
         }
 
         @Test
@@ -114,16 +112,16 @@ class CrudApiTest extends ApiTestSupport {
                     {"name": "Twin", "email": "twin-%s@example.com", "city": "Oslo", "country": "NO", "vip": false}
                     """.formatted(UUID.randomUUID());
             createdId(post("/api/customers", body));
-            assertThat(post("/api/customers", body)).hasStatus(HttpStatus.CONFLICT).bodyJson()
-                    .extractingPath("$.title").isEqualTo("Conflicts with existing data");
+            assertThat(post("/api/customers", body)).hasStatus(HttpStatus.CONFLICT).bodyJson().extractingPath("$.title")
+                    .isEqualTo("Conflicts with existing data");
         }
 
         @Test
         void invalidEmailAndCountry() {
             assertThat(post("/api/customers", """
                     {"name": "X", "email": "not-an-email", "city": "Y", "country": "Germany", "vip": false}
-                    """)).hasStatus(HttpStatus.BAD_REQUEST).bodyJson()
-                    .extractingPath("$.errors").asMap().containsOnlyKeys("email", "country");
+                    """)).hasStatus(HttpStatus.BAD_REQUEST).bodyJson().extractingPath("$.errors").asMap()
+                    .containsOnlyKeys("email", "country");
         }
     }
 
@@ -166,8 +164,8 @@ class CrudApiTest extends ApiTestSupport {
         @Test
         void itemsCountMustBePositive() {
             assertThat(post("/api/orders", order(1).replace("\"itemsCount\": 1", "\"itemsCount\": 0")))
-                    .hasStatus(HttpStatus.BAD_REQUEST).bodyJson()
-                    .extractingPath("$.errors").asMap().containsOnlyKeys("itemsCount");
+                    .hasStatus(HttpStatus.BAD_REQUEST).bodyJson().extractingPath("$.errors").asMap()
+                    .containsOnlyKeys("itemsCount");
         }
     }
 }

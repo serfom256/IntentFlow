@@ -50,10 +50,9 @@ class GeneratedQueryTest {
 
     private static final int QUERIES_PER_SEED = 300;
 
-    static final ServiceDescriptor ITEMS = ServiceDescriptors.of(
-            ServiceNames.of("items"), null, TableNames.of("item_table"),
-            List.of(
-                    FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("item_id"), true, FieldType.NUMBER),
+    static final ServiceDescriptor ITEMS = ServiceDescriptors.of(ServiceNames.of("items"), null,
+            TableNames.of("item_table"),
+            List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("item_id"), true, FieldType.NUMBER),
                     FieldMappings.of(LogicalFieldNames.of("name"), ColumnNames.of("item_name"), true, FieldType.TEXT),
                     FieldMappings.of(LogicalFieldNames.of("category"), ColumnNames.of("cat"), true, FieldType.TEXT,
                             null, List.of("LAPTOP", "PHONE", "SMART_WATCH")),
@@ -65,18 +64,15 @@ class GeneratedQueryTest {
                             FieldType.TIMESTAMP),
                     FieldMappings.of(LogicalFieldNames.of("notes"), ColumnNames.of("notes"), true),
                     FieldMappings.of(LogicalFieldNames.of("secret"), ColumnNames.of("secret"), false, FieldType.TEXT)),
-            List.of(SortKeys.of(LogicalFieldNames.of("id"), SortKey.Direction.ASC)),
-            MaxTakes.of(40),
-            UriTemplates.of("/items/{{id}}?s={{secret}}"),
-            Object.class);
+            List.of(SortKeys.of(LogicalFieldNames.of("id"), SortKey.Direction.ASC)), MaxTakes.of(40),
+            UriTemplates.of("/items/{{id}}?s={{secret}}"), Object.class);
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.of(ITEMS);
-    private static final Set<String> IDENTIFIERS = Set.of(
-            "item_table", "item_id", "item_name", "cat", "price_usd", "is_active", "created_at", "notes", "secret",
-            "intentflow_rank");
+    private static final Set<String> IDENTIFIERS = Set.of("item_table", "item_id", "item_name", "cat", "price_usd",
+            "is_active", "created_at", "notes", "secret", "intentflow_rank");
 
-    private static final Pattern SQL_TOKEN = Pattern.compile(
-            "\\s+|\"(?:[^\"]|\"\")+\"|`(?:[^`]|``)+`|\\?|\\.|\\*|\\+|-|/|,|\\(|\\)|<>|<=|>=|=|<|>|'\\\\'|'!'"
+    private static final Pattern SQL_TOKEN = Pattern
+            .compile("\\s+|\"(?:[^\"]|\"\")+\"|`(?:[^`]|``)+`|\\?|\\.|\\*|\\+|-|/|,|\\(|\\)|<>|<=|>=|=|<|>|'\\\\'|'!'"
                     + "|'(?:year|month|day|hour)'|'%[A-Za-z0-9%: -]+'|\\d+"
                     + "|(?:SELECT|FROM|WHERE|AND|OR|NOT|IN|IS|NULL|LOWER|UPPER|CAST|AS|TIMESTAMP|DATETIME|ILIKE|LIKE"
                     + "|ESCAPE|ORDER|BY|ASC|DESC|NULLS|LAST|LIMIT|OFFSET|COALESCE|EXTRACT|YEAR|MONTH|DAY|HOUR"
@@ -120,9 +116,8 @@ class GeneratedQueryTest {
 
             assertThat(count(text, '?')).as("placeholders vs binds: %s", dsl).isEqualTo(sql.parameters().size());
             assertOnlyKnownTokens(text, dsl);
-            assertThat(text).as(dsl)
-                    .startsWith(
-                            q.top() == null ? "SELECT * FROM \"item_table\"" : "SELECT * FROM (SELECT \"item_table\".*")
+            assertThat(text).as(dsl).startsWith(
+                    q.top().isEmpty() ? "SELECT * FROM \"item_table\"" : "SELECT * FROM (SELECT \"item_table\".*")
                     .contains(" LIMIT ");
             for (DslLiteral p : sql.parameters()) {
                 assertThat(p).as(dsl).isNotNull();
@@ -135,13 +130,13 @@ class GeneratedQueryTest {
     @MethodSource("seeds")
     void wrongTypedLiteralsAreRejected(long seed) {
         Random rnd = new Random(seed);
-        List<FieldMapping> typed = ITEMS.fields().stream()
-                .filter(f -> f.queryable() && f.type() != FieldType.ANY).toList();
+        List<FieldMapping> typed = ITEMS.fields().stream().filter(f -> f.queryable() && f.type() != FieldType.ANY)
+                .toList();
         for (int i = 0; i < 100; i++) {
             FieldMapping f = typed.get(rnd.nextInt(typed.size()));
             DslLiteral wrong = wrongLiteral(f, rnd);
-            AstQuery q = AstQueries.of(ITEMS.name(),
-                    new Compare(f.logical(), ComparisonOp.EQ, wrong), List.of(), null, null);
+            AstQuery q = AstQueries.of(ITEMS.name(), new Compare(f.logical(), ComparisonOp.EQ, wrong), List.of(), null,
+                    null);
             assertThatThrownBy(() -> validator.validate(q, CATALOG))
                     .as("%s == %s", f.logical().value(), RandomQueries.print(wrong))
                     .isInstanceOf(ValidationException.class)
@@ -161,9 +156,9 @@ class GeneratedQueryTest {
             for (int e = 0; e < edits && !dsl.isEmpty(); e++) {
                 int at = rnd.nextInt(dsl.length());
                 switch (rnd.nextInt(3)) {
-                    case 0 -> dsl.deleteCharAt(at);
-                    case 1 -> dsl.insert(at, dsl.charAt(rnd.nextInt(dsl.length())));
-                    default -> dsl.insert(at, junk.charAt(rnd.nextInt(junk.length())));
+                case 0 -> dsl.deleteCharAt(at);
+                case 1 -> dsl.insert(at, dsl.charAt(rnd.nextInt(dsl.length())));
+                default -> dsl.insert(at, junk.charAt(rnd.nextInt(junk.length())));
                 }
             }
             try {
@@ -189,13 +184,12 @@ class GeneratedQueryTest {
 
     private static DslLiteral wrongLiteral(FieldMapping f, Random rnd) {
         return switch (f.type()) {
-            case TEXT -> f.allowedValues().isEmpty() || rnd.nextBoolean()
-                    ? new NumberLiteral(BigDecimal.TEN)
-                    : new TextLiteral("NOT_A_" + f.allowedValues().getFirst());
-            case NUMBER -> rnd.nextBoolean() ? new TextLiteral("10") : new BoolLiteral(true);
-            case BOOLEAN -> rnd.nextBoolean() ? new TextLiteral("true") : new NumberLiteral(BigDecimal.ONE);
-            case TIMESTAMP -> rnd.nextBoolean() ? new TextLiteral("yesterday") : new NumberLiteral(BigDecimal.ONE);
-            case ANY -> throw new IllegalArgumentException("untyped");
+        case TEXT -> f.allowedValues().isEmpty() || rnd.nextBoolean() ? new NumberLiteral(BigDecimal.TEN)
+                : new TextLiteral("NOT_A_" + f.allowedValues().getFirst());
+        case NUMBER -> rnd.nextBoolean() ? new TextLiteral("10") : new BoolLiteral(true);
+        case BOOLEAN -> rnd.nextBoolean() ? new TextLiteral("true") : new NumberLiteral(BigDecimal.ONE);
+        case TIMESTAMP -> rnd.nextBoolean() ? new TextLiteral("yesterday") : new NumberLiteral(BigDecimal.ONE);
+        case ANY -> throw new IllegalArgumentException("untyped");
         };
     }
 

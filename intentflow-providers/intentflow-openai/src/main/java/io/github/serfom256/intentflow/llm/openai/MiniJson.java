@@ -30,18 +30,18 @@ final class MiniJson {
         for (int i = 0; i < raw.length(); i++) {
             char c = raw.charAt(i);
             switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
+            case '"' -> sb.append("\\\"");
+            case '\\' -> sb.append("\\\\");
+            case '\n' -> sb.append("\\n");
+            case '\r' -> sb.append("\\r");
+            case '\t' -> sb.append("\\t");
+            default -> {
+                if (c < 0x20) {
+                    sb.append(String.format("\\u%04x", (int) c));
+                } else {
+                    sb.append(c);
                 }
+            }
             }
         }
         return sb.append('"').toString();
@@ -53,13 +53,13 @@ final class MiniJson {
             throw error("unexpected end of input");
         char c = s.charAt(pos);
         return switch (c) {
-            case '{' -> object();
-            case '[' -> array();
-            case '"' -> string();
-            case 't' -> literal("true", Boolean.TRUE);
-            case 'f' -> literal("false", Boolean.FALSE);
-            case 'n' -> literal("null", null);
-            default -> number();
+        case '{' -> object();
+        case '[' -> array();
+        case '"' -> string();
+        case 't' -> literal("true", Boolean.TRUE);
+        case 'f' -> literal("false", Boolean.FALSE);
+        case 'n' -> literal("null", null);
+        default -> number();
         };
     }
 
@@ -122,19 +122,19 @@ final class MiniJson {
                 break;
             char e = s.charAt(pos++);
             switch (e) {
-                case '"', '\\', '/' -> sb.append(e);
-                case 'b' -> sb.append('\b');
-                case 'f' -> sb.append('\f');
-                case 'n' -> sb.append('\n');
-                case 'r' -> sb.append('\r');
-                case 't' -> sb.append('\t');
-                case 'u' -> {
-                    if (pos + 4 > s.length())
-                        throw error("bad unicode escape");
-                    sb.append((char) Integer.parseInt(s.substring(pos, pos + 4), 16));
-                    pos += 4;
-                }
-                default -> throw error("bad escape '\\" + e + "'");
+            case '"', '\\', '/' -> sb.append(e);
+            case 'b' -> sb.append('\b');
+            case 'f' -> sb.append('\f');
+            case 'n' -> sb.append('\n');
+            case 'r' -> sb.append('\r');
+            case 't' -> sb.append('\t');
+            case 'u' -> {
+                if (pos + 4 > s.length())
+                    throw error("bad unicode escape");
+                sb.append((char) Integer.parseInt(s.substring(pos, pos + 4), 16));
+                pos += 4;
+            }
+            default -> throw error("bad escape '\\" + e + "'");
             }
         }
         throw error("unterminated string");

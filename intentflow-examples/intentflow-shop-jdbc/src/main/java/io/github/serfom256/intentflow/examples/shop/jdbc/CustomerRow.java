@@ -10,10 +10,7 @@ import java.time.OffsetDateTime;
 
 @IntentService(value = "customers", table = "customer", uri = "/customers/{{id}}", maxTake = 50, defaultSort = "id", description = Descriptions.CUSTOMERS)
 @IntentRelation(name = "orders", service = "orders", from = "id", to = "customer_id")
-public record CustomerRow(
-        @IntentField long id,
-        @IntentField(name = "name") String fullName,
-        String email,
+public record CustomerRow(@IntentField long id, @IntentField(name = "name") String fullName, String email,
         @IntentField(description = Descriptions.CUSTOMER_CITY) String city,
         @IntentField(description = Descriptions.CUSTOMER_COUNTRY) String country,
         @IntentField(description = Descriptions.CUSTOMER_VIP) boolean vip,

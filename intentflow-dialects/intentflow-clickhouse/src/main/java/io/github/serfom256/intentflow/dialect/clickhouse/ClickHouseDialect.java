@@ -50,13 +50,13 @@ public final class ClickHouseDialect implements SqlDialect {
     @Override
     public String function(String name) {
         return switch (name) {
-            case "LOWER" -> "lowerUTF8";
-            case "UPPER" -> "upperUTF8";
-            case "AVG" -> "avgOrNull";
-            case "SUM" -> "sumOrNull";
-            case "MIN" -> "minOrNull";
-            case "MAX" -> "maxOrNull";
-            default -> name;
+        case "LOWER" -> "lowerUTF8";
+        case "UPPER" -> "upperUTF8";
+        case "AVG" -> "avgOrNull";
+        case "SUM" -> "sumOrNull";
+        case "MIN" -> "minOrNull";
+        case "MAX" -> "maxOrNull";
+        default -> name;
         };
     }
 
@@ -89,10 +89,10 @@ public final class ClickHouseDialect implements SqlDialect {
     @Override
     public void timestamp(SqlWriter sql, DslLiteral value, Object bound) {
         switch (bound) {
-            case LocalDateTime local -> sql.param(new TextLiteral(text(local)));
-            case OffsetDateTime instant -> sql.text("parseDateTime64BestEffort(")
-                    .param(new TextLiteral(instant.toString())).text(", 6)");
-            default -> sql.param(value, bound);
+        case LocalDateTime local -> sql.param(new TextLiteral(text(local)));
+        case OffsetDateTime instant ->
+            sql.text("parseDateTime64BestEffort(").param(new TextLiteral(instant.toString())).text(", 6)");
+        default -> sql.param(value, bound);
         }
     }
 
@@ -131,11 +131,11 @@ public final class ClickHouseDialect implements SqlDialect {
 
     private static String type(CastType type) {
         return "Nullable(" + switch (type) {
-            case NUMBER -> "Decimal(38, 10)";
-            case INTEGER -> "Int64";
-            case TEXT -> "String";
-            case TIMESTAMP -> "DateTime64(6)";
-            case DATE -> "Date";
+        case NUMBER -> "Decimal(38, 10)";
+        case INTEGER -> "Int64";
+        case TEXT -> "String";
+        case TIMESTAMP -> "DateTime64(6)";
+        case DATE -> "Date";
         } + ")";
     }
 

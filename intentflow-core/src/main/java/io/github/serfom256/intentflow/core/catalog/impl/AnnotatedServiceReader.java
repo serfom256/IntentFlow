@@ -48,16 +48,14 @@ import java.util.function.Supplier;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AnnotatedServiceReader {
 
-    private static final Set<Class<?>> NUMBER_TYPES = Set.of(
-            byte.class, short.class, int.class, long.class, float.class, double.class,
-            Byte.class, Short.class, Integer.class, Long.class, Float.class, Double.class,
+    private static final Set<Class<?>> NUMBER_TYPES = Set.of(byte.class, short.class, int.class, long.class,
+            float.class, double.class, Byte.class, Short.class, Integer.class, Long.class, Float.class, Double.class,
             BigDecimal.class, BigInteger.class);
     private static final Set<Class<?>> INTEGER_TYPES = Set.of(byte.class, short.class, int.class, long.class,
             Byte.class, Short.class, Integer.class, Long.class, BigInteger.class);
 
-    private static final Set<Class<?>> TIMESTAMP_TYPES = Set.of(
-            Instant.class, LocalDate.class, LocalDateTime.class, OffsetDateTime.class,
-            ZonedDateTime.class, Date.class, java.sql.Date.class, Timestamp.class);
+    private static final Set<Class<?>> TIMESTAMP_TYPES = Set.of(Instant.class, LocalDate.class, LocalDateTime.class,
+            OffsetDateTime.class, ZonedDateTime.class, Date.class, java.sql.Date.class, Timestamp.class);
 
     public static ServiceDescriptor read(Class<?> type, List<NameResolver> resolvers) {
         IntentService service = type.getAnnotation(IntentService.class);
@@ -75,23 +73,18 @@ public final class AnnotatedServiceReader {
         String table = !service.table().isEmpty() ? service.table()
                 : resolve(resolvers, r -> r.tableName(type)).orElseGet(() -> snakeCase(type.getSimpleName()));
         List<ServiceRelation> relations = relations(type, fields, resolvers);
-        return new DefaultServiceDescriptor(
-                new DefaultServiceName(service.value()),
-                service.description().isBlank() ? null : new DefaultServiceDescription(service.description()),
-                new DefaultTableName(table),
-                fields,
+        return new DefaultServiceDescriptor(new DefaultServiceName(service.value()),
+                Optional.of(service.description()).filter(text -> !text.isBlank()).map(DefaultServiceDescription::new),
+                new DefaultTableName(table), fields,
                 Arrays.stream(service.defaultSort()).map(AnnotatedServiceReader::sortKey).toList(),
-                new DefaultMaxTake(service.maxTake()),
-                new DefaultUriTemplate(service.uri()),
-                type,
-                relations);
+                new DefaultMaxTake(service.maxTake()), new DefaultUriTemplate(service.uri()), type, relations,
+                restriction(type, resolvers));
     }
 
     private static List<ServiceRelation> relations(Class<?> type, List<FieldMapping> fields,
             List<NameResolver> resolvers) {
         List<ServiceRelation> relations = new ArrayList<>(Arrays.stream(type.getAnnotationsByType(IntentRelation.class))
-                .map(AnnotatedServiceReader::relation)
-                .toList());
+                .map(AnnotatedServiceReader::relation).toList());
         Set<String> names = new HashSet<>();
         relations.forEach(r -> names.add(r.name()));
         for (NameResolver resolver : resolvers) {
@@ -129,8 +122,8 @@ public final class AnnotatedServiceReader {
     }
 
     private static String logicalForColumn(List<FieldMapping> fields, String column) {
-        return fields.stream().filter(fm -> fm.column().value().equals(column))
-                .map(fm -> fm.logical().value()).findFirst().orElse(column);
+        return fields.stream().filter(fm -> fm.column().value().equals(column)).map(fm -> fm.logical().value())
+                .findFirst().orElse(column);
     }
 
     private static List<FieldMapping> declaredMappings(Class<?> type, List<NameResolver> resolvers) {
@@ -167,19 +160,11 @@ public final class AnnotatedServiceReader {
                 : resolvedColumn.get().orElseGet(() -> snakeCase(property));
 
         FieldType type = meta.type() != FieldType.ANY ? meta.type() : inferType(owner, property, javaType);
-        List<String> values = meta.values().length > 0
-                ? List.of(meta.values())
+        List<String> values = meta.values().length > 0 ? List.of(meta.values())
                 : javaType.isEnum() ? enumNames(javaType) : List.of();
 
-        return new DefaultFieldMapping(
-                new DefaultLogicalFieldName(logical),
-                new DefaultColumnName(column),
-                meta.queryable(),
-                type,
-                meta.description(),
-                values,
-                property,
-                meta.caseSensitive());
+        return new DefaultFieldMapping(new DefaultLogicalFieldName(logical), new DefaultColumnName(column),
+                meta.queryable(), type, meta.description(), values, property, meta.caseSensitive());
     }
 
     public static TableFacts facts(Class<?> type, List<NameResolver> resolvers) {
@@ -188,7 +173,7 @@ public final class AnnotatedServiceReader {
         Set<String> integers = new HashSet<>();
         Map<String, List<String>> exactValues = new LinkedHashMap<>();
         for (FieldMapping fm : declaredMappings(type, resolvers)) {
-            Class<?> javaType = javaType(type, fm.property());
+            Class<?> javaType = javaType(type, fm.property().orElse(null));
             if (javaType == null) {
                 continue;
             }
@@ -201,7 +186,7 @@ public final class AnnotatedServiceReader {
             if (INTEGER_TYPES.contains(javaType)) {
                 integers.add(fm.column().value());
             }
-            IntentField meta = annotation(type, fm.property());
+            IntentField meta = annotation(type, fm.property().orElse(null));
             if (javaType.isEnum() && meta != null && meta.values().length == 0) {
                 exactValues.put(fm.column().value(), enumNames(javaType));
             }
@@ -269,8 +254,8 @@ public final class AnnotatedServiceReader {
         if (TIMESTAMP_TYPES.contains(t)) {
             return FieldType.TIMESTAMP;
         }
-        throw new IllegalArgumentException("cannot infer field type of " + owner.getSimpleName() + "."
-                + property + " (" + t.getName() + "); set @IntentField(type = ...)");
+        throw new IllegalArgumentException("cannot infer field type of " + owner.getSimpleName() + "." + property + " ("
+                + t.getName() + "); set @IntentField(type = ...)");
     }
 
     private static List<String> enumNames(Class<?> enumType) {
@@ -285,10 +270,9 @@ public final class AnnotatedServiceReader {
         SortKey.Direction direction = SortKey.Direction.ASC;
         if (parts.length == 2) {
             direction = switch (parts[1].toLowerCase(Locale.ROOT)) {
-                case "asc" -> SortKey.Direction.ASC;
-                case "desc" -> SortKey.Direction.DESC;
-                default -> throw new IllegalArgumentException(
-                        "bad sort direction in defaultSort entry '" + spec + "'");
+            case "asc" -> SortKey.Direction.ASC;
+            case "desc" -> SortKey.Direction.DESC;
+            default -> throw new IllegalArgumentException("bad sort direction in defaultSort entry '" + spec + "'");
             };
         }
         return new DefaultSortKey(new DefaultLogicalFieldName(parts[0]), direction);
@@ -304,8 +288,7 @@ public final class AnnotatedServiceReader {
             Arrays.sort(methods, Comparator.comparing(AnnotatedServiceReader::propertyName));
             for (Method m : methods) {
                 if (m.getParameterCount() == 0 && m.getReturnType() != void.class
-                        && !Modifier.isStatic(m.getModifiers())
-                        && !m.isSynthetic() && seen.add(m.getName())) {
+                        && !Modifier.isStatic(m.getModifiers()) && !m.isSynthetic() && seen.add(m.getName())) {
                     out.add(m);
                 }
             }
@@ -368,8 +351,8 @@ public final class AnnotatedServiceReader {
             if (Character.isUpperCase(c)) {
                 boolean prevLowerOrDigit = i > 0
                         && (Character.isLowerCase(name.charAt(i - 1)) || Character.isDigit(name.charAt(i - 1)));
-                boolean acronymEnd = i > 0 && i + 1 < name.length()
-                        && Character.isUpperCase(name.charAt(i - 1)) && Character.isLowerCase(name.charAt(i + 1));
+                boolean acronymEnd = i > 0 && i + 1 < name.length() && Character.isUpperCase(name.charAt(i - 1))
+                        && Character.isLowerCase(name.charAt(i + 1));
                 if (prevLowerOrDigit || acronymEnd) {
                     sb.append('_');
                 }

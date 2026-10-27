@@ -67,8 +67,8 @@ final class OpenMapperStore<T, E> implements CrudStore<T> {
 
     @Override
     public List<T> findPage(int page, int size) {
-        return procedures.select(selectPage, type, Map.of("limit", size, "offset", page * size)).stream()
-                .map(toDomain).toList();
+        return procedures.select(selectPage, type, Map.of("limit", size, "offset", page * size)).stream().map(toDomain)
+                .toList();
     }
 
     @Override

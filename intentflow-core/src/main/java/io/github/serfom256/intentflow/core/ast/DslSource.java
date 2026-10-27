@@ -1,7 +1,8 @@
 package io.github.serfom256.intentflow.core.ast;
 
 import io.github.serfom256.intentflow.core.api.TokenUsage;
-import org.jspecify.annotations.Nullable;
+
+import java.util.Optional;
 
 public interface DslSource {
 
@@ -16,7 +17,7 @@ public interface DslSource {
     }
 
     /** The model that wrote this query, when the client knows it. */
-    default @Nullable String model() {
-        return null;
+    default Optional<String> model() {
+        return Optional.empty();
     }
 }

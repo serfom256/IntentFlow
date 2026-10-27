@@ -7,7 +7,6 @@ import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
-import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentRelation;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
@@ -49,14 +48,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
 
     @IntentService(value = "gadgets", table = "gadget", uri = "/gadgets/{{id}}", maxTake = 500, defaultSort = "id")
-    public record Gadget(
-            @IntentField long id,
-            @IntentField String name,
-            @IntentField(caseSensitive = true) GadgetKind kind,
-            @IntentField BigDecimal price,
-            @IntentField Integer stock,
-            @IntentField Boolean active,
-            @IntentField LocalDateTime createdAt) {
+    public record Gadget(@IntentField long id, @IntentField String name,
+            @IntentField(caseSensitive = true) GadgetKind kind, @IntentField BigDecimal price,
+            @IntentField Integer stock, @IntentField Boolean active, @IntentField LocalDateTime createdAt) {
     }
 
     @IntentService(value = "customers", table = "rel_customer", uri = "/customers/{{id}}", defaultSort = "id")
@@ -101,10 +95,10 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
 
     private <T> List<Long> ids(String dsl, Class<T> type) {
         return resolve(dsl, type).items().stream().map(item -> switch (item) {
-            case Order o -> o.id();
-            case Customer c -> c.id();
-            case Note n -> n.id();
-            default -> throw new IllegalStateException(String.valueOf(item));
+        case Order o -> o.id();
+        case Customer c -> c.id();
+        case Note n -> n.id();
+        default -> throw new IllegalStateException(String.valueOf(item));
         }).toList();
     }
 
@@ -129,18 +123,13 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
             throw new IllegalStateException(e);
         }
         ServiceCatalog catalog = ServiceCatalogs.of(types.stream().map(ServiceDescriptors::fromAnnotated).toList());
-        Map<ServiceName, String> restrictions = new HashMap<>();
         for (Class<?> t : types) {
             ServiceDescriptor service = catalog.findByType(t).orElseThrow();
             facts.merge(service.table().value(), ServiceDescriptors.factsOf(t, List.of()), TableFacts::merge);
-            ServiceDescriptors.restrictionOf(t, List.of()).ifPresent(sql -> restrictions.put(service.name(), sql));
         }
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((text, scope) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, restrictions)))
-                .executor(new PlainJdbcExecutor(endpoint))
-                .catalog(catalog)
-                .build();
+        IntentPipeline pipeline = IntentPipelines.builder().llm((text, scope) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(database().dialect(), SchemaFacts.of(facts)))
+                .executor(new PlainJdbcExecutor(endpoint)).catalog(catalog).build();
         return pipeline.resolve(IntentRequests.of("q"), type);
     }
 
@@ -150,27 +139,24 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
                 .containsExactly(11L);
         assertThat(ids("customers | filter orders.total > 100 and orders.status == \"PAID\"", Customer.class))
                 .containsExactly(2L, 3L);
-        assertThat(ids("customers | filter not (orders.status == \"CANCELLED\")", Customer.class))
-                .containsExactly(1L, 2L, 4L);
+        assertThat(ids("customers | filter not (orders.status == \"CANCELLED\")", Customer.class)).containsExactly(1L,
+                2L, 4L);
     }
 
     @Test
     void sortsByRelatedFields() {
         SqlCapabilities capabilities = database().dialect().capabilities();
         if (capabilities.sortBySubquery() || capabilities.enforcedKeys()) {
-            assertThat(ids("orders | sort customer.name desc", Order.class))
-                    .containsExactly(13L, 14L, 12L, 10L, 11L);
+            assertThat(ids("orders | sort customer.name desc", Order.class)).containsExactly(13L, 14L, 12L, 10L, 11L);
         } else {
-            assertThatThrownBy(() -> ids("orders | sort customer.name desc", Order.class))
-                    .isInstanceOfSatisfying(ValidationException.class,
-                            e -> assertThat(e.code()).isEqualTo(ErrorCode.UNSUPPORTED));
+            assertThatThrownBy(() -> ids("orders | sort customer.name desc", Order.class)).isInstanceOfSatisfying(
+                    ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.UNSUPPORTED));
         }
         if (capabilities.sortBySubquery()) {
             assertThat(ids("customers | sort orders.total desc", Customer.class)).containsExactly(3L, 1L, 2L, 4L);
         } else {
-            assertThatThrownBy(() -> ids("customers | sort orders.total desc", Customer.class))
-                    .isInstanceOfSatisfying(ValidationException.class,
-                            e -> assertThat(e.code()).isEqualTo(ErrorCode.UNSUPPORTED));
+            assertThatThrownBy(() -> ids("customers | sort orders.total desc", Customer.class)).isInstanceOfSatisfying(
+                    ValidationException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.UNSUPPORTED));
         }
     }
 
@@ -189,8 +175,7 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         assertThat(ids("notes", Note.class)).containsExactly(1L, 3L);
         assertThat(ids("notes | filter text ~ \"call\"", Note.class)).containsExactly(1L);
         assertThat(ids("customers | filter notes.text ~ \"call\"", Customer.class)).containsExactly(1L);
-        assertThat(ids("customers | filter not (notes.text ~ \"call\")", Customer.class))
-                .containsExactly(2L, 3L, 4L);
+        assertThat(ids("customers | filter not (notes.text ~ \"call\")", Customer.class)).containsExactly(2L, 3L, 4L);
     }
 
     private List<Long> events(String dsl, ZoneId zone) {
@@ -202,8 +187,8 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
             s.execute(database().ddl("CREATE TABLE conf_event (id BIGINT PRIMARY KEY, at "
                     + (mysql ? "TIMESTAMP NULL" : "TIMESTAMP WITH TIME ZONE") + ")"));
             try (PreparedStatement insert = c.prepareStatement("INSERT INTO conf_event VALUES (?, ?)")) {
-                List<String> instants = List.of("2026-10-09T21:30:00Z", "2026-10-09T22:30:00Z",
-                        "2026-10-10T21:30:00Z", "2026-10-10T22:30:00Z");
+                List<String> instants = List.of("2026-10-09T21:30:00Z", "2026-10-09T22:30:00Z", "2026-10-10T21:30:00Z",
+                        "2026-10-10T22:30:00Z");
                 for (int i = 0; i < instants.size(); i++) {
                     insert.setLong(1, i + 1);
                     insert.setObject(2, OffsetDateTime.parse(instants.get(i)));
@@ -215,18 +200,15 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         }
         Map<String, TableFacts> facts = new HashMap<>();
         try {
-            facts.putAll(JdbcSchemaIntrospector.introspect(new DriverManagerDataSource(endpoint),
-                    List.of("conf_event")));
+            facts.putAll(
+                    JdbcSchemaIntrospector.introspect(new DriverManagerDataSource(endpoint), List.of("conf_event")));
         } catch (SQLException e) {
             throw new IllegalStateException(e);
         }
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((text, scope) -> DslSources.of(dsl))
+        IntentPipeline pipeline = IntentPipelines.builder().llm((text, scope) -> DslSources.of(dsl))
                 .sqlBuilder(SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, Map.of()),
                         EnumSet.allOf(Optimization.class), zone))
-                .executor(new PlainJdbcExecutor(endpoint))
-                .catalog(ServiceCatalogs.fromAnnotated(Event.class))
-                .build();
+                .executor(new PlainJdbcExecutor(endpoint)).catalog(ServiceCatalogs.fromAnnotated(Event.class)).build();
         return pipeline.resolve(IntentRequests.of("q"), Event.class).items().stream().map(Event::id).toList();
     }
 
@@ -234,8 +216,8 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
     void wholeDaysOfAZonedColumnFollowTheConfiguredZone() {
         assertThat(events("events | filter at == \"2026-10-10\"", ZoneId.of("Europe/Berlin"))).containsExactly(2L, 3L);
         assertThat(events("events | filter at == \"2026-10-10\"", ZoneOffset.UTC)).containsExactly(3L, 4L);
-        assertThat(events("events | filter at >= \"2026-10-10T00:00:00+02:00\"", ZoneOffset.UTC))
-                .containsExactly(2L, 3L, 4L);
+        assertThat(events("events | filter at >= \"2026-10-10T00:00:00+02:00\"", ZoneOffset.UTC)).containsExactly(2L,
+                3L, 4L);
     }
 
     @Test
@@ -268,12 +250,9 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         } catch (SQLException e) {
             throw new IllegalStateException(e);
         }
-        return IntentPipelines.builder()
-                .llm((text, scope) -> DslSources.of(dsl))
+        return IntentPipelines.builder().llm((text, scope) -> DslSources.of(dsl))
                 .sqlBuilder(SqlBuilders.create(database().dialect(), SchemaFacts.of(facts, Map.of())))
-                .executor(new PlainJdbcExecutor(endpoint))
-                .catalog(ServiceCatalogs.fromAnnotated(Item.class))
-                .build();
+                .executor(new PlainJdbcExecutor(endpoint)).catalog(ServiceCatalogs.fromAnnotated(Item.class)).build();
     }
 
     private static List<Long> allPages(IntentPipeline pipeline, List<String> optimizations) {
@@ -285,7 +264,7 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
             if (page > 0) {
                 optimizations.addAll(response.trace().optimizations());
             }
-            cursor = response.nextCursor();
+            cursor = response.nextCursor().orElse(null);
             if (cursor == null) {
                 return ids;
             }
@@ -325,13 +304,13 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
         IntentResponse<Item> first = paging("items | sort price | take 20").resolve(IntentRequests.page("q", null),
                 Item.class);
         IntentResponse<Item> last = paging("items | sort price | take 20")
-                .resolve(IntentRequests.page("q", first.nextCursor()), Item.class);
+                .resolve(IntentRequests.page("q", first.nextCursor().orElseThrow()), Item.class);
 
-        assertThat(first.nextCursor()).isNotNull();
+        assertThat(first.nextCursor()).isPresent();
         assertThat(last.items()).hasSize(3);
-        assertThat(last.nextCursor()).isNull();
+        assertThat(last.nextCursor()).isEmpty();
         assertThatThrownBy(() -> paging("items | sort name | take 20")
-                .resolve(IntentRequests.page("q", first.nextCursor()), Item.class))
+                .resolve(IntentRequests.page("q", first.nextCursor().orElseThrow()), Item.class))
                 .isInstanceOfSatisfying(IntentFlowException.class,
                         e -> assertThat(e.code()).isEqualTo(ErrorCode.INVALID_CURSOR));
     }

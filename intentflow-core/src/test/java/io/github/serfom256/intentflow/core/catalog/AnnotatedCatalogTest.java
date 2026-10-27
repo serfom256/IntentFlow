@@ -35,18 +35,11 @@ class AnnotatedCatalogTest {
 
     @IntentService(value = "products", uri = "/products/{{id}}", maxTake = 25, description = "Things we sell", defaultSort = {
             "rating desc", "id" })
-    record ProductRecord(
-            @IntentField(queryable = false) long id,
-            @IntentField String name,
-            @IntentField Category category,
-            @IntentField(column = "price_usd", description = "USD") BigDecimal price,
-            @IntentField double rating,
-            @IntentField boolean inStock,
-            @IntentField Instant createdAt,
-            @IntentField LocalDate releaseDay,
-            @IntentField UUID externalRef,
-            @IntentField(name = "tier", values = { "gold", "silver" }) String loyaltyTier,
-            String internalNotes) {
+    record ProductRecord(@IntentField(queryable = false) long id, @IntentField String name,
+            @IntentField Category category, @IntentField(column = "price_usd", description = "USD") BigDecimal price,
+            @IntentField double rating, @IntentField boolean inStock, @IntentField Instant createdAt,
+            @IntentField LocalDate releaseDay, @IntentField UUID externalRef,
+            @IntentField(name = "tier", values = { "gold", "silver" }) String loyaltyTier, String internalNotes) {
     }
 
     static class BaseEntity {
@@ -79,8 +72,8 @@ class AnnotatedCatalogTest {
         void serviceLevelAttributes() {
             assertThat(d.name().value()).isEqualTo("products");
             assertThat(d.table().value()).isEqualTo("product_record");
-            assertThat(d.description()).isNotNull();
-            assertThat(d.description().value()).isEqualTo("Things we sell");
+            assertThat(d.description()).isPresent();
+            assertThat(d.description().orElseThrow().value()).isEqualTo("Things we sell");
             assertThat(d.uriTemplate().value()).isEqualTo("/products/{{id}}");
             assertThat(d.maxTake().value()).isEqualTo(25);
             assertThat(d.resultType()).isEqualTo(ProductRecord.class);
@@ -88,9 +81,8 @@ class AnnotatedCatalogTest {
 
         @Test
         void fieldsInComponentOrderAndUnannotatedSkipped() {
-            assertThat(d.fields()).extracting(f -> f.logical().value()).containsExactly(
-                    "id", "name", "category", "price", "rating", "in_stock", "created_at",
-                    "release_day", "external_ref", "tier");
+            assertThat(d.fields()).extracting(f -> f.logical().value()).containsExactly("id", "name", "category",
+                    "price", "rating", "in_stock", "created_at", "release_day", "external_ref", "tier");
         }
 
         @Test
@@ -126,18 +118,16 @@ class AnnotatedCatalogTest {
         @Test
         void descriptionAndQueryableFlags() {
             Map<String, FieldMapping> f = byName(d);
-            assertThat(f.get("price").description()).isEqualTo("USD");
-            assertThat(f.get("name").description()).isNull();
+            assertThat(f.get("price").description()).hasValue("USD");
+            assertThat(f.get("name").description()).isEmpty();
             assertThat(f.get("id").queryable()).isFalse();
             assertThat(f.get("name").queryable()).isTrue();
         }
 
         @Test
         void defaultSortParsed() {
-            assertThat(d.defaultSort()).extracting(k -> k.field().value(), SortKey::direction)
-                    .containsExactly(
-                            Tuple.tuple("rating", SortKey.Direction.DESC),
-                            Tuple.tuple("id", SortKey.Direction.ASC));
+            assertThat(d.defaultSort()).extracting(k -> k.field().value(), SortKey::direction).containsExactly(
+                    Tuple.tuple("rating", SortKey.Direction.DESC), Tuple.tuple("id", SortKey.Direction.ASC));
         }
     }
 
@@ -148,15 +138,15 @@ class AnnotatedCatalogTest {
 
         @Test
         void superclassFieldsComeFirstStaticsSkipped() {
-            assertThat(d.fields()).extracting(f -> f.logical().value())
-                    .containsExactly("id", "created_at", "name", "orders_count");
+            assertThat(d.fields()).extracting(f -> f.logical().value()).containsExactly("id", "created_at", "name",
+                    "orders_count");
         }
 
         @Test
         void explicitTableAndRenamedField() {
             assertThat(d.table().value()).isEqualTo("app_customer");
             assertThat(byName(d).get("name").column().value()).isEqualTo("full_name");
-            assertThat(d.description()).isNull();
+            assertThat(d.description()).isEmpty();
         }
     }
 
@@ -226,11 +216,11 @@ class AnnotatedCatalogTest {
         @Test
         void typeCannotBeInferred() {
             assertThatThrownBy(() -> ServiceDescriptors.fromAnnotated(UnsupportedType.class))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("UnsupportedType.tags")
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("UnsupportedType.tags")
                     .hasMessageContaining("type = ...");
-            assertThat(ServiceDescriptors.fromAnnotated(ExplicitTypeRescuesUnsupported.class)
-                    .fields().getFirst().type()).isEqualTo(FieldType.TEXT);
+            assertThat(
+                    ServiceDescriptors.fromAnnotated(ExplicitTypeRescuesUnsupported.class).fields().getFirst().type())
+                    .isEqualTo(FieldType.TEXT);
         }
 
         @Test
@@ -259,18 +249,15 @@ class AnnotatedCatalogTest {
 
         @Test
         void annotatedAndProgrammaticDescriptorsMix() {
-            ServiceDescriptor manual = ServiceDescriptors.of(
-                    ServiceNames.of("orders"), null, TableNames.of("orders"),
-                    List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true)),
-                    List.of(), MaxTakes.of(10), UriTemplates.of("/orders/{{id}}"), Object.class);
+            ServiceDescriptor manual = ServiceDescriptors.of(ServiceNames.of("orders"), null, TableNames.of("orders"),
+                    List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true)), List.of(),
+                    MaxTakes.of(10), UriTemplates.of("/orders/{{id}}"), Object.class);
 
-            ServiceCatalog catalog = ServiceCatalogs.of(
-                    ServiceDescriptors.fromAnnotated(ProductRecord.class),
-                    ServiceDescriptors.fromAnnotated(Customer.class),
-                    manual);
+            ServiceCatalog catalog = ServiceCatalogs.of(ServiceDescriptors.fromAnnotated(ProductRecord.class),
+                    ServiceDescriptors.fromAnnotated(Customer.class), manual);
 
-            assertThat(catalog.names()).extracting(ServiceName::value)
-                    .containsExactlyInAnyOrder("products", "customers", "orders");
+            assertThat(catalog.names()).extracting(ServiceName::value).containsExactlyInAnyOrder("products",
+                    "customers", "orders");
             assertThat(catalog.get(ServiceNames.of("orders"))).isSameAs(manual);
             assertThat(catalog.find(ServiceNames.of("nope"))).isEmpty();
             assertThat(manual.fields().getFirst().type()).isEqualTo(FieldType.ANY);

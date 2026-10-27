@@ -30,12 +30,9 @@ class JimmerConfig {
 
     @Bean
     JSqlClient jimmerSqlClient(DataSource dataSource) throws SQLException {
-        return JSqlClient.newBuilder()
-                .setConnectionManager(springManaged(dataSource))
-                .setDialect(dialect(dataSource))
+        return JSqlClient.newBuilder().setConnectionManager(springManaged(dataSource)).setDialect(dialect(dataSource))
                 .setDatabaseNamingStrategy(DefaultDatabaseNamingStrategy.LOWER_CASE)
-                .setDefaultEnumStrategy(EnumType.Strategy.NAME)
-                .build();
+                .setDefaultEnumStrategy(EnumType.Strategy.NAME).build();
     }
 
     @Bean
@@ -46,13 +43,12 @@ class JimmerConfig {
     @Bean
     EntityMapper entityMapper() {
         return entity -> switch (entity) {
-            case ProductEntity p -> new Product(p.id(), p.name(), p.brand(), p.category(), p.price(), p.discount(),
-                    p.rating(), p.stock(), p.active(), p.supplierCost(), p.createdAt());
-            case CustomerEntity c -> new Customer(c.id(), c.fullName(), c.email(), c.city(), c.country(), c.vip(),
-                    c.createdAt());
-            case OrderEntity o -> new Order(o.id(), o.customerId(), o.status(), o.total(), o.itemsCount(),
-                    o.createdAt());
-            default -> entity;
+        case ProductEntity p -> new Product(p.id(), p.name(), p.brand(), p.category(), p.price(), p.discount(),
+                p.rating(), p.stock(), p.active(), p.supplierCost(), p.createdAt());
+        case CustomerEntity c ->
+            new Customer(c.id(), c.fullName(), c.email(), c.city(), c.country(), c.vip(), c.createdAt());
+        case OrderEntity o -> new Order(o.id(), o.customerId(), o.status(), o.total(), o.itemsCount(), o.createdAt());
+        default -> entity;
         };
     }
 

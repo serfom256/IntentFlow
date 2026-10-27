@@ -18,9 +18,10 @@ class VertexProvider {
         IntentFlowProperties.Llm llm = properties.llm();
         IntentFlowProperties.Llm.Vertex vertex = llm.vertex();
         Clock today = clock.getIfAvailable(Clock::systemDefaultZone);
-        return (baseUrl, model, apiKey) -> vertex.project() != null
-                ? GeminiLlmClients.vertex(vertex.project(), vertex.location(), model, llm.maxTokens(),
-                        llm.timeout(), today)
-                : GeminiLlmClients.apiKey(baseUrl, apiKey, model, llm.maxTokens(), llm.timeout(), today);
+        return (baseUrl, model,
+                apiKey) -> vertex.project() != null
+                        ? GeminiLlmClients.vertex(vertex.project(), vertex.location(), model, llm.maxTokens(),
+                                llm.timeout(), today)
+                        : GeminiLlmClients.apiKey(baseUrl, apiKey, model, llm.maxTokens(), llm.timeout(), today);
     }
 }

@@ -37,8 +37,8 @@ public final class TokenBucketRateLimiter implements LlmRateLimiter {
         Bucket bucket = buckets.get(key.apply(caller), k -> new Bucket(questions, clock.millis()));
         long waitMillis = bucket.take(clock.millis());
         if (waitMillis > 0) {
-            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period
-                    + " reached", Duration.ofMillis(waitMillis));
+            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period + " reached",
+                    Duration.ofMillis(waitMillis));
         }
     }
 

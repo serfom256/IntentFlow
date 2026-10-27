@@ -46,11 +46,11 @@ final class CqlExpressions {
     @Nullable
     Object eval(ValueExpr expr, Row row) {
         return switch (expr) {
-            case FieldRef f -> comparable(row.getObject(column(f)));
-            case LiteralExpr l -> literal(l.value());
-            case Call c -> call(c, row);
-            case Arith a -> arith(a, row);
-            case CastExpr c -> cast(eval(c.value(), row), c.type());
+        case FieldRef f -> comparable(row.getObject(column(f)));
+        case LiteralExpr l -> literal(l.value());
+        case Call c -> call(c, row);
+        case Arith a -> arith(a, row);
+        case CastExpr c -> cast(eval(c.value(), row), c.type());
         };
     }
 
@@ -94,13 +94,13 @@ final class CqlExpressions {
             return null;
         }
         return switch (c.op()) {
-            case EQ -> cmp == 0;
-            case NE -> cmp != 0;
-            case LT -> cmp < 0;
-            case LE -> cmp <= 0;
-            case GT -> cmp > 0;
-            case GE -> cmp >= 0;
-            case CONTAINS -> throw new IllegalStateException();
+        case EQ -> cmp == 0;
+        case NE -> cmp != 0;
+        case LT -> cmp < 0;
+        case LE -> cmp <= 0;
+        case GT -> cmp > 0;
+        case GE -> cmp >= 0;
+        case CONTAINS -> throw new IllegalStateException();
         };
     }
 
@@ -138,13 +138,13 @@ final class CqlExpressions {
         LocalDateTime start = day.atStartOfDay();
         LocalDateTime end = start.plusDays(1);
         return switch (op) {
-            case EQ -> !at.isBefore(start) && at.isBefore(end);
-            case NE -> at.isBefore(start) || !at.isBefore(end);
-            case LT -> at.isBefore(start);
-            case GE -> !at.isBefore(start);
-            case GT -> !at.isBefore(end);
-            case LE -> at.isBefore(end);
-            case CONTAINS -> throw new IllegalStateException();
+        case EQ -> !at.isBefore(start) && at.isBefore(end);
+        case NE -> at.isBefore(start) || !at.isBefore(end);
+        case LT -> at.isBefore(start);
+        case GE -> !at.isBefore(start);
+        case GT -> !at.isBefore(end);
+        case LE -> at.isBefore(end);
+        case CONTAINS -> throw new IllegalStateException();
         };
     }
 
@@ -168,11 +168,11 @@ final class CqlExpressions {
             }
             LocalDateTime at = timestamp(value);
             return switch (unit) {
-                case "year" -> at.withDayOfYear(1).truncatedTo(ChronoUnit.DAYS);
-                case "month" -> at.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS);
-                case "day" -> at.truncatedTo(ChronoUnit.DAYS);
-                case "hour" -> at.truncatedTo(ChronoUnit.HOURS);
-                default -> throw new IllegalArgumentException("unsupported date_trunc unit: " + unit);
+            case "year" -> at.withDayOfYear(1).truncatedTo(ChronoUnit.DAYS);
+            case "month" -> at.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS);
+            case "day" -> at.truncatedTo(ChronoUnit.DAYS);
+            case "hour" -> at.truncatedTo(ChronoUnit.HOURS);
+            default -> throw new IllegalArgumentException("unsupported date_trunc unit: " + unit);
             };
         }
         Object value = eval(args.getFirst(), row);
@@ -180,19 +180,18 @@ final class CqlExpressions {
             return null;
         }
         return switch (c.function()) {
-            case YEAR -> BigDecimal.valueOf(timestamp(value).getYear());
-            case MONTH -> BigDecimal.valueOf(timestamp(value).getMonthValue());
-            case DAY -> BigDecimal.valueOf(timestamp(value).getDayOfMonth());
-            case HOUR -> BigDecimal.valueOf(timestamp(value).getHour());
-            case LENGTH -> BigDecimal.valueOf(((String) value).codePointCount(0, ((String) value).length()));
-            case LOWER -> CqlValues.lower((String) value);
-            case UPPER -> ((String) value).toUpperCase(Locale.ROOT);
-            case ABS -> ((BigDecimal) value).abs();
-            case ROUND -> ((BigDecimal) value).setScale(args.size() == 2
-                    ? ((NumberLiteral) ((LiteralExpr) args.get(1)).value()).value().intValueExact()
-                    : 0,
-                    RoundingMode.HALF_UP);
-            case COALESCE, DATE_TRUNC -> throw new IllegalStateException();
+        case YEAR -> BigDecimal.valueOf(timestamp(value).getYear());
+        case MONTH -> BigDecimal.valueOf(timestamp(value).getMonthValue());
+        case DAY -> BigDecimal.valueOf(timestamp(value).getDayOfMonth());
+        case HOUR -> BigDecimal.valueOf(timestamp(value).getHour());
+        case LENGTH -> BigDecimal.valueOf(((String) value).codePointCount(0, ((String) value).length()));
+        case LOWER -> CqlValues.lower((String) value);
+        case UPPER -> ((String) value).toUpperCase(Locale.ROOT);
+        case ABS -> ((BigDecimal) value).abs();
+        case ROUND -> ((BigDecimal) value).setScale(
+                args.size() == 2 ? ((NumberLiteral) ((LiteralExpr) args.get(1)).value()).value().intValueExact() : 0,
+                RoundingMode.HALF_UP);
+        case COALESCE, DATE_TRUNC -> throw new IllegalStateException();
         };
     }
 
@@ -203,10 +202,10 @@ final class CqlExpressions {
             return null;
         }
         return switch (a.op()) {
-            case ADD -> l.add(r);
-            case SUBTRACT -> l.subtract(r);
-            case MULTIPLY -> l.multiply(r);
-            case DIVIDE -> r.signum() == 0 ? null : l.divide(r, 20, RoundingMode.HALF_UP);
+        case ADD -> l.add(r);
+        case SUBTRACT -> l.subtract(r);
+        case MULTIPLY -> l.multiply(r);
+        case DIVIDE -> r.signum() == 0 ? null : l.divide(r, 20, RoundingMode.HALF_UP);
         };
     }
 
@@ -215,17 +214,16 @@ final class CqlExpressions {
             return null;
         }
         return switch (type) {
-            case NUMBER -> number(value);
-            case INTEGER -> number(value).setScale(0, RoundingMode.HALF_UP);
-            case TEXT -> value instanceof BigDecimal n ? n.toPlainString() : value.toString();
-            case TIMESTAMP -> timestamp(value instanceof String s
-                    ? CqlValues.parseTimestamp(s)
-                            .orElseThrow(() -> new IllegalArgumentException("not a timestamp: " + s))
-                    : value);
-            case DATE -> value instanceof String s
-                    ? CqlValues.parseTimestamp(s).orElseThrow(() -> new IllegalArgumentException("not a date: " + s))
-                            .toLocalDate()
-                    : timestamp(value).toLocalDate();
+        case NUMBER -> number(value);
+        case INTEGER -> number(value).setScale(0, RoundingMode.HALF_UP);
+        case TEXT -> value instanceof BigDecimal n ? n.toPlainString() : value.toString();
+        case TIMESTAMP -> timestamp(value instanceof String s
+                ? CqlValues.parseTimestamp(s).orElseThrow(() -> new IllegalArgumentException("not a timestamp: " + s))
+                : value);
+        case DATE -> value instanceof String s
+                ? CqlValues.parseTimestamp(s).orElseThrow(() -> new IllegalArgumentException("not a date: " + s))
+                        .toLocalDate()
+                : timestamp(value).toLocalDate();
         };
     }
 
@@ -242,28 +240,28 @@ final class CqlExpressions {
 
     private static LocalDateTime timestamp(Object value) {
         return switch (value) {
-            case LocalDateTime t -> t;
-            case LocalDate d -> d.atStartOfDay();
-            default -> throw new IllegalArgumentException("not a timestamp: " + value);
+        case LocalDateTime t -> t;
+        case LocalDate d -> d.atStartOfDay();
+        default -> throw new IllegalArgumentException("not a timestamp: " + value);
         };
     }
 
     private boolean temporal(ValueExpr expr) {
         return switch (expr) {
-            case FieldRef f -> types.get(f.field().value()) == FieldType.TIMESTAMP;
-            case CastExpr c -> c.type() == CastType.TIMESTAMP || c.type() == CastType.DATE;
-            case Call c -> c.function() == ExprFunction.DATE_TRUNC
-                    || (c.function() == ExprFunction.COALESCE && c.args().stream().anyMatch(this::temporal));
-            default -> false;
+        case FieldRef f -> types.get(f.field().value()) == FieldType.TIMESTAMP;
+        case CastExpr c -> c.type() == CastType.TIMESTAMP || c.type() == CastType.DATE;
+        case Call c -> c.function() == ExprFunction.DATE_TRUNC
+                || (c.function() == ExprFunction.COALESCE && c.args().stream().anyMatch(this::temporal));
+        default -> false;
         };
     }
 
     private static @Nullable Object literal(DslLiteral literal) {
         return switch (literal) {
-            case TextLiteral t -> t.value();
-            case NumberLiteral n -> n.value();
-            case BoolLiteral b -> b.value();
-            case NullLiteral n -> null;
+        case TextLiteral t -> t.value();
+        case NumberLiteral n -> n.value();
+        case BoolLiteral b -> b.value();
+        case NullLiteral n -> null;
         };
     }
 

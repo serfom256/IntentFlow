@@ -57,11 +57,11 @@ class GeminiLlmClientTest {
         DslSource dsl = client().generateDsl(UserTexts.of("one book"), CATALOG);
 
         assertThat(dsl.value()).isEqualTo("books | take 1");
-        assertThat(dsl.model()).isEqualTo("gemini-test-001");
+        assertThat(dsl.model()).hasValue("gemini-test-001");
         assertThat(dsl.usage()).isEqualTo(new TokenUsage(800, 26));
         assertThat(requests.getFirst()).startsWith("POST /v1beta/models/gemini-test:generateContent key=key-1 ")
-                .contains("\"systemInstruction\"").contains("Available services:")
-                .contains("\"temperature\":0").contains("\"maxOutputTokens\":16000");
+                .contains("\"systemInstruction\"").contains("Available services:").contains("\"temperature\":0")
+                .contains("\"maxOutputTokens\":16000");
     }
 
     @Test
@@ -77,8 +77,8 @@ class GeminiLlmClientTest {
     void anApiErrorIsAnLlmException() {
         status = 403;
 
-        assertThatThrownBy(() -> client().generateDsl(UserTexts.of("books"), CATALOG))
-                .isInstanceOf(LlmException.class).hasMessageStartingWith("Gemini request failed");
+        assertThatThrownBy(() -> client().generateDsl(UserTexts.of("books"), CATALOG)).isInstanceOf(LlmException.class)
+                .hasMessageStartingWith("Gemini request failed");
     }
 
     @Test
@@ -95,8 +95,8 @@ class GeminiLlmClientTest {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath() + " key="
                         + exchange.getRequestHeaders().getFirst("x-goog-api-key") + " " + body);
-                String out = status != 200 ? "{\"error\":{\"code\":403,\"message\":\"denied\",\"status\":"
-                        + "\"PERMISSION_DENIED\"}}"
+                String out = status != 200
+                        ? "{\"error\":{\"code\":403,\"message\":\"denied\",\"status\":" + "\"PERMISSION_DENIED\"}}"
                         : exchange.getRequestMethod().equals("GET") ? "{\"name\":\"models/gemini-test\"}" : ANSWER;
                 byte[] bytes = out.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().add("Content-Type", "application/json");

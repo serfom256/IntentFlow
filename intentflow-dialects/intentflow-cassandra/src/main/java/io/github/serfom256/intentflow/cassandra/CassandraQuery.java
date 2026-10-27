@@ -10,16 +10,9 @@ import java.util.List;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-public record CassandraQuery(
-        List<String> segments,
-        List<DslLiteral> parameters,
-        List<Object> bindValues,
-        Predicate<Row> filter,
-        @Nullable Comparator<Row> order,
-        int skip,
-        int limit,
-        @Nullable CassandraAggregate aggregate,
-        @Nullable UnaryOperator<List<Row>> top) implements BoundQuery {
+public record CassandraQuery(List<String> segments, List<DslLiteral> parameters, List<Object> bindValues,
+        Predicate<Row> filter, @Nullable Comparator<Row> order, int skip, int limit,
+        @Nullable CassandraAggregate aggregate, @Nullable UnaryOperator<List<Row>> top) implements BoundQuery {
 
     public CassandraQuery {
         segments = List.copyOf(segments);

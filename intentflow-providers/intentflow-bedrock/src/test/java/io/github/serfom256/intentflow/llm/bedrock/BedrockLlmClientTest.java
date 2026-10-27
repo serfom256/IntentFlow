@@ -61,11 +61,11 @@ class BedrockLlmClientTest {
         DslSource dsl = client(BedrockSettings.of("us-east-1")).generateDsl(UserTexts.of("one book"), CATALOG);
 
         assertThat(dsl.value()).isEqualTo("books | take 1");
-        assertThat(dsl.model()).isEqualTo(MODEL);
+        assertThat(dsl.model()).hasValue(MODEL);
         assertThat(dsl.usage()).isEqualTo(new TokenUsage(940, 7));
         assertThat(requests.getFirst()).startsWith("POST /model/" + MODEL + "/converse signed=true ")
-                .contains("Available services:").contains("\"maxTokens\":16000")
-                .doesNotContain("temperature").doesNotContain("cachePoint");
+                .contains("Available services:").contains("\"maxTokens\":16000").doesNotContain("temperature")
+                .doesNotContain("cachePoint");
     }
 
     @Test

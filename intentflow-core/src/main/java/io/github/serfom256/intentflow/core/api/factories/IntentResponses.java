@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class IntentResponses {
@@ -28,7 +29,8 @@ public final class IntentResponses {
 
     public static <T> IntentResponse<T> of(ServiceName service, Class<T> type, List<T> items, MicroFrontendUri uri,
             @Nullable Aggregation aggregation, IntentTrace trace, @Nullable String nextCursor) {
-        return new DefaultIntentResponse<>(service, type, items, uri, aggregation, trace, nextCursor);
+        return new DefaultIntentResponse<>(service, type, items, uri, Optional.ofNullable(aggregation), trace,
+                Optional.ofNullable(nextCursor));
     }
 
     public static IntentTrace trace(String dsl, boolean cached, String query, List<Object> parameters) {

@@ -11,15 +11,10 @@ import io.github.serfom256.intentflow.core.catalog.SortKey;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
-public record DefaultAstQuery(
-        ServiceName service,
-        @Nullable FilterExpr filter,
-        List<SortKey> sort,
-        @Nullable Skip skip,
-        @Nullable Take take,
-        @Nullable Aggregate aggregate,
-        @Nullable TopN top) implements AstQuery {
+public record DefaultAstQuery(ServiceName service, Optional<FilterExpr> filter, List<SortKey> sort, Optional<Skip> skip,
+        Optional<Take> take, Optional<Aggregate> aggregate, Optional<TopN> top) implements AstQuery {
 
     public DefaultAstQuery {
         sort = List.copyOf(sort);
@@ -27,11 +22,18 @@ public record DefaultAstQuery(
 
     public DefaultAstQuery(ServiceName service, @Nullable FilterExpr filter, List<SortKey> sort, @Nullable Skip skip,
             @Nullable Take take) {
-        this(service, filter, sort, skip, take, null, null);
+        this(service, filter, sort, skip, take, null);
     }
 
     public DefaultAstQuery(ServiceName service, @Nullable FilterExpr filter, List<SortKey> sort, @Nullable Skip skip,
             @Nullable Take take, @Nullable Aggregate aggregate) {
-        this(service, filter, sort, skip, take, aggregate, null);
+        this(service, Optional.ofNullable(filter), sort, Optional.ofNullable(skip), Optional.ofNullable(take),
+                Optional.ofNullable(aggregate), Optional.empty());
+    }
+
+    public static DefaultAstQuery of(ServiceName service, @Nullable FilterExpr filter, List<SortKey> sort,
+            @Nullable Skip skip, @Nullable Take take, @Nullable Aggregate aggregate, @Nullable TopN top) {
+        return new DefaultAstQuery(service, Optional.ofNullable(filter), sort, Optional.ofNullable(skip),
+                Optional.ofNullable(take), Optional.ofNullable(aggregate), Optional.ofNullable(top));
     }
 }

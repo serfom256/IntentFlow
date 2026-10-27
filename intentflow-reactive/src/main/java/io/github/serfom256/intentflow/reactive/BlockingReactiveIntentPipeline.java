@@ -45,7 +45,7 @@ final class BlockingReactiveIntentPipeline implements ReactiveIntentPipeline {
     }
 
     private <R> Mono<R> run(IntentRequest request, Function<IntentRequest, R> call) {
-        Mono<IntentRequest> withCaller = request.context() != null ? Mono.just(request)
+        Mono<IntentRequest> withCaller = request.context().isPresent() ? Mono.just(request)
                 : callers.current().defaultIfEmpty(IntentContexts.anonymous())
                         .map(caller -> IntentRequests.withContext(request, caller));
         return withCaller.publishOn(scheduler).map(call);

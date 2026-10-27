@@ -33,13 +33,13 @@ class TimeZoneTest {
 
     private static final ServiceCatalog CATALOG = ServiceCatalogs.fromAnnotated(Event.class);
     private static final ZoneId BERLIN = ZoneId.of("Europe/Berlin");
-    private static final SchemaFacts FACTS = SchemaFacts.of(Map.of("event",
-            new TableFacts(List.of("id"), List.of(), Set.of(), Map.of(), Set.of("happened_at"))), Map.of());
+    private static final SchemaFacts FACTS = SchemaFacts.of(
+            Map.of("event", new TableFacts(List.of("id"), List.of(), Set.of(), Map.of(), Set.of("happened_at"))),
+            Map.of());
 
     private static BoundQuery sql(SqlDialect dialect, String filter) {
-        return SqlBuilders.create(dialect, FACTS, EnumSet.allOf(Optimization.class), BERLIN)
-                .build(AstValidators.create().validate(
-                        DslParsers.create().parse(DslSources.of("events | filter " + filter)), CATALOG));
+        return SqlBuilders.create(dialect, FACTS, EnumSet.allOf(Optimization.class), BERLIN).build(AstValidators
+                .create().validate(DslParsers.create().parse(DslSources.of("events | filter " + filter)), CATALOG));
     }
 
     @Test
@@ -63,7 +63,6 @@ class TimeZoneTest {
     void calendarPartsOfAZonedColumnAreTakenInTheConfiguredZone() {
         assertThat(sql(new TestDialect(), "hour(happened_at) == 9").sql())
                 .contains("EXTRACT(HOUR FROM (\"happened_at\" AT TIME ZONE 'Europe/Berlin')) = ?");
-        assertThat(sql(new TestDialect(), "hour(local_at) == 9").sql())
-                .contains("EXTRACT(HOUR FROM \"local_at\") = ?");
+        assertThat(sql(new TestDialect(), "hour(local_at) == 9").sql()).contains("EXTRACT(HOUR FROM \"local_at\") = ?");
     }
 }

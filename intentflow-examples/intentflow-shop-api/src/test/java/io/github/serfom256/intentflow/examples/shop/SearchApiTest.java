@@ -74,8 +74,8 @@ class SearchApiTest extends ApiTestSupport {
         @Test
         void theActiveProfilesOrmRunsTheQueries() throws ClassNotFoundException {
             Map<String, String> executors = Map.of("jpa", "io.github.serfom256.intentflow.jpa.JpaQueryExecutor",
-                    "jimmer", "io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor",
-                    "jdbc", "io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor");
+                    "jimmer", "io.github.serfom256.intentflow.jimmer.JimmerQueryExecutor", "jdbc",
+                    "io.github.serfom256.intentflow.jdbc.JdbcQueryExecutor");
             String expected = Arrays.stream(environment.getActiveProfiles()).map(executors::get)
                     .filter(Objects::nonNull).findFirst().orElse(OpenMapperQueryExecutor.class.getName());
             assertThat(executor).isInstanceOf(Class.forName(expected));
@@ -83,8 +83,8 @@ class SearchApiTest extends ApiTestSupport {
 
         @Test
         void annotatedModelsFormTheCatalog() {
-            assertThat(catalog.names()).extracting(ServiceName::value)
-                    .containsExactlyInAnyOrder("products", "customers", "orders");
+            assertThat(catalog.names()).extracting(ServiceName::value).containsExactlyInAnyOrder("products",
+                    "customers", "orders");
         }
 
         @Test
@@ -131,15 +131,14 @@ class SearchApiTest extends ApiTestSupport {
                     .hasPathSatisfying("$.uri", u -> assertThat(u).isEqualTo("/products/1"))
                     .hasPathSatisfying("$.items[0].name", n -> assertThat(n).isEqualTo(macbook.getName()))
                     .hasPathSatisfying("$.items[0].category", c -> assertThat(c).isEqualTo("LAPTOP"))
-                    .doesNotHavePath("$.items[0].supplierCost")
-                    .extractingPath("$.items[0].createdAt").isNotNull();
+                    .doesNotHavePath("$.items[0].supplierCost").extractingPath("$.items[0].createdAt").isNotNull();
         }
 
         @Test
         void filtersCaseInsensitivelyOnTextAndEnumFields() {
             List<Long> expected = products.findAll().stream()
-                    .filter(p -> p.getBrand().equals("Apple") && p.getCategory() == Category.LAPTOP)
-                    .map(Product::getId).sorted().limit(50).toList();
+                    .filter(p -> p.getBrand().equals("Apple") && p.getCategory() == Category.LAPTOP).map(Product::getId)
+                    .sorted().limit(50).toList();
 
             MvcTestResult r = search("apple laptops",
                     "products | filter brand == \"apple\" and category == \"laptop\"");
@@ -150,10 +149,9 @@ class SearchApiTest extends ApiTestSupport {
 
         @Test
         void sortsAndLimits() {
-            List<Long> expected = products.findAll().stream()
-                    .filter(p -> p.getCategory() == Category.HEADPHONES)
-                    .sorted(Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId))
-                    .limit(3).map(Product::getId).toList();
+            List<Long> expected = products.findAll().stream().filter(p -> p.getCategory() == Category.HEADPHONES)
+                    .sorted(Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId)).limit(3)
+                    .map(Product::getId).toList();
 
             assertThat(ids(search("top 3 rated headphones",
                     "products | filter category == \"HEADPHONES\" | sort rating desc, id asc | take 3")))
@@ -163,8 +161,8 @@ class SearchApiTest extends ApiTestSupport {
         @Test
         void routesToOtherServices() {
             List<Long> expected = customers.findAll().stream()
-                    .filter(c -> c.isVip() && List.of("DE", "FR").contains(c.getCountry()))
-                    .map(Customer::getId).sorted().toList();
+                    .filter(c -> c.isVip() && List.of("DE", "FR").contains(c.getCountry())).map(Customer::getId)
+                    .sorted().toList();
 
             MvcTestResult r = search("vip customers in germany or france",
                     "customers | filter vip == true and country in (\"de\", \"fr\")");
@@ -195,8 +193,7 @@ class SearchApiTest extends ApiTestSupport {
             MvcTestResult r = search("/api/products/search", "first apple products",
                     "products | filter brand == \"apple\" | take 3");
 
-            assertThat(r).hasStatusOk().bodyJson()
-                    .hasPathSatisfying("$.items[0].name", n -> assertThat(n).isNotNull())
+            assertThat(r).hasStatusOk().bodyJson().hasPathSatisfying("$.items[0].name", n -> assertThat(n).isNotNull())
                     .doesNotHavePath("$.items[0].supplierCost");
         }
 
@@ -214,8 +211,7 @@ class SearchApiTest extends ApiTestSupport {
             for (int i = 0; i < groups.size(); i++) {
                 assertThat(counts.get(i).longValue()).isEqualTo(expected.get((String) groups.get(i).getFirst()));
             }
-            assertThat(counts.stream().map(Number::longValue).toList())
-                    .isSortedAccordingTo(Comparator.reverseOrder());
+            assertThat(counts.stream().map(Number::longValue).toList()).isSortedAccordingTo(Comparator.reverseOrder());
             assertThat(JsonPath.<List<Object>>read(body(r), "$.items")).isEmpty();
         }
 
@@ -223,17 +219,18 @@ class SearchApiTest extends ApiTestSupport {
         void debugShowsTheDslAndSql() {
             llm.answer("cheap phones", "products | filter category == \"PHONE\" and price < 500");
 
-            MvcTestResult r = mvc.get().uri("/api/search").queryParam("q", "cheap phones")
-                    .queryParam("debug", "true").exchange();
+            MvcTestResult r = mvc.get().uri("/api/search").queryParam("q", "cheap phones").queryParam("debug", "true")
+                    .exchange();
 
             assertThat(r).hasStatusOk().bodyJson()
-                    .hasPathSatisfying("$.trace.dsl", d -> assertThat(d).isEqualTo(
-                            "products | filter category == \"PHONE\" and price < 500"))
-                    .hasPathSatisfying("$.trace.sql", sql -> assertThat(sql).asString().startsWith("SELECT ")
-                            .contains(" FROM \"product\" WHERE "))
+                    .hasPathSatisfying("$.trace.dsl",
+                            d -> assertThat(d).isEqualTo("products | filter category == \"PHONE\" and price < 500"))
+                    .hasPathSatisfying("$.trace.sql",
+                            sql -> assertThat(sql).asString().startsWith("SELECT ")
+                                    .contains(" FROM \"product\" WHERE "))
                     .hasPathSatisfying("$.trace.parameters", p -> assertThat(p).asList().hasSize(2));
-            assertThat(search("cheap phones", "products | filter category == \"PHONE\" and price < 500"))
-                    .bodyJson().doesNotHavePath("$.trace");
+            assertThat(search("cheap phones", "products | filter category == \"PHONE\" and price < 500")).bodyJson()
+                    .doesNotHavePath("$.trace");
         }
 
         @Test
@@ -241,10 +238,9 @@ class SearchApiTest extends ApiTestSupport {
             OffsetDateTime since = OffsetDateTime.parse("2026-01-01T00:00:00Z");
             List<Long> expected = orders.findAll().stream()
                     .filter(o -> o.getStatus() == OrderStatus.DELIVERED
-                            && o.getTotal().compareTo(new BigDecimal("1000")) > 0
-                            && !o.getCreatedAt().isBefore(since))
-                    .sorted(Comparator.comparing(Order::getCreatedAt).reversed()
-                            .thenComparing(Order::getId, Comparator.reverseOrder()))
+                            && o.getTotal().compareTo(new BigDecimal("1000")) > 0 && !o.getCreatedAt().isBefore(since))
+                    .sorted(Comparator.comparing(Order::getCreatedAt).reversed().thenComparing(Order::getId,
+                            Comparator.reverseOrder()))
                     .map(Order::getId).limit(50).toList();
 
             assertThat(ids(search("big delivered orders this year",
@@ -254,8 +250,7 @@ class SearchApiTest extends ApiTestSupport {
 
         @Test
         void containsMatchesSubstringsAndEscapesLikeWildcards() {
-            List<Long> expected = products.findAll().stream()
-                    .filter(p -> p.getName().toLowerCase().contains("pro"))
+            List<Long> expected = products.findAll().stream().filter(p -> p.getName().toLowerCase().contains("pro"))
                     .map(Product::getId).sorted().limit(50).toList();
 
             assertThat(ids(search("anything called pro", "products | filter name ~ \"PRO\"")))
@@ -265,9 +260,8 @@ class SearchApiTest extends ApiTestSupport {
 
         @Test
         void emptyResultIsNotAnError() {
-            assertThat(search("absurdly expensive products", "products | filter price > 1000000"))
-                    .hasStatusOk().bodyJson()
-                    .hasPathSatisfying("$.items", items -> assertThat(items).asArray().isEmpty())
+            assertThat(search("absurdly expensive products", "products | filter price > 1000000")).hasStatusOk()
+                    .bodyJson().hasPathSatisfying("$.items", items -> assertThat(items).asArray().isEmpty())
                     .extractingPath("$.uri").isEqualTo("/products");
         }
 
@@ -305,8 +299,7 @@ class SearchApiTest extends ApiTestSupport {
         @Test
         void coalesceTreatsMissingDiscountsAsZero() {
             List<Product> phones = products.findAll().stream().filter(p -> p.getCategory() == Category.PHONE).toList();
-            List<Long> expected = phones.stream()
-                    .filter(p -> effectivePrice(p).compareTo(new BigDecimal("500")) < 0)
+            List<Long> expected = phones.stream().filter(p -> effectivePrice(p).compareTo(new BigDecimal("500")) < 0)
                     .map(Product::getId).sorted().limit(50).toList();
             assertThat(phones).anySatisfy(p -> {
                 assertThat(p.getDiscount()).isNotNull();
@@ -322,8 +315,9 @@ class SearchApiTest extends ApiTestSupport {
         @Test
         void keepsTheBestRatedProductOfEachCategory() {
             List<Long> expected = products.findAll().stream()
-                    .collect(Collectors.groupingBy(Product::getCategory, Collectors.minBy(
-                            Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId))))
+                    .collect(Collectors.groupingBy(Product::getCategory,
+                            Collectors.minBy(
+                                    Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId))))
                     .values().stream().map(p -> p.orElseThrow().getId()).sorted().toList();
 
             MvcTestResult r = search("the best rated product in each category",
@@ -334,10 +328,8 @@ class SearchApiTest extends ApiTestSupport {
 
         @Test
         void topByAnExpressionPerBrand() {
-            List<Long> expected = products.findAll().stream()
-                    .filter(p -> p.getCategory() == Category.PHONE)
-                    .collect(Collectors.groupingBy(Product::getBrand))
-                    .values().stream()
+            List<Long> expected = products.findAll().stream().filter(p -> p.getCategory() == Category.PHONE)
+                    .collect(Collectors.groupingBy(Product::getBrand)).values().stream()
                     .flatMap(list -> list.stream()
                             .sorted(Comparator.comparing(ComplexQueries::effectivePrice).thenComparing(Product::getId))
                             .limit(2))
@@ -356,50 +348,45 @@ class SearchApiTest extends ApiTestSupport {
         void latestOrderOfEveryVipCustomer() {
             Set<Long> vip = customers.findAll().stream().filter(Customer::isVip).map(Customer::getId)
                     .collect(Collectors.toSet());
-            List<Long> expected = orders.findAll().stream()
-                    .filter(o -> vip.contains(o.getCustomerId()))
-                    .collect(Collectors.groupingBy(Order::getCustomerId,
-                            Collectors.minBy(NEWEST_FIRST)))
-                    .values().stream().map(o -> o.orElseThrow())
-                    .sorted(NEWEST_FIRST).map(Order::getId).limit(50).toList();
+            List<Long> expected = orders.findAll().stream().filter(o -> vip.contains(o.getCustomerId()))
+                    .collect(Collectors.groupingBy(Order::getCustomerId, Collectors.minBy(NEWEST_FIRST))).values()
+                    .stream().map(o -> o.orElseThrow()).sorted(NEWEST_FIRST).map(Order::getId).limit(50).toList();
 
             assertThat(ids(search("the latest order of every vip customer",
-                    "orders | filter customer.vip == true | top 1 per customer_id by created_at desc")))
-                    .hasSize(50).containsExactlyElementsOf(expected);
+                    "orders | filter customer.vip == true | top 1 per customer_id by created_at desc"))).hasSize(50)
+                    .containsExactlyElementsOf(expected);
         }
 
         @Test
         void sortsByARelatedFieldLikeAJoinWould() {
-            List<Long> joined = jdbc.sql("SELECT o.id FROM orders o JOIN customer c ON c.id = o.customer_id "
-                    + "WHERE o.status = 'PAID' ORDER BY c.full_name, o.created_at DESC, o.id DESC LIMIT 50")
+            List<Long> joined = jdbc
+                    .sql("SELECT o.id FROM orders o JOIN customer c ON c.id = o.customer_id "
+                            + "WHERE o.status = 'PAID' ORDER BY c.full_name, o.created_at DESC, o.id DESC LIMIT 50")
                     .query(Long.class).list();
 
             assertThat(ids(search("paid orders sorted by customer name",
-                    "orders | filter status == \"PAID\" | sort customer.name")))
-                    .containsExactlyElementsOf(joined);
+                    "orders | filter status == \"PAID\" | sort customer.name"))).containsExactlyElementsOf(joined);
         }
 
         @Test
         void sortsCustomersByTheirLargestOrderWithoutDuplicates() {
-            Map<Long, BigDecimal> largest = orders.findAll().stream().collect(Collectors.toMap(
-                    Order::getCustomerId, Order::getTotal, BigDecimal::max));
+            Map<Long, BigDecimal> largest = orders.findAll().stream()
+                    .collect(Collectors.toMap(Order::getCustomerId, Order::getTotal, BigDecimal::max));
             List<Long> expected = largest.entrySet().stream()
-                    .filter(e -> e.getValue().compareTo(new BigDecimal("5000")) > 0)
-                    .sorted(Map.Entry.<Long, BigDecimal>comparingByValue().reversed()
-                            .thenComparing(Map.Entry.comparingByKey()))
+                    .filter(e -> e.getValue().compareTo(new BigDecimal("5000")) > 0).sorted(Map.Entry
+                            .<Long, BigDecimal>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
                     .map(Map.Entry::getKey).limit(50).toList();
 
             assertThat(ids(search("customers with an order over 5000, biggest order first",
-                    "customers | filter orders.total > 5000 | sort orders.total desc")))
-                    .doesNotHaveDuplicates().containsExactlyElementsOf(expected);
+                    "customers | filter orders.total > 5000 | sort orders.total desc"))).doesNotHaveDuplicates()
+                    .containsExactlyElementsOf(expected);
         }
 
         @Test
         void groupsByAnExpression() {
             List<Map<String, Object>> reference = jdbc.sql("SELECT date_trunc('month', created_at) AS month, "
                     + "sum(total) AS revenue FROM orders WHERE created_at >= CAST('2026-01-01' AS TIMESTAMP) "
-                    + "GROUP BY 1")
-                    .query().listOfRows();
+                    + "GROUP BY 1").query().listOfRows();
 
             MvcTestResult r = search("revenue per month in 2026", "orders | filter created_at >= \"2026-01-01\" "
                     + "| group date_trunc(\"month\", created_at) | sum total | sort date_trunc(\"month\", created_at)");
@@ -420,8 +407,8 @@ class SearchApiTest extends ApiTestSupport {
 
         @Test
         void productSearchReturnsProducts() {
-            List<Long> expected = products.findAll().stream()
-                    .filter(p -> p.getStock() == 0).map(Product::getId).sorted().limit(50).toList();
+            List<Long> expected = products.findAll().stream().filter(p -> p.getStock() == 0).map(Product::getId)
+                    .sorted().limit(50).toList();
 
             MvcTestResult r = search("/api/products/search", "scoped: out of stock", "products | filter stock == 0");
 
@@ -462,41 +449,41 @@ class SearchApiTest extends ApiTestSupport {
             assertThat(search("products by supplier cost", "unsupported \"products have no supplier cost field\""))
                     .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson()
                     .hasPathSatisfying("$.title", t -> assertThat(t).isEqualTo("Can't answer that"))
-                    .hasPathSatisfying("$.kind", k -> assertThat(k).isEqualTo("unsupported"))
-                    .extractingPath("$.detail").isEqualTo("products have no supplier cost field");
+                    .hasPathSatisfying("$.kind", k -> assertThat(k).isEqualTo("unsupported")).extractingPath("$.detail")
+                    .isEqualTo("products have no supplier cost field");
         }
 
         @Test
         void hiddenFieldIsRejectedEvenIfTheModelTriesIt() {
             assertThat(search("sneaky cost sort", "products | sort supplier_cost desc"))
-                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson()
-                    .extractingPath("$.detail").asString().contains("supplier_cost");
+                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson().extractingPath("$.detail").asString()
+                    .contains("supplier_cost");
         }
 
         @Test
         void typeErrorsAreRejected() {
             assertThat(search("price is cheap", "products | filter price == \"cheap\""))
-                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson()
-                    .extractingPath("$.detail").asString().contains("expected a number");
+                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson().extractingPath("$.detail").asString()
+                    .contains("expected a number");
             assertThat(search("toasters", "products | filter category == \"toaster\""))
-                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson()
-                    .extractingPath("$.detail").asString().contains("is not one of");
+                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson().extractingPath("$.detail").asString()
+                    .contains("is not one of");
         }
 
         @Test
         void unknownServiceAndGarbageDsl() {
             assertThat(search("list invoices", "invoices | take 3")).hasStatus(HttpStatus.UNPROCESSABLE_CONTENT);
             assertThat(search("model rambles", "Sure! Here is your query: products where cheap"))
-                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson()
-                    .extractingPath("$.title").isEqualTo("Couldn't understand the question");
+                    .hasStatus(HttpStatus.UNPROCESSABLE_CONTENT).bodyJson().extractingPath("$.title")
+                    .isEqualTo("Couldn't understand the question");
         }
 
         @Test
         void llmOutageIsA503() {
             llm.fail("when is the llm down", new LlmException("connection refused"));
             assertThat(mvc.get().uri("/api/search").queryParam("q", "when is the llm down"))
-                    .hasStatus(HttpStatus.SERVICE_UNAVAILABLE).bodyJson()
-                    .extractingPath("$.title").isEqualTo("Search assistant unavailable");
+                    .hasStatus(HttpStatus.SERVICE_UNAVAILABLE).bodyJson().extractingPath("$.title")
+                    .isEqualTo("Search assistant unavailable");
         }
 
         @Test

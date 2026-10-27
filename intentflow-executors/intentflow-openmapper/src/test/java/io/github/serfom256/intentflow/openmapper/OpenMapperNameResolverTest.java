@@ -38,11 +38,6 @@ class OpenMapperNameResolverTest {
         List<String> columns = ServiceDescriptors.fromAnnotated(User.class, List.of(new OpenMapperNameResolver()))
                 .fields().stream().map(FieldMapping::column).map(c -> c.value()).toList();
 
-        assertThat(columns).containsExactly(
-                "id",
-                "full_name",
-                "nickName",
-                "email_override",
-                "login_count");
+        assertThat(columns).containsExactly("id", "full_name", "nickName", "email_override", "login_count");
     }
 }

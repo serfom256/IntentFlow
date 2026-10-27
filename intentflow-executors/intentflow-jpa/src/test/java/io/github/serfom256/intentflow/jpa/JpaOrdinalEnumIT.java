@@ -60,8 +60,8 @@ class JpaOrdinalEnumIT {
 
     private static final Map<TestDatabase, EntityManager> MANAGERS = new HashMap<>();
 
-    private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
-            ServiceDescriptors.fromAnnotated(Ticket.class, List.of(new JpaNameResolver())));
+    private static final ServiceCatalog CATALOG = ServiceCatalogs
+            .of(ServiceDescriptors.fromAnnotated(Ticket.class, List.of(new JpaNameResolver())));
 
     private static final SchemaFacts FACTS = SchemaFacts.of(
             Map.of("ord_ticket", ServiceDescriptors.factsOf(Ticket.class, List.of(new JpaNameResolver()))), Map.of());
@@ -83,12 +83,9 @@ class JpaOrdinalEnumIT {
 
     private static IntentResponse<Ticket> resolve(TestDatabase db, String dsl) {
         manager(db).clear();
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((t, c) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(db.dialect(), FACTS))
-                .executor(new JpaQueryExecutor(manager(db)))
-                .catalog(CATALOG)
-                .build();
+        IntentPipeline pipeline = IntentPipelines.builder().llm((t, c) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(db.dialect(), FACTS)).executor(new JpaQueryExecutor(manager(db)))
+                .catalog(CATALOG).build();
         return pipeline.resolve(IntentRequests.of("q"), Ticket.class);
     }
 
@@ -103,21 +100,17 @@ class JpaOrdinalEnumIT {
         assertThat(ids(db, "tickets | filter priority in (\"low\", \"medium\")")).containsExactly(1L, 3L);
         assertThat(ids(db, "tickets | filter priority != \"high\"")).containsExactly(1L, 3L, 4L);
         assertThat(ids(db, "tickets | filter priority ~ \"ed\"")).containsExactly(3L);
-        assertThat(resolve(db, "tickets | filter priority == \"high\"").trace().query()).containsAnyOf(
-                "\"priority\" = ?",
-                "`priority` = ?");
+        assertThat(resolve(db, "tickets | filter priority == \"high\"").trace().query())
+                .containsAnyOf("\"priority\" = ?", "`priority` = ?");
     }
 
     @ParameterizedTest
     @MethodSource("databases")
     void sortingAndGroupingUseTheConstantNames(TestDatabase db) {
         assertThat(ids(db, "tickets | sort priority, id")).containsExactly(2L, 5L, 1L, 3L, 4L);
-        assertThat(resolve(db, "tickets | group priority | count").aggregation().rows())
+        assertThat(resolve(db, "tickets | group priority | count").aggregation().orElseThrow().rows())
                 .extracting(r -> r.group().getFirst(), AggregateRow::value)
-                .containsExactlyInAnyOrder(
-                        tuple("HIGH", new BigDecimal("2")),
-                        tuple("LOW", new BigDecimal("1")),
-                        tuple("MEDIUM", new BigDecimal("1")),
-                        tuple(null, new BigDecimal("1")));
+                .containsExactlyInAnyOrder(tuple("HIGH", new BigDecimal("2")), tuple("LOW", new BigDecimal("1")),
+                        tuple("MEDIUM", new BigDecimal("1")), tuple(null, new BigDecimal("1")));
     }
 }

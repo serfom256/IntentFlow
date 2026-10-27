@@ -54,8 +54,8 @@ public final class OpenMapperQueryExecutor implements QueryExecutor {
     @Override
     public List<List<@Nullable Object>> rows(BoundQuery query) {
         if (jdbcClient == null) {
-            throw new UnsupportedOperationException("OpenMapper maps rows to @Model classes only; "
-                    + "pass a JdbcClient to run aggregate queries");
+            throw new UnsupportedOperationException(
+                    "OpenMapper maps rows to @Model classes only; " + "pass a JdbcClient to run aggregate queries");
         }
         return jdbcClient.sql(query.sql()).params(query.values()).query((rs, n) -> {
             int columns = rs.getMetaData().getColumnCount();

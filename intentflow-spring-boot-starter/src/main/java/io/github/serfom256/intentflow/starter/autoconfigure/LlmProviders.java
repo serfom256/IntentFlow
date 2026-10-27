@@ -30,8 +30,7 @@ final class LlmProviders {
 
     static List<String> present(@Nullable ClassLoader classLoader) {
         List<String> present = MARKERS.entrySet().stream()
-                .filter(marker -> ClassUtils.isPresent(marker.getValue(), classLoader)).map(Map.Entry::getKey)
-                .toList();
+                .filter(marker -> ClassUtils.isPresent(marker.getValue(), classLoader)).map(Map.Entry::getKey).toList();
         return present.size() > 1 ? present.stream().filter(name -> !name.equals(OPENAI)).toList() : present;
     }
 

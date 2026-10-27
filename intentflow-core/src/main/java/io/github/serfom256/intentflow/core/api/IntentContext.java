@@ -1,28 +1,23 @@
 package io.github.serfom256.intentflow.core.api;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * Who is asking. An {@code AccessPolicy} reads it to decide which
- * services and fields the caller may query and which rows they may see, so
- * questions like "my orders" or a
- * tenant's data are answered from the caller's records only.
+ * Who is asking. An {@code AccessPolicy} reads it to decide which services and
+ * fields the caller may query and which rows they may see, so questions like
+ * "my orders" or a tenant's data are answered from the caller's records only.
  */
 public interface IntentContext {
 
-    /** The caller's id, such as a user name; {@code null} when anonymous. */
-    @Nullable
-    String principal();
+    /** The caller's id, such as a user name; empty when anonymous. */
+    Optional<String> principal();
 
     /**
-     * The tenant the caller belongs to; {@code null} when the application has no
-     * tenants.
+     * The tenant the caller belongs to; empty when the application has no tenants.
      */
-    @Nullable
-    String tenant();
+    Optional<String> tenant();
 
     /** Roles or authorities, such as {@code ROLE_ADMIN}. */
     Set<String> roles();
@@ -34,7 +29,7 @@ public interface IntentContext {
         return roles().contains(role);
     }
 
-    default @Nullable Object attribute(String name) {
-        return attributes().get(name);
+    default Optional<Object> attribute(String name) {
+        return Optional.ofNullable(attributes().get(name));
     }
 }

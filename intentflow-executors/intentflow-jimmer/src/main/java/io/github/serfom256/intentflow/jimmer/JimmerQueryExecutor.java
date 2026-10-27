@@ -77,8 +77,7 @@ public final class JimmerQueryExecutor implements QueryExecutor {
         }
         @SuppressWarnings("unchecked")
         Fetcher<T> fetcher = (Fetcher<T>) fetchers.get(resultType);
-        Map<Object, T> byId = fetcher == null
-                ? sqlClient.getEntities().findMapByIds(resultType, ids)
+        Map<Object, T> byId = fetcher == null ? sqlClient.getEntities().findMapByIds(resultType, ids)
                 : sqlClient.getEntities().findMapByIds(fetcher, ids);
         return ids.stream().map(byId::get).filter(Objects::nonNull).toList();
     }

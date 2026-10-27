@@ -1,15 +1,13 @@
 package io.github.serfom256.intentflow.core.catalog;
 
-import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
-import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptions;
-import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
-import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
 import io.github.serfom256.intentflow.core.catalog.factories.ColumnNames;
-import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
-import io.github.serfom256.intentflow.core.catalog.factories.MaxTakes;
 import io.github.serfom256.intentflow.core.catalog.factories.FieldMappings;
-import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
+import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
+import io.github.serfom256.intentflow.core.catalog.factories.MaxTakes;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
+import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
+import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
+import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -23,12 +21,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ServiceCatalogTest {
 
     private static ServiceDescriptor sample(ServiceName name) {
-        return ServiceDescriptors.of(
-                name, null, TableNames.of("book"),
-                List.of(FieldMappings.of(
-                        LogicalFieldNames.of("id"), ColumnNames.of("id"), true)),
-                List.of(), MaxTakes.of(100),
-                UriTemplates.of("/x"), Object.class);
+        return ServiceDescriptors.of(name, null, TableNames.of("book"),
+                List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true)), List.of(),
+                MaxTakes.of(100), UriTemplates.of("/x"), Object.class);
     }
 
     @Test
@@ -43,8 +38,7 @@ class ServiceCatalogTest {
     void defaultGetThrowsServiceNotFoundWhenAbsent() {
         ServiceCatalog catalog = stubCatalog(Map.of());
         ServiceName ghost = ServiceNames.of("ghost");
-        assertThatThrownBy(() -> catalog.get(ghost))
-                .isInstanceOf(ServiceNotFoundException.class)
+        assertThatThrownBy(() -> catalog.get(ghost)).isInstanceOf(ServiceNotFoundException.class)
                 .hasMessageContaining("ghost");
     }
 

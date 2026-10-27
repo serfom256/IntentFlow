@@ -5,6 +5,7 @@ import io.github.serfom256.intentflow.core.ast.Aggregate;
 import io.github.serfom256.intentflow.core.ast.AstQuery;
 import io.github.serfom256.intentflow.core.ast.ExprSortKey;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
+import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
@@ -35,7 +36,7 @@ final class QueryPlanner {
 
     static boolean keysetEligible(ValidatedQuery query, PlanContext context) {
         AstQuery ast = query.ast();
-        if (!context.enabled(Optimization.KEYSET_PAGING) || ast.aggregate() != null || ast.top() != null) {
+        if (!context.enabled(Optimization.KEYSET_PAGING) || ast.aggregate().isPresent() || ast.top().isPresent()) {
             return false;
         }
         SqlScope scope = SqlScope.outer(context, query.service(), query.related(), false);
@@ -52,13 +53,13 @@ final class QueryPlanner {
 
     static Select plan(ValidatedQuery query, PlanContext context, @Nullable List<Object> after) {
         AstQuery ast = query.ast();
-        Aggregate aggregate = ast.aggregate();
+        Aggregate aggregate = ast.aggregate().orElse(null);
         SqlScope scope = SqlScope.outer(context, query.service(), query.related(), false);
         if (aggregate == null && OrderPlanner.joinsForSort(query.effectiveSort(), scope)) {
             scope = SqlScope.outer(context, query.service(), query.related(), true);
         }
 
-        FilterExpr filter = filter(ast.filter(), scope);
+        FilterExpr filter = filter(ast.filter().orElse(null), scope);
         List<SqlPredicate> where = new ArrayList<>(
                 scope.where(filter == null ? List.of() : List.of(FilterPlanner.plan(filter, scope))));
         if (after != null) {
@@ -68,8 +69,8 @@ final class QueryPlanner {
         List<Select.Order> order = new ArrayList<>(OrderPlanner.plan(query.effectiveSort(), aggregate, scope));
 
         Select select;
-        if (ast.top() != null) {
-            select = topN(query, ast.top(), where, scope);
+        if (ast.top().isPresent()) {
+            select = topN(query, ast.top().get(), where, scope);
         } else {
             select = Select.from(scope.withJoins(scope.from()), items(aggregate, scope), where);
         }
@@ -79,15 +80,15 @@ final class QueryPlanner {
                 select = AggregatePlanner.derived(select, aggregate, order, scope);
             }
         }
-        int limit = ast.take() != null ? ast.take().value() : query.service().maxTake().value();
-        int offset = after != null || ast.skip() == null ? 0 : Math.max(0, ast.skip().value());
+        int limit = ast.take().map(Take::value).orElse(query.service().maxTake().value());
+        int offset = after != null ? 0 : ast.skip().map(skip -> Math.max(0, skip.value())).orElse(0);
         return select.withOrderBy(order).withPaging(new Select.Paging(limit, offset));
     }
 
     private static SqlPredicate after(List<SortKey> keys, List<Object> values, SqlScope scope) {
         if (keys.size() != values.size()) {
-            throw new IllegalArgumentException("keyset paging needs one value per sort key, got " + values.size()
-                    + " for " + keys.size());
+            throw new IllegalArgumentException(
+                    "keyset paging needs one value per sort key, got " + values.size() + " for " + keys.size());
         }
         List<SqlPredicate> alternatives = new ArrayList<>();
         for (int i = 0; i < keys.size(); i++) {
@@ -137,9 +138,8 @@ final class QueryPlanner {
 
     private static Select topN(ValidatedQuery query, TopN top, List<SqlPredicate> where, SqlScope scope) {
         if (!scope.context().capabilities().windowFunctions()) {
-            throw new ValidationException(ErrorCode.UNSUPPORTED,
-                    "'top' needs window functions, which " + scope.context().dialectName()
-                            + " does not support; ask for a sorted list with 'take' instead",
+            throw new ValidationException(ErrorCode.UNSUPPORTED, "'top' needs window functions, which "
+                    + scope.context().dialectName() + " does not support; ask for a sorted list with 'take' instead",
                     Map.of());
         }
         SqlExpr rank = new SqlExpr.RowNumber(top.partition().stream().map(p -> ValuePlanner.plan(p, scope)).toList(),

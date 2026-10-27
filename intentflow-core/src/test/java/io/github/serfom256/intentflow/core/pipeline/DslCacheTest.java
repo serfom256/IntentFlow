@@ -1,6 +1,5 @@
 package io.github.serfom256.intentflow.core.pipeline;
 
-import io.github.serfom256.intentflow.core.api.UserText;
 import io.github.serfom256.intentflow.core.api.factories.UserTexts;
 import io.github.serfom256.intentflow.core.ast.DslSource;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
@@ -105,8 +104,7 @@ class DslCacheTest {
 
     @Test
     void factoryRejectsZeroTtl() {
-        assertThatThrownBy(() -> DslCaches.create(Duration.ZERO, 100))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> DslCaches.create(Duration.ZERO, 100)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ttl");
     }
 
@@ -119,8 +117,7 @@ class DslCacheTest {
     @Test
     void factoryRejectsNonPositiveMaxSize() {
         assertThatThrownBy(() -> DslCaches.create(Duration.ofMinutes(1), 0))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("maxSize");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("maxSize");
         assertThatThrownBy(() -> DslCaches.create(Duration.ofMinutes(1), -5))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -142,15 +139,15 @@ class DslCacheTest {
                     for (int i = 0; i < ops; i++) {
                         DslCacheKey k = key("key-" + (i % 20));
                         switch (i % 4) {
-                            case 0 -> c.put(k, DslSources.of("dsl-" + seed));
-                            case 1 -> c.get(k);
-                            case 2 -> c.invalidate(k);
-                            case 3 -> {
-                                if (i % 100 == 0)
-                                    c.invalidateAll();
-                                else
-                                    c.get(k);
-                            }
+                        case 0 -> c.put(k, DslSources.of("dsl-" + seed));
+                        case 1 -> c.get(k);
+                        case 2 -> c.invalidate(k);
+                        case 3 -> {
+                            if (i % 100 == 0)
+                                c.invalidateAll();
+                            else
+                                c.get(k);
+                        }
                         }
                     }
                 } catch (Throwable th) {

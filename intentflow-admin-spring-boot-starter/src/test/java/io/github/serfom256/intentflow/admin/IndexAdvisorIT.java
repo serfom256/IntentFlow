@@ -46,13 +46,14 @@ class IndexAdvisorIT {
         IndexAdvisor advisor = new IndexAdvisor(dataSource(db));
         String table = q(db, "adv_product");
 
-        IndexAdvisor.Advice advice = advisor.advise("SELECT * FROM " + table + " WHERE " + q(db, "category")
-                + " = ? ORDER BY " + q(db, "id") + " LIMIT 10", List.of("LAPTOP"));
+        IndexAdvisor.Advice advice = advisor.advise(
+                "SELECT * FROM " + table + " WHERE " + q(db, "category") + " = ? ORDER BY " + q(db, "id") + " LIMIT 10",
+                List.of("LAPTOP"));
 
         assertThat(advice.error()).isNull();
         assertThat(advice.plan()).isNotBlank();
-        assertThat(advice.suggestions()).extracting(IndexAdvisor.Suggestion::ddl).anyMatch(ddl -> ddl.contains(
-                "ON " + table + " (" + q(db, "category")));
+        assertThat(advice.suggestions()).extracting(IndexAdvisor.Suggestion::ddl)
+                .anyMatch(ddl -> ddl.contains("ON " + table + " (" + q(db, "category")));
     }
 
     @ParameterizedTest
@@ -61,10 +62,10 @@ class IndexAdvisorIT {
         IndexAdvisor advisor = new IndexAdvisor(dataSource(db));
         String table = q(db, "adv_product");
 
-        IndexAdvisor.Advice equal = advisor.advise("SELECT * FROM " + table + " WHERE LOWER(" + q(db, "name")
-                + ") = LOWER(?)", List.of("Galaxy"));
-        IndexAdvisor.Advice contains = advisor.advise("SELECT * FROM " + table + " WHERE LOWER(" + q(db, "name")
-                + ") LIKE LOWER(?)", List.of("%pro%"));
+        IndexAdvisor.Advice equal = advisor
+                .advise("SELECT * FROM " + table + " WHERE LOWER(" + q(db, "name") + ") = LOWER(?)", List.of("Galaxy"));
+        IndexAdvisor.Advice contains = advisor.advise(
+                "SELECT * FROM " + table + " WHERE LOWER(" + q(db, "name") + ") LIKE LOWER(?)", List.of("%pro%"));
 
         assertThat(equal.suggestions()).extracting(IndexAdvisor.Suggestion::ddl)
                 .anyMatch(ddl -> ddl.contains("((lower(" + q(db, "name") + ")))"));
@@ -79,8 +80,8 @@ class IndexAdvisorIT {
     void skipsColumnsAnIndexAlreadyCovers(TestDatabase db) {
         IndexAdvisor advisor = new IndexAdvisor(dataSource(db));
 
-        IndexAdvisor.Advice advice = advisor.advise("SELECT * FROM " + q(db, "adv_product") + " WHERE "
-                + q(db, "price") + " > ?", List.of(10));
+        IndexAdvisor.Advice advice = advisor
+                .advise("SELECT * FROM " + q(db, "adv_product") + " WHERE " + q(db, "price") + " > ?", List.of(10));
 
         assertThat(advice.error()).isNull();
         assertThat(advice.suggestions()).noneMatch(s -> s.ddl().contains("(" + q(db, "price") + ")"));

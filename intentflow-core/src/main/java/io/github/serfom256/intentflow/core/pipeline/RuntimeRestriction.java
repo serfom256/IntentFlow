@@ -5,6 +5,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public record RuntimeRestriction(List<String> segments, List<Object> values) {
 
@@ -14,6 +15,9 @@ public record RuntimeRestriction(List<String> segments, List<Object> values) {
         if (segments.size() != values.size() + 1) {
             throw new IllegalArgumentException("expected " + (values.size() + 1) + " segments for " + values.size()
                     + " values, got " + segments.size());
+        }
+        if (values.stream().anyMatch(Optional.class::isInstance)) {
+            throw new IllegalArgumentException("bind the value inside the Optional, not the Optional itself");
         }
     }
 
@@ -26,6 +30,10 @@ public record RuntimeRestriction(List<String> segments, List<Object> values) {
             return of("1 = 0");
         }
         return new RuntimeRestriction(List.of(column + " = ", ""), List.of(value));
+    }
+
+    public static RuntimeRestriction equalTo(String column, Optional<?> value) {
+        return equalTo(column, value.orElse(null));
     }
 
     public static RuntimeRestriction in(String column, Collection<?> values) {

@@ -48,8 +48,8 @@ class AdminSecurityTest {
     }
 
     private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class,
-                    IntentFlowAdminAutoConfiguration.class))
+            .withConfiguration(
+                    AutoConfigurations.of(IntentFlowAutoConfiguration.class, IntentFlowAdminAutoConfiguration.class))
             .withUserConfiguration(Mvc.class)
             .withPropertyValues("intentflow.catalog.packages=io.github.serfom256.intentflow.admin")
             .withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books | take 1"))
@@ -80,16 +80,14 @@ class AdminSecurityTest {
     void withoutSpringSecurityTheAdminAsksForHttpBasicCredentials() {
         withoutSpringSecurity.withPropertyValues("intentflow.admin.security.password=s3cret").run(ctx -> {
             MockMvc mvc = mvc(ctx);
-            mvc.perform(get("/intentflow-admin/api/services"))
-                    .andExpect(status().isUnauthorized())
+            mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isUnauthorized())
                     .andExpect(header().string("WWW-Authenticate", containsString("Basic")))
                     .andExpect(jsonPath("$.kind").value("unauthenticated"));
             mvc.perform(get("/intentflow-admin/index.html")).andExpect(status().isUnauthorized());
             mvc.perform(get("/intentflow-admin/api/services").header("Authorization", basic("admin", "wrong")))
                     .andExpect(status().isUnauthorized());
             mvc.perform(get("/intentflow-admin/api/session").header("Authorization", basic("admin", "s3cret")))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.user").value("admin"));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.user").value("admin"));
             mvc.perform(get("/intentflow-admin/index.html").header("Authorization", basic("admin", "s3cret")))
                     .andExpect(status().isOk());
         });
@@ -111,24 +109,21 @@ class AdminSecurityTest {
     void withSpringSecurityTheApplicationsAuthenticationDecides() {
         runner.withPropertyValues("intentflow.admin.security.login-url=/login").run(ctx -> {
             MockMvc mvc = mvc(ctx);
-            mvc.perform(get("/intentflow-admin/api/services"))
-                    .andExpect(status().isUnauthorized())
+            mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.login").value("/login"));
             mvc.perform(get("/intentflow-admin/index.html")).andExpect(status().isOk());
 
-            SecurityContextHolder.getContext().setAuthentication(
-                    new TestingAuthenticationToken("bob", "x", "ROLE_USER"));
-            mvc.perform(get("/intentflow-admin/api/services"))
-                    .andExpect(status().isForbidden())
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new TestingAuthenticationToken("bob", "x", "ROLE_USER"));
+            mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.kind").value("forbidden"))
                     .andExpect(jsonPath("$.authorities[0]").value("ROLE_ADMIN"));
 
-            SecurityContextHolder.getContext().setAuthentication(
-                    new TestingAuthenticationToken("ann", "x", "ROLE_ADMIN"));
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new TestingAuthenticationToken("ann", "x", "ROLE_ADMIN"));
             mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isOk());
-            mvc.perform(get("/intentflow-admin/api/session")
-                    .requestAttr("_csrf", new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "t0ken")))
-                    .andExpect(jsonPath("$.user").value("ann"))
+            mvc.perform(get("/intentflow-admin/api/session").requestAttr("_csrf",
+                    new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "t0ken"))).andExpect(jsonPath("$.user").value("ann"))
                     .andExpect(jsonPath("$.csrf.header").value("X-CSRF-TOKEN"))
                     .andExpect(jsonPath("$.csrf.token").value("t0ken"));
         });
@@ -137,17 +132,17 @@ class AdminSecurityTest {
     @Test
     void requiredAuthoritiesAreConfigurable() {
         runner.withPropertyValues("intentflow.admin.security.authorities=SCOPE_intentflow.admin").run(ctx -> {
-            SecurityContextHolder.getContext().setAuthentication(
-                    new TestingAuthenticationToken("svc", "x", "SCOPE_intentflow.admin"));
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new TestingAuthenticationToken("svc", "x", "SCOPE_intentflow.admin"));
             mvc(ctx).perform(get("/intentflow-admin/api/services")).andExpect(status().isOk());
         });
     }
 
     @Test
     void aCustomAdminAccessBeanReplacesTheDefaults() {
-        runner.withBean(AdminAccess.class, () -> request -> "10.0.0.1".equals(request.getRemoteAddr())
-                ? AdminAccess.Decision.allowed("ops")
-                : AdminAccess.Decision.forbidden(null))
+        runner.withBean(AdminAccess.class,
+                () -> request -> "10.0.0.1".equals(request.getRemoteAddr()) ? AdminAccess.Decision.allowed("ops")
+                        : AdminAccess.Decision.forbidden(null))
                 .run(ctx -> {
                     MockMvc mvc = mvc(ctx);
                     mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isForbidden());
@@ -169,22 +164,18 @@ class AdminSecurityTest {
         runner.withPropertyValues("intentflow.admin.security.read-only-authorities=ROLE_CATALOG_VIEWER",
                 "intentflow.dialect=postgresql").run(ctx -> {
                     MockMvc mvc = mvc(ctx);
-                    SecurityContextHolder.getContext().setAuthentication(
-                            new TestingAuthenticationToken("vic", "x", "ROLE_CATALOG_VIEWER"));
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(new TestingAuthenticationToken("vic", "x", "ROLE_CATALOG_VIEWER"));
 
-                    mvc.perform(get("/intentflow-admin/api/session"))
-                            .andExpect(status().isOk())
-                            .andExpect(jsonPath("$.user").value("vic"))
-                            .andExpect(jsonPath("$.editor").value(false));
+                    mvc.perform(get("/intentflow-admin/api/session")).andExpect(status().isOk())
+                            .andExpect(jsonPath("$.user").value("vic")).andExpect(jsonPath("$.editor").value(false));
                     mvc.perform(get("/intentflow-admin/api/services")).andExpect(status().isOk());
                     mvc.perform(post("/intentflow-admin/api/explain").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"question\": \"books\"}")).andExpect(status().isOk());
                     mvc.perform(put("/intentflow-admin/api/services/books").contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"description\": \"Every book\"}"))
-                            .andExpect(status().isForbidden())
+                            .content("{\"description\": \"Every book\"}")).andExpect(status().isForbidden())
                             .andExpect(jsonPath("$.kind").value("read-only"));
-                    mvc.perform(delete("/intentflow-admin/api/services/books"))
-                            .andExpect(status().isForbidden());
+                    mvc.perform(delete("/intentflow-admin/api/services/books")).andExpect(status().isForbidden());
                 });
     }
 
@@ -192,8 +183,8 @@ class AdminSecurityTest {
     void editorsCanChangeOverrides() {
         runner.withPropertyValues("intentflow.admin.security.read-only-authorities=ROLE_CATALOG_VIEWER").run(ctx -> {
             MockMvc mvc = mvc(ctx);
-            SecurityContextHolder.getContext().setAuthentication(
-                    new TestingAuthenticationToken("eda", "x", "ROLE_ADMIN"));
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new TestingAuthenticationToken("eda", "x", "ROLE_ADMIN"));
 
             mvc.perform(get("/intentflow-admin/api/session")).andExpect(jsonPath("$.editor").value(true));
             mvc.perform(put("/intentflow-admin/api/services/books").contentType(MediaType.APPLICATION_JSON)
@@ -204,11 +195,10 @@ class AdminSecurityTest {
     @Test
     void usersWithNeitherRoleAreToldWhichAuthoritiesGrantAccess() {
         runner.withPropertyValues("intentflow.admin.security.read-only-authorities=ROLE_CATALOG_VIEWER").run(ctx -> {
-            SecurityContextHolder.getContext().setAuthentication(
-                    new TestingAuthenticationToken("bob", "x", "ROLE_USER"));
+            SecurityContextHolder.getContext()
+                    .setAuthentication(new TestingAuthenticationToken("bob", "x", "ROLE_USER"));
 
-            mvc(ctx).perform(get("/intentflow-admin/api/services"))
-                    .andExpect(status().isForbidden())
+            mvc(ctx).perform(get("/intentflow-admin/api/services")).andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.authorities[0]").value("ROLE_ADMIN"))
                     .andExpect(jsonPath("$.authorities[1]").value("ROLE_CATALOG_VIEWER"));
         });
@@ -221,8 +211,7 @@ class AdminSecurityTest {
                 "intentflow.admin.security.read-only-authorities=ROLE_intentflow-viewer").run(ctx -> {
                     MockMvc mvc = mvc(ctx);
                     SecurityContextHolder.getContext().setAuthentication(oidc(roles, "lena", "intentflow-viewer"));
-                    mvc.perform(get("/intentflow-admin/api/session"))
-                            .andExpect(jsonPath("$.user").value("lena"))
+                    mvc.perform(get("/intentflow-admin/api/session")).andExpect(jsonPath("$.user").value("lena"))
                             .andExpect(jsonPath("$.editor").value(false));
 
                     SecurityContextHolder.getContext().setAuthentication(oidc(roles, "omar", "intentflow-editor"));

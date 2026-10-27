@@ -8,9 +8,6 @@ import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 
-public record OrderRequest(
-        @Positive long customerId,
-        @NotNull OrderStatus status,
-        @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal total,
-        @Positive int itemsCount) {
+public record OrderRequest(@Positive long customerId, @NotNull OrderStatus status,
+        @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal total, @Positive int itemsCount) {
 }

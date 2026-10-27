@@ -9,8 +9,7 @@ final class TestEntityManagers {
     }
 
     static EntityManagerFactory create(String url, String user, String password, Class<?>... entities) {
-        Configuration configuration = new Configuration()
-                .setProperty("jakarta.persistence.jdbc.url", url)
+        Configuration configuration = new Configuration().setProperty("jakarta.persistence.jdbc.url", url)
                 .setProperty("jakarta.persistence.jdbc.user", user)
                 .setProperty("jakarta.persistence.jdbc.password", password)
                 .setProperty("hibernate.hbm2ddl.auto", "none");

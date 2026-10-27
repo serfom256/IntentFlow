@@ -20,10 +20,7 @@ public final class DefaultDslCache implements DslCache {
         if (maxSize <= 0) {
             throw new IllegalArgumentException("DslCache maxSize must be > 0");
         }
-        this.cache = Caffeine.newBuilder()
-                .expireAfterWrite(ttl)
-                .maximumSize(maxSize)
-                .build();
+        this.cache = Caffeine.newBuilder().expireAfterWrite(ttl).maximumSize(maxSize).build();
     }
 
     @Override

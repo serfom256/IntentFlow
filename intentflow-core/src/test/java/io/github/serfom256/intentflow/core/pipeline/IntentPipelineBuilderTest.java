@@ -24,24 +24,20 @@ class IntentPipelineBuilderTest {
     }
 
     private static IntentPipelineBuilder complete() {
-        return IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of("books"))
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(new QueryExecutor() {
+        return IntentPipelines.builder().llm((text, catalog) -> DslSources.of("books"))
+                .sqlBuilder(SqlBuilders.create(new TestDialect())).executor(new QueryExecutor() {
                     @Override
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         return List.of();
                     }
-                })
-                .catalog(ServiceCatalogs.fromAnnotated(Book.class));
+                }).catalog(ServiceCatalogs.fromAnnotated(Book.class));
     }
 
     @Test
     void theFourRequiredPartsAreEnoughEverythingElseHasDefaults() {
         IntentPipeline pipeline = complete().build();
 
-        assertThat(pipeline.resolve(IntentRequests.of("books"), Book.class).trace().query())
-                .startsWith("SELECT");
+        assertThat(pipeline.resolve(IntentRequests.of("books"), Book.class).trace().query()).startsWith("SELECT");
     }
 
     @Test

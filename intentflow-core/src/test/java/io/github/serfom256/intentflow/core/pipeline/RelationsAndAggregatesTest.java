@@ -42,8 +42,8 @@ class RelationsAndAggregatesTest {
             @IntentField BigDecimal total) {
     }
 
-    private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
-            ServiceDescriptors.fromAnnotated(Customer.class), ServiceDescriptors.fromAnnotated(Order.class));
+    private static final ServiceCatalog CATALOG = ServiceCatalogs.of(ServiceDescriptors.fromAnnotated(Customer.class),
+            ServiceDescriptors.fromAnnotated(Order.class));
 
     private static BoundQuery sql(String dsl) {
         AstQuery ast = DslParsers.create().parse(DslSources.of(dsl));
@@ -58,15 +58,15 @@ class RelationsAndAggregatesTest {
     void parsesAggregateStagesAndDottedFields() {
         AstQuery q = parse("orders | filter customer.country == \"DE\" | group status | sum total | sort sum desc");
 
-        assertThat(q.aggregate().function()).isEqualTo(AggregateFunction.SUM);
-        assertThat(Expressions.print(q.aggregate().argument())).isEqualTo("total");
-        assertThat(q.aggregate().groupNames()).containsExactly("status");
+        assertThat(q.aggregate().orElseThrow().function()).isEqualTo(AggregateFunction.SUM);
+        assertThat(Expressions.print(q.aggregate().orElseThrow().argument())).isEqualTo("total");
+        assertThat(q.aggregate().orElseThrow().groupNames()).containsExactly("status");
         assertThat(q.sort().getFirst().field().value()).isEqualTo("sum");
     }
 
     @Test
     void aggregateWordsAreStillFieldNamesInFilters() {
-        assertThat(parse("stats | filter count > 3 and min == 1").aggregate()).isNull();
+        assertThat(parse("stats | filter count > 3 and min == 1").aggregate()).isEmpty();
     }
 
     @Test
@@ -96,8 +96,8 @@ class RelationsAndAggregatesTest {
 
     @Test
     void caseSensitiveFieldsAreComparedWithoutLower() {
-        assertThat(sql("customers | filter code == \"Ab\" and code in (\"x\", \"Y\")").sql())
-                .contains("\"code\" = ?").contains("\"code\" IN (?, ?)").doesNotContain("LOWER(\"code\")");
+        assertThat(sql("customers | filter code == \"Ab\" and code in (\"x\", \"Y\")").sql()).contains("\"code\" = ?")
+                .contains("\"code\" IN (?, ?)").doesNotContain("LOWER(\"code\")");
     }
 
     @Test
@@ -112,8 +112,8 @@ class RelationsAndAggregatesTest {
         assertThat(sql("orders | group status, customer_id | count").sql()).isEqualTo(
                 "SELECT \"status\", \"customer_id\", COUNT(*) FROM \"orders\" GROUP BY \"status\", \"customer_id\" "
                         + "ORDER BY COUNT(*) DESC NULLS LAST, \"status\" ASC, \"customer_id\" ASC LIMIT 50");
-        assertThat(sql("orders | filter status == \"PAID\" | avg total").sql()).isEqualTo(
-                "SELECT AVG(\"total\") FROM \"orders\" WHERE LOWER(\"status\") = LOWER(?) LIMIT 50");
+        assertThat(sql("orders | filter status == \"PAID\" | avg total").sql())
+                .isEqualTo("SELECT AVG(\"total\") FROM \"orders\" WHERE LOWER(\"status\") = LOWER(?) LIMIT 50");
         assertThat(sql("orders | group status | max total | sort status").sql())
                 .contains("ORDER BY \"status\" ASC LIMIT 50");
     }
@@ -123,8 +123,7 @@ class RelationsAndAggregatesTest {
         assertThatThrownBy(() -> sql("orders | sum status")).isInstanceOf(ValidationException.class)
                 .hasMessageContaining("sum needs a number field");
         assertThatThrownBy(() -> sql("orders | group status | count | sort total"))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("sort by 'count' or a group field");
+                .isInstanceOf(ValidationException.class).hasMessageContaining("sort by 'count' or a group field");
         assertThatThrownBy(() -> sql("orders | group customer.country | count")).isInstanceOf(ValidationException.class)
                 .hasMessageContaining("related field");
         assertThatThrownBy(() -> sql("orders | filter buyer.country == \"DE\"")).isInstanceOf(ValidationException.class)
@@ -147,19 +146,14 @@ class RelationsAndAggregatesTest {
                 return List.of(List.of("PAID", 3L));
             }
         };
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((text, catalog) -> {
-                    seen.addAll(catalog.names().stream().map(n -> n.value()).sorted().toList());
-                    return DslSources.of(text.value().equals("count") ? "orders | group status | count" : "customers");
-                })
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(executor)
-                .catalog(CATALOG)
-                .build();
+        IntentPipeline pipeline = IntentPipelines.builder().llm((text, catalog) -> {
+            seen.addAll(catalog.names().stream().map(n -> n.value()).sorted().toList());
+            return DslSources.of(text.value().equals("count") ? "orders | group status | count" : "customers");
+        }).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(executor).catalog(CATALOG).build();
 
         IntentResponse<Order> response = pipeline.resolve(IntentRequests.of("count"), Order.class);
         assertThat(seen).containsExactly("customers", "orders");
-        assertThat(response.aggregation().rows().getFirst().value()).isEqualTo(BigDecimal.valueOf(3));
+        assertThat(response.aggregation().orElseThrow().rows().getFirst().value()).isEqualTo(BigDecimal.valueOf(3));
         assertThat(response.trace().dsl()).isEqualTo("orders | group status | count");
         assertThat(response.trace().cached()).isFalse();
         assertThat(pipeline.resolve(IntentRequests.of("count"), Order.class).trace().cached()).isTrue();

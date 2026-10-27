@@ -31,31 +31,25 @@ public final class ServiceDescriptors {
         return AnnotatedServiceReader.restriction(type, resolvers);
     }
 
-    public static ServiceDescriptor of(
-            ServiceName name,
-            @Nullable ServiceDescription description,
-            TableName table,
-            List<FieldMapping> fields,
-            List<SortKey> defaultSort,
-            MaxTake maxTake,
-            UriTemplate uriTemplate,
+    public static ServiceDescriptor of(ServiceName name, @Nullable ServiceDescription description, TableName table,
+            List<FieldMapping> fields, List<SortKey> defaultSort, MaxTake maxTake, UriTemplate uriTemplate,
             Class<?> resultType) {
-        return new DefaultServiceDescriptor(
-                name, description, table, fields, defaultSort, maxTake, uriTemplate, resultType);
+        return new DefaultServiceDescriptor(name, description, table, fields, defaultSort, maxTake, uriTemplate,
+                resultType);
     }
 
-    public static ServiceDescriptor of(
-            ServiceName name,
-            @Nullable ServiceDescription description,
-            TableName table,
-            List<FieldMapping> fields,
-            List<SortKey> defaultSort,
-            MaxTake maxTake,
-            UriTemplate uriTemplate,
-            Class<?> resultType,
-            List<ServiceRelation> relations) {
-        return new DefaultServiceDescriptor(
-                name, description, table, fields, defaultSort, maxTake, uriTemplate, resultType, relations);
+    public static ServiceDescriptor of(ServiceName name, @Nullable ServiceDescription description, TableName table,
+            List<FieldMapping> fields, List<SortKey> defaultSort, MaxTake maxTake, UriTemplate uriTemplate,
+            Class<?> resultType, List<ServiceRelation> relations) {
+        return new DefaultServiceDescriptor(name, description, table, fields, defaultSort, maxTake, uriTemplate,
+                resultType, relations);
+    }
+
+    public static ServiceDescriptor of(ServiceName name, @Nullable ServiceDescription description, TableName table,
+            List<FieldMapping> fields, List<SortKey> defaultSort, MaxTake maxTake, UriTemplate uriTemplate,
+            Class<?> resultType, List<ServiceRelation> relations, @Nullable String restriction) {
+        return new DefaultServiceDescriptor(name, description, table, fields, defaultSort, maxTake, uriTemplate,
+                resultType, relations, restriction);
     }
 
     public static ServiceDescriptor fromAnnotated(Class<?> type) {

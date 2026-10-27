@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.5.2")
-    implementation("io.github.serfom256:intentflow-jdbc:0.5.2")
-    implementation("io.github.serfom256:intentflow-postgresql:0.5.2")
-    implementation("io.github.serfom256:intentflow-openai:0.5.2")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.9.0")
+    implementation("io.github.serfom256:intentflow-jdbc:0.9.0")
+    implementation("io.github.serfom256:intentflow-postgresql:0.9.0")
+    implementation("io.github.serfom256:intentflow-openai:0.9.0")
 }
 ```
 
@@ -154,10 +154,10 @@ IntentResponse<?> response = pipeline.resolve(IntentRequests.of("vip customers w
 | Method          | Contents                                                                       |
 | --------------- | ------------------------------------------------------------------------------ |
 | `items()`       | The entities, in query order; empty for an aggregation                          |
-| `aggregation()` | Rows of an aggregate query, otherwise `null`                                    |
+| `aggregation()` | Rows of an aggregate query, otherwise empty                                     |
 | `uri()`         | The `uri` template filled from the first item, e.g. `/products/12`, or `/products` |
 | `trace()`       | The DSL, whether it was cached, the SQL and its parameters                      |
-| `nextCursor()`  | With `IntentRequests.page(text, cursor)`: where the next page starts, `null` on the last |
+| `nextCursor()`  | With `IntentRequests.page(text, cursor)`: where the next page starts, empty on the last |
 
 Only the question → DSL translation is cached; every call runs the query. On WebFlux, `ReactiveIntentPipeline`
 (`intentflow-reactive`) returns `Mono`s. With the starter, inject `SpringIntentPipeline` to resolve a generic
@@ -276,7 +276,7 @@ orders | group status | count
 products | group category | avg price | sort avg desc | take 3
 ```
 
-`response.aggregation().rows()` holds one row per group: the group values and the result, numbers as `BigDecimal`.
+`response.aggregation().orElseThrow().rows()` holds one row per group: the group values and the result, numbers as `BigDecimal`.
 Rows are ordered by the result, largest first, unless the query sorts them.
 
 `top` keeps the first rows of every group and still returns entities, for questions like "the latest order of every
@@ -313,7 +313,7 @@ into ad-hoc SQL. Not supported:
 
 | Module                             | Maps rows with                                               |
 | ---------------------------------- | ------------------------------------------------------------ |
-| `intentflow-openmapper`            | OpenMapper `Procedures` (not yet on Oracle)                  |
+| `intentflow-openmapper`            | OpenMapper `Procedures`                                       |
 | `intentflow-jpa`                   | JPA: ids first, then JPQL with an optional entity graph      |
 | `intentflow-jimmer`                | Jimmer: ids first, then `findMapByIds` with an optional `Fetcher` |
 | `intentflow-spring-data-jdbc`      | Spring Data JDBC entity mapping                              |
@@ -335,8 +335,14 @@ overrides it.
 **LLM providers** connect to a model: `intentflow-openai` for OpenAI-compatible APIs, plus Azure OpenAI, Anthropic,
 Bedrock, Vertex AI and GigaChat; see [intentflow-providers](intentflow-providers/README.md).
 
-The build is tested against Spring Boot 3.2, 3.5 and 4.0. Spring Boot 3.0 and 3.1 are not supported, because the
-JDBC executors need `JdbcClient` (Spring Framework 6.1).
+| Tested on        | Versions                                                                          |
+| ---------------- | --------------------------------------------------------------------------------- |
+| Java             | 21, 25                                                                            |
+| Spring Boot      | 3.2, 3.5, 4.0; not 3.0 or 3.1, since the JDBC executors need `JdbcClient`         |
+| Databases        | Those in the dialect table, each on its real engine (Testcontainers; in memory for H2) |
+| LLM providers    | Each module against a stub of its API in CI; translation quality against live models with `llmTest`, see [intentflow-examples](intentflow-examples) |
+
+[CONTRIBUTING.md](CONTRIBUTING.md) describes how to build and contribute.
 
 ## How SQL is generated
 

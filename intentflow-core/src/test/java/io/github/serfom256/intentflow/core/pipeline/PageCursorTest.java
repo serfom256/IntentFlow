@@ -44,7 +44,7 @@ class PageCursorTest {
     private final AccessPolicy noTitleForClerks = new AccessPolicy() {
         @Override
         public boolean canSee(ServiceDescriptor service, FieldMapping field, IntentContext caller) {
-            return !(field.logical().value().equals("title") && "clerk".equals(caller.principal()));
+            return !(field.logical().value().equals("title") && caller.principal().filter("clerk"::equals).isPresent());
         }
     };
 
@@ -55,24 +55,17 @@ class PageCursorTest {
 
         Instance(byte[] key, String... answers) {
             Deque<String> queue = new ArrayDeque<>(Arrays.asList(answers));
-            pipeline = IntentPipelines.builder()
-                    .llm((text, catalog) -> {
-                        llmCalls.incrementAndGet();
-                        return DslSources.of(queue.size() > 1 ? queue.poll() : queue.peek());
-                    })
-                    .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                    .executor(new QueryExecutor() {
-                        @Override
-                        @SuppressWarnings("unchecked")
-                        public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
-                            return (List<T>) LongStream.rangeClosed(1, 6)
-                                    .mapToObj(id -> new Book(id, "t" + id, "a" + id)).toList();
-                        }
-                    })
-                    .catalog(ServiceCatalogs.fromAnnotated(Book.class))
-                    .accessPolicy(noTitleForClerks)
-                    .cursorKey(key)
-                    .build();
+            pipeline = IntentPipelines.builder().llm((text, catalog) -> {
+                llmCalls.incrementAndGet();
+                return DslSources.of(queue.size() > 1 ? queue.poll() : queue.peek());
+            }).sqlBuilder(SqlBuilders.create(new TestDialect())).executor(new QueryExecutor() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
+                    return (List<T>) LongStream.rangeClosed(1, 6).mapToObj(id -> new Book(id, "t" + id, "a" + id))
+                            .toList();
+                }
+            }).catalog(ServiceCatalogs.fromAnnotated(Book.class)).accessPolicy(noTitleForClerks).cursorKey(key).build();
         }
 
         IntentResponse<Book> page(String question, String cursor) {
@@ -94,7 +87,7 @@ class PageCursorTest {
         Instance first = new Instance(SHARED_KEY, SORTED);
         Instance second = new Instance(SHARED_KEY, "books | sort author | take 5");
 
-        String cursor = first.page("books by title", null).nextCursor();
+        String cursor = first.page("books by title", null).nextCursor().orElseThrow();
         IntentResponse<Book> next = second.page("books by title", cursor);
 
         assertThat(next.trace().dsl()).isEqualTo(SORTED);
@@ -107,7 +100,7 @@ class PageCursorTest {
     void theNextPageKeepsTheQueryEvenWhenTheModelWouldNowAnswerDifferently() {
         Instance instance = new Instance(SHARED_KEY, SORTED, "books | sort author | take 5");
 
-        String cursor = instance.page("books by title", null).nextCursor();
+        String cursor = instance.page("books by title", null).nextCursor().orElseThrow();
 
         assertThat(instance.page("books by title", cursor).trace().dsl()).isEqualTo(SORTED);
         assertThat(instance.llmCalls).hasValue(1);
@@ -115,7 +108,7 @@ class PageCursorTest {
 
     @Test
     void withoutTheKeyTheQuestionIsTranslatedAgainAndMustMatch() {
-        String cursor = new Instance(SHARED_KEY, SORTED).page("books by title", null).nextCursor();
+        String cursor = new Instance(SHARED_KEY, SORTED).page("books by title", null).nextCursor().orElseThrow();
         byte[] otherKey = "a different key of another instance".getBytes(StandardCharsets.UTF_8);
 
         Instance same = new Instance(otherKey, SORTED);
@@ -127,15 +120,14 @@ class PageCursorTest {
     @Test
     void anEditedCursorLosesItsSignature() {
         Instance instance = new Instance(SHARED_KEY, SORTED);
-        String cursor = instance.page("books by title", null).nextCursor();
+        String cursor = instance.page("books by title", null).nextCursor().orElseThrow();
         String payload = new String(Base64.getUrlDecoder().decode(cursor.substring(0, cursor.indexOf('.'))),
                 StandardCharsets.UTF_8);
         String[] parts = payload.split("\\|");
         parts[2] = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString("books | sort author | take 5".getBytes(StandardCharsets.UTF_8));
-        String edited = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(String.join("|", parts).getBytes(StandardCharsets.UTF_8))
-                + cursor.substring(cursor.indexOf('.'));
+        String edited = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                String.join("|", parts).getBytes(StandardCharsets.UTF_8)) + cursor.substring(cursor.indexOf('.'));
 
         assertInvalid(() -> instance.page("books by title", edited));
     }
@@ -143,7 +135,7 @@ class PageCursorTest {
     @Test
     void aCursorBelongsToItsQuestion() {
         Instance instance = new Instance(SHARED_KEY, SORTED);
-        String cursor = instance.page("books by title", null).nextCursor();
+        String cursor = instance.page("books by title", null).nextCursor().orElseThrow();
 
         assertInvalid(() -> instance.page("books by author", cursor));
         assertThat(instance.llmCalls).hasValue(1);
@@ -152,7 +144,7 @@ class PageCursorTest {
     @Test
     void aCursorIsCheckedAgainstTheCurrentCallersAccess() {
         Instance instance = new Instance(SHARED_KEY, SORTED);
-        String cursor = instance.page("books by title", null).nextCursor();
+        String cursor = instance.page("books by title", null).nextCursor().orElseThrow();
 
         assertInvalid(() -> instance.page("books by title", cursor, CLERK));
     }

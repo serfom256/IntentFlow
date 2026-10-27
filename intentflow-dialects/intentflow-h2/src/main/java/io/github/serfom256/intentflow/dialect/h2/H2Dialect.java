@@ -18,17 +18,16 @@ public final class H2Dialect implements SqlDialect {
 
     private static final Pattern FOLDED = Pattern.compile("[a-z_][a-z0-9_]*|[A-Z_][A-Z0-9_]*");
 
-    private static final Set<String> KEYWORDS = Set.of(
-            "ALL", "AND", "ANY", "ARRAY", "AS", "ASYMMETRIC", "AUTHORIZATION", "BETWEEN", "BOTH", "CASE", "CAST",
-            "CHECK", "CONSTRAINT", "CROSS", "CURRENT_CATALOG", "CURRENT_DATE", "CURRENT_PATH", "CURRENT_ROLE",
-            "CURRENT_SCHEMA", "CURRENT_TIME", "CURRENT_TIMESTAMP", "CURRENT_USER", "DAY", "DEFAULT", "DISTINCT",
-            "ELSE", "END", "EXCEPT", "EXISTS", "FALSE", "FETCH", "FOR", "FOREIGN", "FROM", "FULL", "GROUP", "GROUPS",
-            "HAVING", "HOUR", "IF", "ILIKE", "IN", "INNER", "INTERSECT", "INTERVAL", "IS", "JOIN", "KEY", "LEADING",
-            "LEFT", "LIKE", "LIMIT", "LOCALTIME", "LOCALTIMESTAMP", "MINUS", "MINUTE", "MONTH", "NATURAL", "NOT",
-            "NULL", "OFFSET", "ON", "OR", "ORDER", "OVER", "PARTITION", "PRIMARY", "QUALIFY", "RANGE", "REGEXP",
-            "RIGHT", "ROW", "ROWNUM", "ROWS", "SECOND", "SELECT", "SESSION_USER", "SET", "SOME", "SYMMETRIC",
-            "SYSTEM_USER", "TABLE", "TO", "TOP", "TRAILING", "TRUE", "UESCAPE", "UNION", "UNIQUE", "UNKNOWN", "USER",
-            "USING", "VALUE", "VALUES", "WHEN", "WHERE", "WINDOW", "WITH", "YEAR", "_ROWID_");
+    private static final Set<String> KEYWORDS = Set.of("ALL", "AND", "ANY", "ARRAY", "AS", "ASYMMETRIC",
+            "AUTHORIZATION", "BETWEEN", "BOTH", "CASE", "CAST", "CHECK", "CONSTRAINT", "CROSS", "CURRENT_CATALOG",
+            "CURRENT_DATE", "CURRENT_PATH", "CURRENT_ROLE", "CURRENT_SCHEMA", "CURRENT_TIME", "CURRENT_TIMESTAMP",
+            "CURRENT_USER", "DAY", "DEFAULT", "DISTINCT", "ELSE", "END", "EXCEPT", "EXISTS", "FALSE", "FETCH", "FOR",
+            "FOREIGN", "FROM", "FULL", "GROUP", "GROUPS", "HAVING", "HOUR", "IF", "ILIKE", "IN", "INNER", "INTERSECT",
+            "INTERVAL", "IS", "JOIN", "KEY", "LEADING", "LEFT", "LIKE", "LIMIT", "LOCALTIME", "LOCALTIMESTAMP", "MINUS",
+            "MINUTE", "MONTH", "NATURAL", "NOT", "NULL", "OFFSET", "ON", "OR", "ORDER", "OVER", "PARTITION", "PRIMARY",
+            "QUALIFY", "RANGE", "REGEXP", "RIGHT", "ROW", "ROWNUM", "ROWS", "SECOND", "SELECT", "SESSION_USER", "SET",
+            "SOME", "SYMMETRIC", "SYSTEM_USER", "TABLE", "TO", "TOP", "TRAILING", "TRUE", "UESCAPE", "UNION", "UNIQUE",
+            "UNKNOWN", "USER", "USING", "VALUE", "VALUES", "WHEN", "WHERE", "WINDOW", "WITH", "YEAR", "_ROWID_");
 
     @Override
     public String name() {
@@ -90,11 +89,11 @@ public final class H2Dialect implements SqlDialect {
         sql.text("CAST(");
         value.run();
         sql.text(switch (type) {
-            case NUMBER -> " AS NUMERIC(38, 10))";
-            case INTEGER -> " AS BIGINT)";
-            case TEXT -> " AS VARCHAR)";
-            case TIMESTAMP -> " AS TIMESTAMP)";
-            case DATE -> " AS DATE)";
+        case NUMBER -> " AS NUMERIC(38, 10))";
+        case INTEGER -> " AS BIGINT)";
+        case TEXT -> " AS VARCHAR)";
+        case TIMESTAMP -> " AS TIMESTAMP)";
+        case DATE -> " AS DATE)";
         });
     }
 

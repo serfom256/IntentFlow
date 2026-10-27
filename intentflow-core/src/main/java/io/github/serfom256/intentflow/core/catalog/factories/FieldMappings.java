@@ -18,14 +18,12 @@ public final class FieldMappings {
         return new DefaultFieldMapping(logical, column, queryable);
     }
 
-    public static FieldMapping of(LogicalFieldName logical, ColumnName column, boolean queryable,
-            FieldType type) {
+    public static FieldMapping of(LogicalFieldName logical, ColumnName column, boolean queryable, FieldType type) {
         return new DefaultFieldMapping(logical, column, queryable, type, null, List.of());
     }
 
-    public static FieldMapping of(LogicalFieldName logical, ColumnName column, boolean queryable,
-            FieldType type, @Nullable String description,
-            List<String> allowedValues) {
+    public static FieldMapping of(LogicalFieldName logical, ColumnName column, boolean queryable, FieldType type,
+            @Nullable String description, List<String> allowedValues) {
         return new DefaultFieldMapping(logical, column, queryable, type, description, allowedValues);
     }
 }

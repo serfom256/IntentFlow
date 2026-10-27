@@ -53,10 +53,7 @@ public class CustomerService {
     }
 
     private static Customer.CustomerBuilder apply(Customer.CustomerBuilder b, CustomerRequest r) {
-        return b.fullName(r.name().strip())
-                .email(r.email().strip().toLowerCase(Locale.ROOT))
-                .city(r.city().strip())
-                .country(r.country().toUpperCase(Locale.ROOT))
-                .vip(r.vip());
+        return b.fullName(r.name().strip()).email(r.email().strip().toLowerCase(Locale.ROOT)).city(r.city().strip())
+                .country(r.country().toUpperCase(Locale.ROOT)).vip(r.vip());
     }
 }

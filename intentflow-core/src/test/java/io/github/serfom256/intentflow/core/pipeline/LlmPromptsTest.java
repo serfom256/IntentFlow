@@ -6,6 +6,7 @@ import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,19 +17,30 @@ class LlmPromptsTest {
     }
 
     @IntentService(value = "books", uri = "/books/{{id}}", description = "Books in stock")
-    record Book(@IntentField long id, @IntentField(description = "as printed") String title,
-            @IntentField Genre genre, String supplier) {
+    record Book(@IntentField long id, @IntentField(description = "as printed") String title, @IntentField Genre genre,
+            String supplier) {
+    }
+
+    @IntentService(value = "shelves", uri = "/shelves/{{id}}")
+    record Shelf(@IntentField long id, @IntentField LocalDateTime filledAt) {
     }
 
     @Test
     void theSystemPromptListsTheCatalogAndToday() {
         String prompt = LlmPrompts.system(ServiceCatalogs.fromAnnotated(Book.class), LocalDate.of(2026, 10, 21));
 
-        assertThat(prompt).contains("Today is 2026-10-21.")
-                .contains("- books: Books in stock")
-                .contains("    title (text) - as printed")
-                .contains("    genre (text, one of: FANTASY, HISTORY)")
+        assertThat(prompt).contains("Today is 2026-10-21.").contains("- books: Books in stock")
+                .contains("  title (text) - as printed").contains("  genre (text, one of: FANTASY, HISTORY)")
                 .doesNotContain("supplier");
+    }
+
+    @Test
+    void rulesForDatesAndRelationsAppearOnlyWhenTheCatalogHasThem() {
+        String prompt = LlmPrompts.system(ServiceCatalogs.fromAnnotated(Book.class), LocalDate.of(2026, 10, 21));
+
+        assertThat(prompt).doesNotContain("Timestamps are").doesNotContain("<relation>.<field>");
+        assertThat(LlmPrompts.system(ServiceCatalogs.fromAnnotated(Shelf.class), LocalDate.of(2026, 10, 21)))
+                .contains("Timestamps are");
     }
 
     @Test

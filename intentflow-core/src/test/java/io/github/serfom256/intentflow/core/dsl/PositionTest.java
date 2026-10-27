@@ -1,7 +1,6 @@
 package io.github.serfom256.intentflow.core.dsl;
 
 import io.github.serfom256.intentflow.core.dsl.factories.Positions;
-import io.github.serfom256.intentflow.core.dsl.factories.Lexers;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,22 +26,19 @@ class PositionTest {
 
     @Test
     void rejectsNegativeOffset() {
-        assertThatThrownBy(() -> Positions.of(-1, 1, 1))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> Positions.of(-1, 1, 1)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("offset");
     }
 
     @Test
     void rejectsZeroLine() {
-        assertThatThrownBy(() -> Positions.of(0, 0, 1))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> Positions.of(0, 0, 1)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("line");
     }
 
     @Test
     void rejectsZeroColumn() {
-        assertThatThrownBy(() -> Positions.of(0, 1, 0))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> Positions.of(0, 1, 0)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("column");
     }
 }

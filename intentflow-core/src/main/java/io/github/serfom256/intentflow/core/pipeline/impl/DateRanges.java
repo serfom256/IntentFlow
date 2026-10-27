@@ -44,48 +44,46 @@ final class DateRanges {
     static FilterExpr rewrite(FilterExpr expr, Predicate<LogicalFieldName> timestamp,
             Predicate<LogicalFieldName> nullable) {
         return switch (expr) {
-            case And a -> conjunction(a, timestamp, nullable);
-            case Or o -> {
-                FilterExpr left = rewrite(o.left(), timestamp, nullable);
-                FilterExpr right = rewrite(o.right(), timestamp, nullable);
-                yield left == o.left() && right == o.right() ? o : new Or(left, right);
+        case And a -> conjunction(a, timestamp, nullable);
+        case Or o -> {
+            FilterExpr left = rewrite(o.left(), timestamp, nullable);
+            FilterExpr right = rewrite(o.right(), timestamp, nullable);
+            yield left == o.left() && right == o.right() ? o : new Or(left, right);
+        }
+        case Not n -> {
+            FilterExpr inner = rewrite(n.inner(), timestamp, nullable);
+            if (inner == n.inner()) {
+                yield n;
             }
-            case Not n -> {
-                FilterExpr inner = rewrite(n.inner(), timestamp, nullable);
-                if (inner == n.inner()) {
-                    yield n;
-                }
-                LogicalFieldName field = negatedField(n.inner());
-                yield field != null && nullable.test(field) ? new Or(new Not(inner), new IsNull(field))
-                        : new Not(inner);
+            LogicalFieldName field = negatedField(n.inner());
+            yield field != null && nullable.test(field) ? new Or(new Not(inner), new IsNull(field)) : new Not(inner);
+        }
+        case ExprCompare c -> {
+            FilterExpr range = single(c, timestamp);
+            LogicalFieldName field = rangeField(c.left());
+            if (range == null || field == null) {
+                yield c;
             }
-            case ExprCompare c -> {
-                FilterExpr range = single(c, timestamp);
-                LogicalFieldName field = rangeField(c.left());
-                if (range == null || field == null) {
-                    yield c;
-                }
-                yield c.op() == ComparisonOp.NE && nullable.test(field) ? new Or(range, new IsNull(field)) : range;
-            }
-            case ExprIn i -> {
-                FilterExpr range = years(i, timestamp);
-                yield range == null ? i : range;
-            }
-            default -> expr;
+            yield c.op() == ComparisonOp.NE && nullable.test(field) ? new Or(range, new IsNull(field)) : range;
+        }
+        case ExprIn i -> {
+            FilterExpr range = years(i, timestamp);
+            yield range == null ? i : range;
+        }
+        default -> expr;
         };
     }
 
     private static @Nullable LogicalFieldName negatedField(FilterExpr inner) {
         return switch (inner) {
-            case ExprCompare c when c.op() != ComparisonOp.NE -> rangeField(c.left());
-            case ExprIn i -> rangeField(i.value());
-            default -> null;
+        case ExprCompare c when c.op() != ComparisonOp.NE -> rangeField(c.left());
+        case ExprIn i -> rangeField(i.value());
+        default -> null;
         };
     }
 
     private static @Nullable LogicalFieldName rangeField(ValueExpr value) {
-        if (value instanceof Call call && !call.args().isEmpty()
-                && call.args().getLast() instanceof FieldRef f) {
+        if (value instanceof Call call && !call.args().isEmpty() && call.args().getLast() instanceof FieldRef f) {
             return f.field();
         }
         return null;
@@ -180,8 +178,8 @@ final class DateRanges {
     private static @Nullable FilterExpr truncated(Call call, ExprCompare c, Predicate<LogicalFieldName> timestamp) {
         if (!(call.args().get(1) instanceof FieldRef f) || !timestamp.test(f.field())
                 || !(call.args().getFirst() instanceof LiteralExpr unitLiteral)
-                || !(unitLiteral.value() instanceof TextLiteral unitText)
-                || !(c.right() instanceof LiteralExpr l) || !(l.value() instanceof TextLiteral t)) {
+                || !(unitLiteral.value() instanceof TextLiteral unitText) || !(c.right() instanceof LiteralExpr l)
+                || !(l.value() instanceof TextLiteral t)) {
             return null;
         }
         LocalDateTime start = parse(t.value());
@@ -190,11 +188,11 @@ final class DateRanges {
             return null;
         }
         LocalDateTime end = switch (unit) {
-            case "year" -> start.plusYears(1);
-            case "month" -> start.plusMonths(1);
-            case "day" -> start.plusDays(1);
-            case "hour" -> start.plusHours(1);
-            default -> null;
+        case "year" -> start.plusYears(1);
+        case "month" -> start.plusMonths(1);
+        case "day" -> start.plusDays(1);
+        case "hour" -> start.plusHours(1);
+        default -> null;
         };
         return end == null ? null : bounded(f.field(), c.op(), start, end);
     }
@@ -220,13 +218,13 @@ final class DateRanges {
     private static @Nullable FilterExpr bounded(LogicalFieldName field, ComparisonOp op, LocalDateTime start,
             LocalDateTime end) {
         return switch (op) {
-            case EQ -> range(field, start, end);
-            case NE -> new Or(compare(field, ComparisonOp.LT, start), compare(field, ComparisonOp.GE, end));
-            case LT -> compare(field, ComparisonOp.LT, start);
-            case LE -> compare(field, ComparisonOp.LT, end);
-            case GT -> compare(field, ComparisonOp.GE, end);
-            case GE -> compare(field, ComparisonOp.GE, start);
-            case CONTAINS -> null;
+        case EQ -> range(field, start, end);
+        case NE -> new Or(compare(field, ComparisonOp.LT, start), compare(field, ComparisonOp.GE, end));
+        case LT -> compare(field, ComparisonOp.LT, start);
+        case LE -> compare(field, ComparisonOp.LT, end);
+        case GT -> compare(field, ComparisonOp.GE, end);
+        case GE -> compare(field, ComparisonOp.GE, start);
+        case CONTAINS -> null;
         };
     }
 
@@ -297,11 +295,11 @@ final class DateRanges {
 
     private static boolean aligned(LocalDateTime start, String unit) {
         return switch (unit) {
-            case "year" -> start.getDayOfYear() == 1 && start.toLocalTime().equals(LocalTime.MIDNIGHT);
-            case "month" -> start.getDayOfMonth() == 1 && start.toLocalTime().equals(LocalTime.MIDNIGHT);
-            case "day" -> start.toLocalTime().equals(LocalTime.MIDNIGHT);
-            case "hour" -> start.getMinute() == 0 && start.getSecond() == 0 && start.getNano() == 0;
-            default -> false;
+        case "year" -> start.getDayOfYear() == 1 && start.toLocalTime().equals(LocalTime.MIDNIGHT);
+        case "month" -> start.getDayOfMonth() == 1 && start.toLocalTime().equals(LocalTime.MIDNIGHT);
+        case "day" -> start.toLocalTime().equals(LocalTime.MIDNIGHT);
+        case "hour" -> start.getMinute() == 0 && start.getSecond() == 0 && start.getNano() == 0;
+        default -> false;
         };
     }
 }

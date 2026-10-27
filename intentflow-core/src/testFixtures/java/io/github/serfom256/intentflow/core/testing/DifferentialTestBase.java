@@ -28,13 +28,14 @@ import io.github.serfom256.intentflow.core.ast.Not;
 import io.github.serfom256.intentflow.core.ast.NullLiteral;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
 import io.github.serfom256.intentflow.core.ast.Or;
+import io.github.serfom256.intentflow.core.ast.Skip;
+import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.ast.ValueExpr;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
-import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
@@ -117,8 +118,8 @@ public abstract class DifferentialTestBase {
             fields.put(f.logical().value(), f);
         }
         assertThat(gadgets.table().value()).isEqualTo("gadget");
-        assertThat(fields.keySet()).containsExactlyInAnyOrder(
-                "id", "name", "kind", "price", "stock", "active", "created_at");
+        assertThat(fields.keySet()).containsExactlyInAnyOrder("id", "name", "kind", "price", "stock", "active",
+                "created_at");
         assertThat(fields.get("created_at").column().value()).isEqualTo("created_at");
         assertThat(fields.get("kind").caseSensitive()).as("kind must be @IntentField(caseSensitive = true)").isTrue();
 
@@ -161,9 +162,8 @@ public abstract class DifferentialTestBase {
             String ctx = entityType().getSimpleName() + " on " + target() + " seed " + seed + " #" + i + ": " + dsl;
 
             assertThat(actual.type()).as(ctx).isEqualTo(entityType());
-            List<Map<String, Object>> matching = top(q, data.stream()
-                    .filter(row -> Boolean.TRUE.equals(eval(q.filter(), row)))
-                    .toList());
+            List<Map<String, Object>> matching = top(q,
+                    data.stream().filter(row -> Boolean.TRUE.equals(eval(q.filter().orElse(null), row))).toList());
             List<List<Object>> got = actual.items().stream().map(e -> row(e, columns)).toList();
 
             List<SortKey> sort = ValidatedQueries.of(gadgets, q).effectiveSort();
@@ -175,9 +175,8 @@ public abstract class DifferentialTestBase {
             if (got.isEmpty()) {
                 assertThat(actual.uri().value()).as(ctx).isEqualTo("/gadgets");
             } else {
-                assertThat(actual.uri().value()).as(ctx)
-                        .isEqualTo(
-                                "/gadgets/" + ((BigDecimal) got.getFirst().get(columns.indexOf("id"))).toPlainString());
+                assertThat(actual.uri().value()).as(ctx).isEqualTo(
+                        "/gadgets/" + ((BigDecimal) got.getFirst().get(columns.indexOf("id"))).toPlainString());
             }
         }
     }
@@ -188,13 +187,13 @@ public abstract class DifferentialTestBase {
         RandomQueries gen = new RandomQueries(seed, gadgets, pools(), "abcXYZ01 _%'\\\"", 3);
         for (int i = 0; i < AGGREGATES_PER_SEED; i++) {
             AstQuery q = gen.aggregateQuery();
-            Aggregate aggregate = Objects.requireNonNull(q.aggregate());
+            Aggregate aggregate = q.aggregate().orElseThrow();
             String dsl = RandomQueries.print(q);
             String ctx = entityType().getSimpleName() + " on " + target() + " seed " + seed + " #" + i + ": " + dsl;
             IntentResponse<?> actual = pipelineAnswering(dsl).resolve(IntentRequests.of("q"), entityType());
 
             assertThat(actual.items()).as(ctx).isEmpty();
-            Aggregation aggregation = Objects.requireNonNull(actual.aggregation(), ctx);
+            Aggregation aggregation = actual.aggregation().orElseThrow(() -> new AssertionError(ctx));
             List<List<Object>> got = aggregation.rows().stream().map(r -> {
                 List<Object> row = new ArrayList<>();
                 r.group().forEach(v -> row.add(normalize(v)));
@@ -209,8 +208,8 @@ public abstract class DifferentialTestBase {
                 assertThat(g.subList(0, g.size() - 1)).as(ctx + " row " + r).isEqualTo(e.subList(0, e.size() - 1));
                 Object gv = g.getLast(), ev = e.getLast();
                 if (aggregate.function() == AggregateFunction.AVG && gv != null && ev != null) {
-                    assertThat((BigDecimal) gv).as(ctx + " row " + r)
-                            .isCloseTo((BigDecimal) ev, within(new BigDecimal("0.0001")));
+                    assertThat((BigDecimal) gv).as(ctx + " row " + r).isCloseTo((BigDecimal) ev,
+                            within(new BigDecimal("0.0001")));
                 } else {
                     assertThat(gv).as(ctx + " row " + r).isEqualTo(ev);
                 }
@@ -222,7 +221,7 @@ public abstract class DifferentialTestBase {
         List<String> groupBy = aggregate.groupNames();
         Map<List<Object>, List<Map<String, Object>>> groups = new LinkedHashMap<>();
         for (Map<String, Object> row : data) {
-            if (Boolean.TRUE.equals(eval(q.filter(), row))) {
+            if (Boolean.TRUE.equals(eval(q.filter().orElse(null), row))) {
                 List<Object> key = new ArrayList<>();
                 aggregate.groupBy().forEach(g -> key.add(normalize(value(g, row))));
                 groups.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
@@ -247,23 +246,23 @@ public abstract class DifferentialTestBase {
         if (aggregate.function() == AggregateFunction.COUNT) {
             return BigDecimal.valueOf(rows.size());
         }
-        List<Object> values = rows.stream().map(r -> normalize(value(aggregate.argument(), r)))
-                .filter(Objects::nonNull).toList();
+        List<Object> values = rows.stream().map(r -> normalize(value(aggregate.argument(), r))).filter(Objects::nonNull)
+                .toList();
         if (values.isEmpty()) {
             return null;
         }
         return switch (aggregate.function()) {
-            case SUM -> values.stream().map(BigDecimal.class::cast).reduce(BigDecimal.ZERO, BigDecimal::add);
-            case AVG -> values.stream().map(BigDecimal.class::cast).reduce(BigDecimal.ZERO, BigDecimal::add)
-                    .divide(BigDecimal.valueOf(values.size()), 10, RoundingMode.HALF_UP);
-            case MIN -> values.stream().min(DifferentialTestBase::compareValues).orElseThrow();
-            case MAX -> values.stream().max(DifferentialTestBase::compareValues).orElseThrow();
-            case COUNT -> throw new IllegalStateException();
+        case SUM -> values.stream().map(BigDecimal.class::cast).reduce(BigDecimal.ZERO, BigDecimal::add);
+        case AVG -> values.stream().map(BigDecimal.class::cast).reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(values.size()), 10, RoundingMode.HALF_UP);
+        case MIN -> values.stream().min(DifferentialTestBase::compareValues).orElseThrow();
+        case MAX -> values.stream().max(DifferentialTestBase::compareValues).orElseThrow();
+        case COUNT -> throw new IllegalStateException();
         };
     }
 
     private List<Map<String, Object>> top(AstQuery q, List<Map<String, Object>> rows) {
-        TopN top = q.top();
+        TopN top = q.top().orElse(null);
         if (top == null) {
             return rows;
         }
@@ -283,8 +282,8 @@ public abstract class DifferentialTestBase {
     }
 
     private List<List<Object>> page(List<List<Object>> ordered, AstQuery q) {
-        int skip = q.skip() == null ? 0 : q.skip().value();
-        int limit = q.take() == null ? gadgets.maxTake().value() : q.take().value();
+        int skip = q.skip().map(Skip::value).orElse(0);
+        int limit = q.take().map(Take::value).orElse(gadgets.maxTake().value());
         return ordered.subList(Math.min(skip, ordered.size()), Math.min(ordered.size(), skip + limit));
     }
 
@@ -318,50 +317,50 @@ public abstract class DifferentialTestBase {
 
     private Object value(ValueExpr expr, Map<String, Object> row) {
         return switch (expr) {
-            case FieldRef f -> row.get(f.field().value());
-            case LiteralExpr l -> switch (l.value()) {
-                case TextLiteral t -> t.value();
-                case NumberLiteral n -> n.value();
-                case BoolLiteral b -> b.value();
-                case NullLiteral n -> null;
+        case FieldRef f -> row.get(f.field().value());
+        case LiteralExpr l -> switch (l.value()) {
+        case TextLiteral t -> t.value();
+        case NumberLiteral n -> n.value();
+        case BoolLiteral b -> b.value();
+        case NullLiteral n -> null;
+        };
+        case Arith a -> {
+            Object left = value(a.left(), row), right = value(a.right(), row);
+            if (left == null || right == null) {
+                yield null;
+            }
+            BigDecimal l = (BigDecimal) left, r = (BigDecimal) right;
+            yield switch (a.op()) {
+            case ADD -> l.add(r);
+            case SUBTRACT -> l.subtract(r);
+            case MULTIPLY -> l.multiply(r);
+            case DIVIDE -> r.signum() == 0 ? null : l.divide(r, 20, RoundingMode.HALF_UP);
             };
-            case Arith a -> {
-                Object left = value(a.left(), row), right = value(a.right(), row);
-                if (left == null || right == null) {
-                    yield null;
-                }
-                BigDecimal l = (BigDecimal) left, r = (BigDecimal) right;
-                yield switch (a.op()) {
-                    case ADD -> l.add(r);
-                    case SUBTRACT -> l.subtract(r);
-                    case MULTIPLY -> l.multiply(r);
-                    case DIVIDE -> r.signum() == 0 ? null : l.divide(r, 20, RoundingMode.HALF_UP);
-                };
+        }
+        case CastExpr c -> {
+            Object v = value(c.value(), row);
+            if (v == null) {
+                yield null;
             }
-            case CastExpr c -> {
-                Object v = value(c.value(), row);
-                if (v == null) {
-                    yield null;
-                }
-                yield switch (c.type()) {
-                    case NUMBER -> v instanceof BigDecimal n ? n : new BigDecimal(v.toString().strip());
-                    case INTEGER -> (v instanceof BigDecimal n ? n : new BigDecimal(v.toString().strip()))
-                            .setScale(0, RoundingMode.HALF_UP);
-                    case TEXT -> v instanceof BigDecimal n ? n.toPlainString() : v.toString();
-                    case TIMESTAMP -> v instanceof String s ? parseTimestamp(s) : v;
-                    case DATE -> v instanceof String s ? LocalDate.parse(s.substring(0, 10))
-                            : ((LocalDateTime) v).toLocalDate();
-                };
-            }
-            case Call c -> call(c, row);
+            yield switch (c.type()) {
+            case NUMBER -> v instanceof BigDecimal n ? n : new BigDecimal(v.toString().strip());
+            case INTEGER -> (v instanceof BigDecimal n ? n : new BigDecimal(v.toString().strip())).setScale(0,
+                    RoundingMode.HALF_UP);
+            case TEXT -> v instanceof BigDecimal n ? n.toPlainString() : v.toString();
+            case TIMESTAMP -> v instanceof String s ? parseTimestamp(s) : v;
+            case DATE ->
+                v instanceof String s ? LocalDate.parse(s.substring(0, 10)) : ((LocalDateTime) v).toLocalDate();
+            };
+        }
+        case Call c -> call(c, row);
         };
     }
 
     private Object call(Call c, Map<String, Object> row) {
         List<ValueExpr> args = c.args();
         if (c.function() == ExprFunction.COALESCE) {
-            boolean temporal = args.stream().anyMatch(a -> a instanceof FieldRef f
-                    && fields.get(f.field().value()).type() == FieldType.TIMESTAMP);
+            boolean temporal = args.stream().anyMatch(
+                    a -> a instanceof FieldRef f && fields.get(f.field().value()).type() == FieldType.TIMESTAMP);
             for (ValueExpr arg : args) {
                 Object v = value(arg, row);
                 if (v != null) {
@@ -375,32 +374,31 @@ public abstract class DifferentialTestBase {
             return null;
         }
         return switch (c.function()) {
-            case YEAR -> BigDecimal.valueOf(((LocalDateTime) v).getYear());
-            case MONTH -> BigDecimal.valueOf(((LocalDateTime) v).getMonthValue());
-            case DAY -> BigDecimal.valueOf(((LocalDateTime) v).getDayOfMonth());
-            case HOUR -> BigDecimal.valueOf(((LocalDateTime) v).getHour());
-            case DATE_TRUNC -> {
-                LocalDateTime t = (LocalDateTime) v;
-                yield switch (((String) value(args.getFirst(), row)).toLowerCase(Locale.ROOT)) {
-                    case "year" -> t.withDayOfYear(1).truncatedTo(ChronoUnit.DAYS);
-                    case "month" -> t.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS);
-                    case "day" -> t.truncatedTo(ChronoUnit.DAYS);
-                    default -> t.truncatedTo(ChronoUnit.HOURS);
-                };
-            }
-            case LENGTH -> BigDecimal.valueOf(((String) v).codePointCount(0, ((String) v).length()));
-            case LOWER -> ((String) v).toLowerCase(Locale.ROOT);
-            case UPPER -> ((String) v).toUpperCase(Locale.ROOT);
-            case ABS -> ((BigDecimal) v).abs();
-            case ROUND -> {
-                Object first = value(args.getFirst(), row);
-                yield first == null ? null
-                        : ((BigDecimal) first).setScale(args.size() == 2
-                                ? ((NumberLiteral) ((LiteralExpr) args.get(1)).value()).value().intValueExact()
-                                : 0,
-                                RoundingMode.HALF_UP);
-            }
-            case COALESCE -> throw new IllegalStateException();
+        case YEAR -> BigDecimal.valueOf(((LocalDateTime) v).getYear());
+        case MONTH -> BigDecimal.valueOf(((LocalDateTime) v).getMonthValue());
+        case DAY -> BigDecimal.valueOf(((LocalDateTime) v).getDayOfMonth());
+        case HOUR -> BigDecimal.valueOf(((LocalDateTime) v).getHour());
+        case DATE_TRUNC -> {
+            LocalDateTime t = (LocalDateTime) v;
+            yield switch (((String) value(args.getFirst(), row)).toLowerCase(Locale.ROOT)) {
+            case "year" -> t.withDayOfYear(1).truncatedTo(ChronoUnit.DAYS);
+            case "month" -> t.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS);
+            case "day" -> t.truncatedTo(ChronoUnit.DAYS);
+            default -> t.truncatedTo(ChronoUnit.HOURS);
+            };
+        }
+        case LENGTH -> BigDecimal.valueOf(((String) v).codePointCount(0, ((String) v).length()));
+        case LOWER -> ((String) v).toLowerCase(Locale.ROOT);
+        case UPPER -> ((String) v).toUpperCase(Locale.ROOT);
+        case ABS -> ((BigDecimal) v).abs();
+        case ROUND -> {
+            Object first = value(args.getFirst(), row);
+            yield first == null ? null
+                    : ((BigDecimal) first).setScale(args.size() == 2
+                            ? ((NumberLiteral) ((LiteralExpr) args.get(1)).value()).value().intValueExact()
+                            : 0, RoundingMode.HALF_UP);
+        }
+        case COALESCE -> throw new IllegalStateException();
         };
     }
 
@@ -428,17 +426,16 @@ public abstract class DifferentialTestBase {
             right = LocalDate.parse(s.substring(0, 10));
         }
         int c = left instanceof String a && right instanceof String b
-                && (op == ComparisonOp.EQ || op == ComparisonOp.NE)
-                        ? lower(a).compareTo(lower(b))
+                && (op == ComparisonOp.EQ || op == ComparisonOp.NE) ? lower(a).compareTo(lower(b))
                         : compareValues(left, right);
         return switch (op) {
-            case EQ -> c == 0;
-            case NE -> c != 0;
-            case LT -> c < 0;
-            case LE -> c <= 0;
-            case GT -> c > 0;
-            case GE -> c >= 0;
-            case CONTAINS -> throw new IllegalStateException();
+        case EQ -> c == 0;
+        case NE -> c != 0;
+        case LT -> c < 0;
+        case LE -> c <= 0;
+        case GT -> c > 0;
+        case GE -> c >= 0;
+        case CONTAINS -> throw new IllegalStateException();
         };
     }
 
@@ -447,83 +444,84 @@ public abstract class DifferentialTestBase {
             return true;
         }
         return switch (e) {
-            case And a -> {
-                Boolean l = eval(a.left(), row), r = eval(a.right(), row);
-                yield Boolean.FALSE.equals(l) || Boolean.FALSE.equals(r) ? Boolean.FALSE
-                        : l == null || r == null ? null : Boolean.TRUE;
+        case And a -> {
+            Boolean l = eval(a.left(), row), r = eval(a.right(), row);
+            yield Boolean.FALSE.equals(l) || Boolean.FALSE.equals(r) ? Boolean.FALSE
+                    : l == null || r == null ? null : Boolean.TRUE;
+        }
+        case Or o -> {
+            Boolean l = eval(o.left(), row), r = eval(o.right(), row);
+            yield Boolean.TRUE.equals(l) || Boolean.TRUE.equals(r) ? Boolean.TRUE
+                    : l == null || r == null ? null : Boolean.FALSE;
+        }
+        case Not n -> {
+            if (nullOperand(n.inner(), row)) {
+                yield true;
             }
-            case Or o -> {
-                Boolean l = eval(o.left(), row), r = eval(o.right(), row);
-                yield Boolean.TRUE.equals(l) || Boolean.TRUE.equals(r) ? Boolean.TRUE
-                        : l == null || r == null ? null : Boolean.FALSE;
-            }
-            case Not n -> {
-                if (nullOperand(n.inner(), row)) {
-                    yield true;
+            Boolean v = eval(n.inner(), row);
+            yield v == null ? null : !v;
+        }
+        case ExprCompare c -> exprCompare(c.left(), c.op(), c.right(), row);
+        case ExprIn in -> {
+            boolean unknown = false;
+            Boolean result = Boolean.FALSE;
+            for (DslLiteral v : in.values()) {
+                Boolean match = exprCompare(in.value(), ComparisonOp.EQ, new LiteralExpr(v), row);
+                if (Boolean.TRUE.equals(match)) {
+                    result = Boolean.TRUE;
+                    break;
                 }
-                Boolean v = eval(n.inner(), row);
-                yield v == null ? null : !v;
+                unknown |= match == null;
             }
-            case ExprCompare c -> exprCompare(c.left(), c.op(), c.right(), row);
-            case ExprIn in -> {
-                boolean unknown = false;
-                Boolean result = Boolean.FALSE;
-                for (DslLiteral v : in.values()) {
-                    Boolean match = exprCompare(in.value(), ComparisonOp.EQ, new LiteralExpr(v), row);
-                    if (Boolean.TRUE.equals(match)) {
-                        result = Boolean.TRUE;
-                        break;
-                    }
-                    unknown |= match == null;
-                }
-                yield Boolean.TRUE.equals(result) ? Boolean.TRUE : unknown ? null : Boolean.FALSE;
+            yield Boolean.TRUE.equals(result) ? Boolean.TRUE : unknown ? null : Boolean.FALSE;
+        }
+        case IsNull n -> row.get(n.field().value()) == null;
+        case IsNotNull n -> row.get(n.field().value()) != null;
+        case In in -> {
+            Object col = row.get(in.field().value());
+            if (col == null) {
+                yield null;
             }
-            case IsNull n -> row.get(n.field().value()) == null;
-            case IsNotNull n -> row.get(n.field().value()) != null;
-            case In in -> {
-                Object col = row.get(in.field().value());
-                if (col == null) {
-                    yield null;
-                }
-                FieldMapping fm = fields.get(in.field().value());
-                yield in.values().stream().anyMatch(v -> fm.type() == FieldType.TIMESTAMP
-                        ? Boolean.TRUE.equals(day(ComparisonOp.EQ, (LocalDateTime) col, ((TextLiteral) v).value()))
-                        : compare(fm, col, v, true) == 0);
+            FieldMapping fm = fields.get(in.field().value());
+            yield in.values().stream()
+                    .anyMatch(v -> fm.type() == FieldType.TIMESTAMP
+                            ? Boolean.TRUE.equals(day(ComparisonOp.EQ, (LocalDateTime) col, ((TextLiteral) v).value()))
+                            : compare(fm, col, v, true) == 0);
+        }
+        case Compare c -> {
+            Object col = row.get(c.field().value());
+            if (col == null) {
+                yield c.op() == ComparisonOp.NE ? Boolean.TRUE : null;
             }
-            case Compare c -> {
-                Object col = row.get(c.field().value());
-                if (col == null) {
-                    yield c.op() == ComparisonOp.NE ? Boolean.TRUE : null;
-                }
-                FieldMapping fm = fields.get(c.field().value());
-                Boolean day = fm.type() == FieldType.TIMESTAMP
-                        ? day(c.op(), (LocalDateTime) col, ((TextLiteral) c.value()).value())
-                        : null;
-                if (day != null) {
-                    yield day;
-                }
-                yield switch (c.op()) {
-                    case CONTAINS -> lower(col).contains(lower(((TextLiteral) c.value()).value()));
-                    case EQ -> compare(fm, col, c.value(), true) == 0;
-                    case NE -> compare(fm, col, c.value(), true) != 0;
-                    case LT -> compare(fm, col, c.value(), false) < 0;
-                    case LE -> compare(fm, col, c.value(), false) <= 0;
-                    case GT -> compare(fm, col, c.value(), false) > 0;
-                    case GE -> compare(fm, col, c.value(), false) >= 0;
-                };
+            FieldMapping fm = fields.get(c.field().value());
+            Boolean day = fm.type() == FieldType.TIMESTAMP
+                    ? day(c.op(), (LocalDateTime) col, ((TextLiteral) c.value()).value())
+                    : null;
+            if (day != null) {
+                yield day;
             }
+            yield switch (c.op()) {
+            case CONTAINS -> lower(col).contains(lower(((TextLiteral) c.value()).value()));
+            case EQ -> compare(fm, col, c.value(), true) == 0;
+            case NE -> compare(fm, col, c.value(), true) != 0;
+            case LT -> compare(fm, col, c.value(), false) < 0;
+            case LE -> compare(fm, col, c.value(), false) <= 0;
+            case GT -> compare(fm, col, c.value(), false) > 0;
+            case GE -> compare(fm, col, c.value(), false) >= 0;
+            };
+        }
         };
     }
 
     private boolean nullOperand(FilterExpr inner, Map<String, Object> row) {
         return switch (inner) {
-            case Compare c when c.op() != ComparisonOp.NE -> row.get(c.field().value()) == null;
-            case In i -> row.get(i.field().value()) == null;
-            case ExprCompare c when c.op() != ComparisonOp.NE
-                    && !(c.right() instanceof LiteralExpr l && l.value() instanceof NullLiteral) ->
-                value(c.left(), row) == null;
-            case ExprIn i -> value(i.value(), row) == null;
-            default -> false;
+        case Compare c when c.op() != ComparisonOp.NE -> row.get(c.field().value()) == null;
+        case In i -> row.get(i.field().value()) == null;
+        case ExprCompare c when c.op() != ComparisonOp.NE
+                && !(c.right() instanceof LiteralExpr l && l.value() instanceof NullLiteral) ->
+            value(c.left(), row) == null;
+        case ExprIn i -> value(i.value(), row) == null;
+        default -> false;
         };
     }
 
@@ -534,37 +532,36 @@ public abstract class DifferentialTestBase {
         LocalDateTime start = LocalDate.parse(literal).atStartOfDay();
         LocalDateTime end = start.plusDays(1);
         return switch (op) {
-            case EQ -> !at.isBefore(start) && at.isBefore(end);
-            case NE -> at.isBefore(start) || !at.isBefore(end);
-            case LT -> at.isBefore(start);
-            case GE -> !at.isBefore(start);
-            case GT -> !at.isBefore(end);
-            case LE -> at.isBefore(end);
-            case CONTAINS -> throw new IllegalStateException();
+        case EQ -> !at.isBefore(start) && at.isBefore(end);
+        case NE -> at.isBefore(start) || !at.isBefore(end);
+        case LT -> at.isBefore(start);
+        case GE -> !at.isBefore(start);
+        case GT -> !at.isBefore(end);
+        case LE -> at.isBefore(end);
+        case CONTAINS -> throw new IllegalStateException();
         };
     }
 
     private static Boolean dayless(ComparisonOp op, LocalDateTime at, LocalDateTime value) {
         int c = at.compareTo(value);
         return switch (op) {
-            case EQ -> c == 0;
-            case NE -> c != 0;
-            case LT -> c < 0;
-            case LE -> c <= 0;
-            case GT -> c > 0;
-            case GE -> c >= 0;
-            case CONTAINS -> throw new IllegalStateException();
+        case EQ -> c == 0;
+        case NE -> c != 0;
+        case LT -> c < 0;
+        case LE -> c <= 0;
+        case GT -> c > 0;
+        case GE -> c >= 0;
+        case CONTAINS -> throw new IllegalStateException();
         };
     }
 
     private static int compare(FieldMapping fm, Object col, DslLiteral v, boolean equality) {
         return switch (fm.type()) {
-            case TEXT, ANY -> equality && !fm.caseSensitive()
-                    ? lower(col).compareTo(lower(((TextLiteral) v).value()))
-                    : ((String) col).compareTo(((TextLiteral) v).value());
-            case NUMBER -> ((BigDecimal) col).compareTo(((NumberLiteral) v).value());
-            case BOOLEAN -> Boolean.compare((Boolean) col, ((BoolLiteral) v).value());
-            case TIMESTAMP -> ((LocalDateTime) col).compareTo(parseTimestamp(((TextLiteral) v).value()));
+        case TEXT, ANY -> equality && !fm.caseSensitive() ? lower(col).compareTo(lower(((TextLiteral) v).value()))
+                : ((String) col).compareTo(((TextLiteral) v).value());
+        case NUMBER -> ((BigDecimal) col).compareTo(((NumberLiteral) v).value());
+        case BOOLEAN -> Boolean.compare((Boolean) col, ((BoolLiteral) v).value());
+        case TIMESTAMP -> ((LocalDateTime) col).compareTo(parseTimestamp(((TextLiteral) v).value()));
         };
     }
 
@@ -592,7 +589,7 @@ public abstract class DifferentialTestBase {
     private List<Object> row(Object entity, List<String> columns) {
         List<Object> out = new ArrayList<>(columns.size());
         for (String c : columns) {
-            out.add(normalize(readField(entity, Objects.requireNonNull(fields.get(c).property()))));
+            out.add(normalize(readField(entity, fields.get(c).property().orElseThrow())));
         }
         return out;
     }
@@ -624,15 +621,15 @@ public abstract class DifferentialTestBase {
 
     private static Object normalize(Object v) {
         return switch (v) {
-            case null -> null;
-            case BigDecimal bd -> bd.stripTrailingZeros();
-            case Integer n -> BigDecimal.valueOf(n).stripTrailingZeros();
-            case Long n -> BigDecimal.valueOf(n).stripTrailingZeros();
-            case Enum<?> e -> e.name();
-            case Timestamp t -> t.toLocalDateTime();
-            case Instant t -> LocalDateTime.ofInstant(t, ZoneOffset.UTC);
-            case OffsetDateTime t -> t.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
-            default -> v;
+        case null -> null;
+        case BigDecimal bd -> bd.stripTrailingZeros();
+        case Integer n -> BigDecimal.valueOf(n).stripTrailingZeros();
+        case Long n -> BigDecimal.valueOf(n).stripTrailingZeros();
+        case Enum<?> e -> e.name();
+        case Timestamp t -> t.toLocalDateTime();
+        case Instant t -> LocalDateTime.ofInstant(t, ZoneOffset.UTC);
+        case OffsetDateTime t -> t.atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        default -> v;
         };
     }
 
@@ -647,11 +644,11 @@ public abstract class DifferentialTestBase {
 
     private static DslLiteral literal(Object v) {
         return switch (v) {
-            case String s -> new TextLiteral(s);
-            case BigDecimal bd -> new NumberLiteral(bd);
-            case Boolean b -> new BoolLiteral(b);
-            case LocalDateTime t -> new TextLiteral(t.toString());
-            default -> throw new IllegalArgumentException(v.getClass().getName());
+        case String s -> new TextLiteral(s);
+        case BigDecimal bd -> new NumberLiteral(bd);
+        case Boolean b -> new BoolLiteral(b);
+        case LocalDateTime t -> new TextLiteral(t.toString());
+        default -> throw new IllegalArgumentException(v.getClass().getName());
         };
     }
 
@@ -660,11 +657,7 @@ public abstract class DifferentialTestBase {
     }
 
     private IntentPipeline pipelineAnswering(String dsl) {
-        return IntentPipelines.builder()
-                .llm((text, catalog) -> DslSources.of(dsl))
-                .sqlBuilder(sqlBuilder())
-                .executor(executor)
-                .catalog(ServiceCatalogs.of(gadgets))
-                .build();
+        return IntentPipelines.builder().llm((text, catalog) -> DslSources.of(dsl)).sqlBuilder(sqlBuilder())
+                .executor(executor).catalog(ServiceCatalogs.of(gadgets)).build();
     }
 }

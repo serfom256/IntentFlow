@@ -5,8 +5,6 @@ import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.NameResolver;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
-import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
-import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentField;
 import io.github.serfom256.intentflow.core.catalog.annotation.IntentService;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceCatalogs;
@@ -81,20 +79,15 @@ class JpaRestrictionsIT {
     private static final List<Class<?>> ENTITIES = List.of(Item.class, Book.class, Film.class, ShortFilm.class);
     private static final List<NameResolver> RESOLVERS = List.of(new JpaNameResolver(() -> ENTITIES));
     private static final List<Class<?>> SERVICES = List.of(Item.class, Book.class, Film.class);
-    private static final ServiceCatalog CATALOG = ServiceCatalogs.of(
-            SERVICES.stream().map(t -> ServiceDescriptors.fromAnnotated(t, RESOLVERS)).toList());
+    private static final ServiceCatalog CATALOG = ServiceCatalogs
+            .of(SERVICES.stream().map(t -> ServiceDescriptors.fromAnnotated(t, RESOLVERS)).toList());
 
     private static final Map<TestDatabase, EntityManager> MANAGERS = new HashMap<>();
 
     private static SchemaFacts facts() {
         Map<String, TableFacts> tables = new HashMap<>();
         tables.put("inh_item", TableFacts.primaryKey(List.of("id")));
-        Map<ServiceName, String> restrictions = new HashMap<>();
-        for (Class<?> type : SERVICES) {
-            ServiceDescriptor service = CATALOG.findByType(type).orElseThrow();
-            ServiceDescriptors.restrictionOf(type, RESOLVERS).ifPresent(sql -> restrictions.put(service.name(), sql));
-        }
-        return SchemaFacts.of(tables, restrictions);
+        return SchemaFacts.of(tables);
     }
 
     private static synchronized EntityManager manager(TestDatabase db) {
@@ -109,19 +102,17 @@ class JpaRestrictionsIT {
             } catch (SQLException ex) {
                 throw new IllegalStateException(ex);
             }
-            return TestEntityManagers.create(e.url(), e.user(), e.password(), Item.class, Book.class, Film.class,
-                    ShortFilm.class).createEntityManager();
+            return TestEntityManagers
+                    .create(e.url(), e.user(), e.password(), Item.class, Book.class, Film.class, ShortFilm.class)
+                    .createEntityManager();
         });
     }
 
     private static <T> IntentResponse<T> resolve(TestDatabase db, String dsl, Class<T> type) {
         manager(db).clear();
-        IntentPipeline pipeline = IntentPipelines.builder()
-                .llm((t, c) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(db.dialect(), facts()))
-                .executor(new JpaQueryExecutor(manager(db)))
-                .catalog(CATALOG)
-                .build();
+        IntentPipeline pipeline = IntentPipelines.builder().llm((t, c) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(db.dialect(), facts())).executor(new JpaQueryExecutor(manager(db)))
+                .catalog(CATALOG).build();
         return pipeline.resolve(IntentRequests.of("q"), type);
     }
 
@@ -135,7 +126,7 @@ class JpaRestrictionsIT {
         assertThat(ids(db, "items", Item.class)).containsExactly(1L, 2L, 3L, 4L, 5L);
         assertThat(ids(db, "books", Book.class)).containsExactly(2L, 3L);
         assertThat(ids(db, "films", Film.class)).containsExactly(4L, 5L);
-        assertThat(resolve(db, "films | count", Film.class).aggregation().rows().getFirst().value())
+        assertThat(resolve(db, "films | count", Film.class).aggregation().orElseThrow().rows().getFirst().value())
                 .hasToString("2");
     }
 

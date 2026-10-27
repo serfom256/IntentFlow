@@ -86,13 +86,8 @@ class CassandraDifferentialIT extends DifferentialTestBase {
         for (Map<String, Object> row : rows) {
             BigDecimal stock = (BigDecimal) row.get("stock");
             LocalDateTime createdAt = (LocalDateTime) row.get("created_at");
-            session.execute(insert.bind(
-                    ((BigDecimal) row.get("id")).longValueExact(),
-                    row.get("name"),
-                    row.get("kind"),
-                    row.get("price"),
-                    stock == null ? null : stock.intValueExact(),
-                    row.get("active"),
+            session.execute(insert.bind(((BigDecimal) row.get("id")).longValueExact(), row.get("name"), row.get("kind"),
+                    row.get("price"), stock == null ? null : stock.intValueExact(), row.get("active"),
                     createdAt == null ? null : createdAt.toInstant(ZoneOffset.UTC)));
         }
         return CassandraQueryExecutor.of(session);

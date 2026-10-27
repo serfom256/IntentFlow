@@ -19,9 +19,9 @@ class LlmHealthBoot3 {
         return () -> {
             LlmHealth.Result result = health.check();
             Health.Builder builder = switch (result.status()) {
-                case UP -> Health.up();
-                case DOWN -> Health.down();
-                case UNKNOWN -> Health.unknown();
+            case UP -> Health.up();
+            case DOWN -> Health.down();
+            case UNKNOWN -> Health.unknown();
             };
             if (result.error() != null) {
                 builder.withDetail("error", result.error());

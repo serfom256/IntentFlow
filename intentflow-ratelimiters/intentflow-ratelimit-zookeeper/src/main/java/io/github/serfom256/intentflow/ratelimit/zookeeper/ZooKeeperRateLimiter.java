@@ -86,8 +86,8 @@ public final class ZooKeeperRateLimiter implements LlmRateLimiter {
                 Double.parseDouble(parts[0]) + Math.max(0, now - Long.parseLong(parts[1])) * perMilli);
         if (tokens < 1) {
             long waitMillis = (long) Math.ceil((1 - tokens) / perMilli);
-            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period
-                    + " reached", Duration.ofMillis(waitMillis));
+            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period + " reached",
+                    Duration.ofMillis(waitMillis));
         }
         try {
             client.setData().withVersion(stat.getVersion()).forPath(path, encode(tokens - 1, now));

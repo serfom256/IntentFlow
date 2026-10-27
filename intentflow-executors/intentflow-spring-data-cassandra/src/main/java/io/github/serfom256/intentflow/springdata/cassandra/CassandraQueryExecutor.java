@@ -149,23 +149,23 @@ public final class CassandraQueryExecutor implements QueryExecutor {
             }
             present++;
             switch (function) {
-                case SUM, AVG -> sum = sum == null ? (BigDecimal) value : sum.add((BigDecimal) value);
-                case MIN ->
-                    extreme = extreme == null || extreme.compareTo(value) > 0 ? (Comparable<Object>) value : extreme;
-                case MAX ->
-                    extreme = extreme == null || extreme.compareTo(value) < 0 ? (Comparable<Object>) value : extreme;
-                case COUNT -> {
-                }
+            case SUM, AVG -> sum = sum == null ? (BigDecimal) value : sum.add((BigDecimal) value);
+            case MIN ->
+                extreme = extreme == null || extreme.compareTo(value) > 0 ? (Comparable<Object>) value : extreme;
+            case MAX ->
+                extreme = extreme == null || extreme.compareTo(value) < 0 ? (Comparable<Object>) value : extreme;
+            case COUNT -> {
+            }
             }
         }
 
         @Nullable
         Object result() {
             return switch (function) {
-                case COUNT -> BigDecimal.valueOf(count);
-                case SUM -> sum;
-                case AVG -> sum == null ? null : sum.divide(BigDecimal.valueOf(present), MathContext.DECIMAL64);
-                case MIN, MAX -> extreme;
+            case COUNT -> BigDecimal.valueOf(count);
+            case SUM -> sum;
+            case AVG -> sum == null ? null : sum.divide(BigDecimal.valueOf(present), MathContext.DECIMAL64);
+            case MIN, MAX -> extreme;
             };
         }
     }

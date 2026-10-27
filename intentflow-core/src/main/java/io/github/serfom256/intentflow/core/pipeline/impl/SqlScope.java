@@ -162,17 +162,14 @@ final class SqlScope {
 
     List<SqlPredicate> restriction() {
         List<SqlPredicate> restriction = new ArrayList<>();
-        String sql = context.restriction(service.name());
-        if (sql != null) {
-            restriction.add(new SqlPredicate.Raw(sql));
-        }
-        context.runtimeRestrictions(service).forEach(r -> restriction.add(new SqlPredicate.Bound(r.segments(),
-                r.values())));
+        context.restrictions(service).forEach(sql -> restriction.add(new SqlPredicate.Raw(sql)));
+        context.runtimeRestrictions(service)
+                .forEach(r -> restriction.add(new SqlPredicate.Bound(r.segments(), r.values())));
         return restriction;
     }
 
     private boolean restricted(ServiceDescriptor candidate) {
-        return context.restriction(candidate.name()) != null || !context.runtimeRestrictions(candidate).isEmpty();
+        return !context.restrictions(candidate).isEmpty() || !context.runtimeRestrictions(candidate).isEmpty();
     }
 
     List<SqlPredicate> where(List<SqlPredicate> conditions) {
@@ -212,9 +209,8 @@ final class SqlScope {
     }
 
     private ServiceRelation relation(String name) {
-        return service.relations().stream().filter(r -> r.name().equals(name)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("'" + name + "' is not a relation of "
-                        + service.name().value()));
+        return service.relations().stream().filter(r -> r.name().equals(name)).findFirst().orElseThrow(
+                () -> new IllegalArgumentException("'" + name + "' is not a relation of " + service.name().value()));
     }
 
     private ServiceDescriptor related(String name) {

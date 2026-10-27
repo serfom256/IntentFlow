@@ -37,9 +37,9 @@ public @interface IntentService {
 
     /**
      * SQL condition every row of this service satisfies, e.g.
-     * {@code deleted_at IS NULL}, ANDed into every query on
-     * the table. ORM restrictions such as Hibernate's {@code @SQLRestriction} are
-     * picked up without it.
+     * {@code deleted_at IS NULL}, ANDed into every query on the table. ORM
+     * restrictions such as Hibernate's {@code @SQLRestriction} are picked up
+     * without it.
      */
     String restriction() default "";
 }

@@ -10,9 +10,8 @@ import java.lang.annotation.Target;
 
 /**
  * Exposes a field (or record component) of an {@link IntentService} class, or a
- * property
- * method of an {@link IntentService} interface such as a Jimmer entity.
- * Fields without this annotation are invisible to the LLM.
+ * property method of an {@link IntentService} interface such as a Jimmer
+ * entity. Fields without this annotation are invisible to the LLM.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
@@ -29,8 +28,8 @@ public @interface IntentField {
     String description() default "";
 
     /**
-     * {@code false} lists the field in the catalog (so URI templates can use
-     * it) but forbids the LLM from filtering or sorting on it.
+     * {@code false} lists the field in the catalog (so URI templates can use it)
+     * but forbids the LLM from filtering or sorting on it.
      */
     boolean queryable() default true;
 

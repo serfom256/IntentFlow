@@ -7,19 +7,10 @@ import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
-import io.github.serfom256.intentflow.core.catalog.factories.ColumnNames;
-import io.github.serfom256.intentflow.core.catalog.factories.FieldMappings;
-import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
-import io.github.serfom256.intentflow.core.catalog.factories.MaxTakes;
-import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptors;
-import io.github.serfom256.intentflow.core.catalog.factories.ServiceNames;
-import io.github.serfom256.intentflow.core.catalog.factories.TableNames;
-import io.github.serfom256.intentflow.core.catalog.factories.UriTemplates;
 import io.github.serfom256.intentflow.core.pipeline.factories.LlmClients;
 import io.github.serfom256.intentflow.core.pipeline.impl.StubLlmClient;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -49,8 +40,7 @@ class LlmClientTest {
     void stubThrowsForUnregisteredInput() {
         LlmClient client = LlmClients.stub(Map.of());
 
-        assertThatThrownBy(() -> client.generateDsl(FIND_BOOKS, EMPTY_CATALOG))
-                .isInstanceOf(LlmException.class)
+        assertThatThrownBy(() -> client.generateDsl(FIND_BOOKS, EMPTY_CATALOG)).isInstanceOf(LlmException.class)
                 .hasMessageContaining("find all books");
     }
 
@@ -69,9 +59,7 @@ class LlmClientTest {
         UserText second = UserTexts.of("show authors");
         DslSource secondDsl = DslSources.of("authors | take 5");
 
-        LlmClient client = LlmClients.stub(Map.of(
-                FIND_BOOKS, BOOKS_DSL,
-                second, secondDsl));
+        LlmClient client = LlmClients.stub(Map.of(FIND_BOOKS, BOOKS_DSL, second, secondDsl));
 
         assertThat(client.generateDsl(FIND_BOOKS, EMPTY_CATALOG).value()).isEqualTo("books | take 10");
         assertThat(client.generateDsl(second, EMPTY_CATALOG).value()).isEqualTo("authors | take 5");
@@ -84,8 +72,7 @@ class LlmClientTest {
         UserText extra = UserTexts.of("list all");
         DslSource extraDsl = DslSources.of("books");
 
-        assertThatThrownBy(() -> client.generateDsl(extra, EMPTY_CATALOG))
-                .isInstanceOf(LlmException.class);
+        assertThatThrownBy(() -> client.generateDsl(extra, EMPTY_CATALOG)).isInstanceOf(LlmException.class);
 
         ((StubLlmClient) client).register(extra, extraDsl);
 

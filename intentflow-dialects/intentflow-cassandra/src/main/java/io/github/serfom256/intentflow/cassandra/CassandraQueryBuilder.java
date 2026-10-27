@@ -14,12 +14,12 @@ import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
 import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
+import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.ast.ValueExpr;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
-import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
@@ -57,26 +57,25 @@ public final class CassandraQueryBuilder implements SqlBuilder {
         ServiceDescriptor service = query.service();
         AstQuery ast = query.ast();
         if (!query.related().isEmpty()) {
-            throw new ValidationException(ErrorCode.UNSUPPORTED,
-                    "Cassandra has no joins; filter on fields of '" + service.name().value()
-                            + "' only, not on " + query.related().keySet(),
-                    Map.of());
+            throw new ValidationException(ErrorCode.UNSUPPORTED, "Cassandra has no joins; filter on fields of '"
+                    + service.name().value() + "' only, not on " + query.related().keySet(), Map.of());
         }
         Fields fields = Fields.of(service);
-        Pushdown pushdown = pushdown(table(service.table().value()), ast.filter(), fields);
+        Pushdown pushdown = pushdown(table(service.table().value()), ast.filter().orElse(null), fields);
 
-        int limit = ast.take() != null ? ast.take().value() : service.maxTake().value();
-        int skip = ast.skip() != null ? Math.max(0, ast.skip().value()) : 0;
+        int limit = ast.take().map(Take::value).orElse(service.maxTake().value());
+        int skip = ast.skip().map(value -> Math.max(0, value.value())).orElse(0);
         CqlExpressions expressions = new CqlExpressions(fields.columns(), fields.types(), zone);
-        RowFilter filter = new RowFilter(ast.filter(), fields.columns(), fields.caseSensitive(), expressions);
-        Aggregate aggregate = ast.aggregate();
+        RowFilter filter = new RowFilter(ast.filter().orElse(null), fields.columns(), fields.caseSensitive(),
+                expressions);
+        Aggregate aggregate = ast.aggregate().orElse(null);
         if (aggregate == null) {
             return new CassandraQuery(pushdown.segments(), pushdown.parameters(), pushdown.bindValues(), filter,
                     RowOrder.of(query.effectiveSort(), fields.columns(), expressions), skip, limit, null,
                     top(query, fields.columns(), expressions));
         }
-        return new CassandraQuery(pushdown.segments(), pushdown.parameters(), pushdown.bindValues(), filter, null,
-                skip, limit, aggregate(query, aggregate, expressions), null);
+        return new CassandraQuery(pushdown.segments(), pushdown.parameters(), pushdown.bindValues(), filter, null, skip,
+                limit, aggregate(query, aggregate, expressions), null);
     }
 
     private record Fields(Map<String, CqlIdentifier> columns, Set<String> caseSensitive, Map<String, FieldType> types) {
@@ -103,8 +102,8 @@ public final class CassandraQueryBuilder implements SqlBuilder {
         List<String> segments = new ArrayList<>();
         List<DslLiteral> parameters = new ArrayList<>();
         List<Object> bindValues = new ArrayList<>();
-        StringBuilder cql = new StringBuilder("SELECT * FROM ")
-                .append(table.getKeyspace().asCql(true)).append('.').append(table.getName().asCql(true));
+        StringBuilder cql = new StringBuilder("SELECT * FROM ").append(table.getKeyspace().asCql(true)).append('.')
+                .append(table.getName().asCql(true));
         Map<CqlIdentifier, Restriction> restrictions = new HashMap<>();
         boolean where = false;
         List<FilterExpr> conjuncts = filterExpr == null ? List.of() : conjuncts(filterExpr, new ArrayList<>());
@@ -122,8 +121,8 @@ public final class CassandraQueryBuilder implements SqlBuilder {
             if (bound == null || !restrictions.computeIfAbsent(column, k -> new Restriction()).accepts(c.op())) {
                 continue;
             }
-            cql.append(where ? " AND " : " WHERE ").append(column.asCql(true)).append(' ')
-                    .append(cqlOp(c.op())).append(' ');
+            cql.append(where ? " AND " : " WHERE ").append(column.asCql(true)).append(' ').append(cqlOp(c.op()))
+                    .append(' ');
             segments.add(cql.toString());
             cql.setLength(0);
             parameters.add(c.value());
@@ -139,19 +138,15 @@ public final class CassandraQueryBuilder implements SqlBuilder {
 
     private static boolean pushable(TableMetadata table, ColumnMetadata metadata, Compare c) {
         boolean dayLiteral = c.value() instanceof TextLiteral t && CqlValues.dateOnly(t.value()).isPresent();
-        return pushable(table, metadata, c.op())
-                && (!CqlValues.isText(metadata.getType()) || c.op() == ComparisonOp.EQ)
+        return pushable(table, metadata, c.op()) && (!CqlValues.isText(metadata.getType()) || c.op() == ComparisonOp.EQ)
                 && (!dayLiteral || c.op() == ComparisonOp.LT || c.op() == ComparisonOp.GE);
     }
 
-    private static CassandraAggregate aggregate(ValidatedQuery query, Aggregate aggregate,
-            CqlExpressions expressions) {
+    private static CassandraAggregate aggregate(ValidatedQuery query, Aggregate aggregate, CqlExpressions expressions) {
         List<String> rowColumns = new ArrayList<>(aggregate.groupNames());
         rowColumns.add(ValidatedQuery.valueField(aggregate).value());
-        return new CassandraAggregate(
-                aggregate.function(),
-                aggregate.groupBy().stream()
-                        .<Function<Row, @Nullable Object>>map(g -> row -> expressions.eval(g, row))
+        return new CassandraAggregate(aggregate.function(),
+                aggregate.groupBy().stream().<Function<Row, @Nullable Object>>map(g -> row -> expressions.eval(g, row))
                         .toList(),
                 aggregate.argument() == null ? null : row -> expressions.eval(aggregate.argument(), row),
                 RowOrder.ofValues(query.effectiveSort(), rowColumns));
@@ -159,7 +154,7 @@ public final class CassandraQueryBuilder implements SqlBuilder {
 
     private static @Nullable UnaryOperator<List<Row>> top(ValidatedQuery query, Map<String, CqlIdentifier> columns,
             CqlExpressions expressions) {
-        TopN top = query.ast().top();
+        TopN top = query.ast().top().orElse(null);
         if (top == null) {
             return null;
         }
@@ -186,14 +181,11 @@ public final class CassandraQueryBuilder implements SqlBuilder {
 
     private TableMetadata table(String name) {
         int dot = name.indexOf('.');
-        CqlIdentifier keyspace = dot >= 0
-                ? CqlIdentifier.fromInternal(name.substring(0, dot))
-                : session.getKeyspace().orElseThrow(() -> new IllegalStateException(
-                        "No keyspace for table '" + name + "': set one on the CqlSession or use "
-                                + "@IntentService(table = \"keyspace.table\")"));
+        CqlIdentifier keyspace = dot >= 0 ? CqlIdentifier.fromInternal(name.substring(0, dot))
+                : session.getKeyspace().orElseThrow(() -> new IllegalStateException("No keyspace for table '" + name
+                        + "': set one on the CqlSession or use " + "@IntentService(table = \"keyspace.table\")"));
         CqlIdentifier table = CqlIdentifier.fromInternal(dot >= 0 ? name.substring(dot + 1) : name);
-        return session.getMetadata().getKeyspace(keyspace)
-                .flatMap(ks -> ks.getTable(table))
+        return session.getMetadata().getKeyspace(keyspace).flatMap(ks -> ks.getTable(table))
                 .or(() -> session.refreshSchema().getKeyspace(keyspace).flatMap(ks -> ks.getTable(table)))
                 .orElseThrow(() -> new IllegalStateException(
                         "Cassandra table " + keyspace.asCql(true) + "." + table.asCql(true) + " not found"));
@@ -221,12 +213,12 @@ public final class CassandraQueryBuilder implements SqlBuilder {
 
     private static String cqlOp(ComparisonOp op) {
         return switch (op) {
-            case EQ -> "=";
-            case LT -> "<";
-            case LE -> "<=";
-            case GT -> ">";
-            case GE -> ">=";
-            case NE, CONTAINS -> throw new IllegalStateException(op + " is never pushed down");
+        case EQ -> "=";
+        case LT -> "<";
+        case LE -> "<=";
+        case GT -> ">";
+        case GE -> ">=";
+        case NE, CONTAINS -> throw new IllegalStateException(op + " is never pushed down");
         };
     }
 
@@ -240,27 +232,27 @@ public final class CassandraQueryBuilder implements SqlBuilder {
                 return false;
             }
             switch (op) {
-                case EQ -> {
-                    if (lower || upper) {
-                        return false;
-                    }
-                    equal = true;
-                }
-                case GT, GE -> {
-                    if (lower) {
-                        return false;
-                    }
-                    lower = true;
-                }
-                case LT, LE -> {
-                    if (upper) {
-                        return false;
-                    }
-                    upper = true;
-                }
-                default -> {
+            case EQ -> {
+                if (lower || upper) {
                     return false;
                 }
+                equal = true;
+            }
+            case GT, GE -> {
+                if (lower) {
+                    return false;
+                }
+                lower = true;
+            }
+            case LT, LE -> {
+                if (upper) {
+                    return false;
+                }
+                upper = true;
+            }
+            default -> {
+                return false;
+            }
             }
             return true;
         }

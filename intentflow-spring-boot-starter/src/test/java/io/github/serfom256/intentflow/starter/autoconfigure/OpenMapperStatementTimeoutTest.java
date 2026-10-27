@@ -55,8 +55,8 @@ class OpenMapperStatementTimeoutTest {
         JdbcClient.create(reports).sql("INSERT INTO tick VALUES (7)").update();
 
         runner.withBean(ProceduresCustomizer.class, () -> builder -> builder.dataSource(reports))
-                .run(ctx -> assertThat(ctx.getBean(QueryExecutor.class)
-                        .execute(BoundQueries.of("SELECT x FROM tick"), Tick.class))
+                .run(ctx -> assertThat(
+                        ctx.getBean(QueryExecutor.class).execute(BoundQueries.of("SELECT x FROM tick"), Tick.class))
                         .extracting(tick -> tick.x).containsExactly(7L));
     }
 }

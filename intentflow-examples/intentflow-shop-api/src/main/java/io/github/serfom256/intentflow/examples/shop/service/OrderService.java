@@ -57,9 +57,6 @@ public class OrderService {
     }
 
     private static Order.OrderBuilder apply(Order.OrderBuilder b, OrderRequest r) {
-        return b.customerId(r.customerId())
-                .status(r.status())
-                .total(r.total())
-                .itemsCount(r.itemsCount());
+        return b.customerId(r.customerId()).status(r.status()).total(r.total()).itemsCount(r.itemsCount());
     }
 }

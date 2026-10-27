@@ -18,33 +18,18 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AstQueries {
 
-    public static AstQuery of(
-            ServiceName service,
-            @Nullable FilterExpr filter,
-            List<SortKey> sort,
-            @Nullable Skip skip,
+    public static AstQuery of(ServiceName service, @Nullable FilterExpr filter, List<SortKey> sort, @Nullable Skip skip,
             @Nullable Take take) {
         return new DefaultAstQuery(service, filter, sort, skip, take);
     }
 
-    public static AstQuery of(
-            ServiceName service,
-            @Nullable FilterExpr filter,
-            List<SortKey> sort,
-            @Nullable Skip skip,
-            @Nullable Take take,
-            @Nullable Aggregate aggregate) {
+    public static AstQuery of(ServiceName service, @Nullable FilterExpr filter, List<SortKey> sort, @Nullable Skip skip,
+            @Nullable Take take, @Nullable Aggregate aggregate) {
         return new DefaultAstQuery(service, filter, sort, skip, take, aggregate);
     }
 
-    public static AstQuery of(
-            ServiceName service,
-            @Nullable FilterExpr filter,
-            List<SortKey> sort,
-            @Nullable Skip skip,
-            @Nullable Take take,
-            @Nullable Aggregate aggregate,
-            @Nullable TopN top) {
-        return new DefaultAstQuery(service, filter, sort, skip, take, aggregate, top);
+    public static AstQuery of(ServiceName service, @Nullable FilterExpr filter, List<SortKey> sort, @Nullable Skip skip,
+            @Nullable Take take, @Nullable Aggregate aggregate, @Nullable TopN top) {
+        return DefaultAstQuery.of(service, filter, sort, skip, take, aggregate, top);
     }
 }

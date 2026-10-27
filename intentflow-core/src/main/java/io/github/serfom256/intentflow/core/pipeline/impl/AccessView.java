@@ -13,7 +13,6 @@ import io.github.serfom256.intentflow.core.catalog.TableName;
 import io.github.serfom256.intentflow.core.catalog.UriTemplate;
 import io.github.serfom256.intentflow.core.catalog.factories.ServiceDescriptions;
 import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
-import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -50,23 +49,22 @@ final class AccessView implements ServiceCatalog {
     private static ServiceDescriptor visible(ServiceDescriptor service, Map<ServiceName, ServiceDescriptor> queryable,
             AccessPolicy policy, IntentContext caller) {
         List<FieldMapping> fields = service.fields().stream().filter(f -> policy.canSee(service, f, caller)).toList();
-        List<ServiceRelation> relations = service.relations().stream()
-                .filter(r -> queryable.containsKey(r.target())).toList();
-        String scope = policy.scope(service, caller);
-        ServiceDescription description = service.description();
-        if (scope != null && !scope.isBlank()) {
+        List<ServiceRelation> relations = service.relations().stream().filter(r -> queryable.containsKey(r.target()))
+                .toList();
+        String scope = policy.scope(service, caller).filter(text -> !text.isBlank()).orElse(null);
+        ServiceDescription description = service.description().orElse(null);
+        if (scope != null) {
             String visibleRows = "The caller sees " + scope.strip() + ", so \"my\" or \"mine\" needs no filter.";
-            description = ServiceDescriptions.of(description == null ? visibleRows
-                    : description.value().strip() + " " + visibleRows);
+            description = ServiceDescriptions
+                    .of(description == null ? visibleRows : description.value().strip() + " " + visibleRows);
         }
-        return new Visible(service, description, fields, relations);
+        return new Visible(service, Optional.ofNullable(description), fields, relations);
     }
 
     private static int fingerprint(Map<ServiceName, ServiceDescriptor> visible) {
         Set<String> parts = new LinkedHashSet<>();
         visible.values().forEach(service -> {
-            parts.add(service.name().value() + ":" + (service.description() == null ? ""
-                    : service.description().value()));
+            parts.add(service.name().value() + ":" + service.description().map(ServiceDescription::value).orElse(""));
             service.fields().forEach(f -> parts.add(service.name().value() + "." + f.logical().value()));
             service.relations().forEach(r -> parts.add(service.name().value() + ">" + r.name()));
         });
@@ -88,7 +86,7 @@ final class AccessView implements ServiceCatalog {
         return version;
     }
 
-    private record Visible(ServiceDescriptor service, @Nullable ServiceDescription description,
+    private record Visible(ServiceDescriptor service, Optional<ServiceDescription> description,
             List<FieldMapping> fields, List<ServiceRelation> relations) implements ServiceDescriptor {
 
         @Override
@@ -119,6 +117,11 @@ final class AccessView implements ServiceCatalog {
         @Override
         public Class<?> resultType() {
             return service.resultType();
+        }
+
+        @Override
+        public Optional<String> restriction() {
+            return service.restriction();
         }
     }
 }

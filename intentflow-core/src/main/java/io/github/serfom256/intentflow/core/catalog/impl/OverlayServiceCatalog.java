@@ -15,7 +15,6 @@ import io.github.serfom256.intentflow.core.catalog.ServiceRelation;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.catalog.TableName;
 import io.github.serfom256.intentflow.core.catalog.UriTemplate;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,8 +41,7 @@ public final class OverlayServiceCatalog implements ServiceCatalog {
     @Override
     public Optional<ServiceDescriptor> find(ServiceName name) {
         return declared.find(name).map(service -> overrides.find(name)
-                .<ServiceDescriptor>map(o -> new Overridden(service, o))
-                .orElse(service));
+                .<ServiceDescriptor>map(o -> new Overridden(service, o)).orElse(service));
     }
 
     @Override
@@ -64,9 +62,9 @@ public final class OverlayServiceCatalog implements ServiceCatalog {
         }
 
         @Override
-        public @Nullable ServiceDescription description() {
+        public Optional<ServiceDescription> description() {
             return override.description() == null ? service.description()
-                    : new DefaultServiceDescription(override.description());
+                    : Optional.of(new DefaultServiceDescription(override.description()));
         }
 
         @Override
@@ -106,9 +104,19 @@ public final class OverlayServiceCatalog implements ServiceCatalog {
         public List<ServiceRelation> relations() {
             return service.relations();
         }
+
+        @Override
+        public Optional<String> restriction() {
+            return service.restriction();
+        }
     }
 
-    private record DescribedField(FieldMapping field, String description) implements FieldMapping {
+    private record DescribedField(FieldMapping field, String text) implements FieldMapping {
+
+        @Override
+        public Optional<String> description() {
+            return Optional.of(text);
+        }
 
         @Override
         public LogicalFieldName logical() {
@@ -131,7 +139,7 @@ public final class OverlayServiceCatalog implements ServiceCatalog {
         }
 
         @Override
-        public @Nullable String property() {
+        public Optional<String> property() {
             return field.property();
         }
 

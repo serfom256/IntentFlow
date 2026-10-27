@@ -52,8 +52,7 @@ public class CatalogAdminController {
     @GetMapping("/session")
     public SessionView session(HttpServletRequest request) {
         return new SessionView(user(request),
-                !Boolean.FALSE.equals(request.getAttribute(AdminAccessInterceptor.EDITOR)),
-                csrf(request));
+                !Boolean.FALSE.equals(request.getAttribute(AdminAccessInterceptor.EDITOR)), csrf(request));
     }
 
     private static @Nullable String user(HttpServletRequest request) {

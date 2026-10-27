@@ -31,8 +31,8 @@ public record DefaultBoundQuery(List<String> segments, List<DslLiteral> paramete
         optimizations = List.copyOf(optimizations);
         typedValues = Map.copyOf(typedValues);
         if (segments.size() != parameters.size() + 1) {
-            throw new IllegalArgumentException("expected " + (parameters.size() + 1)
-                    + " segments for " + parameters.size() + " parameters, got " + segments.size());
+            throw new IllegalArgumentException("expected " + (parameters.size() + 1) + " segments for "
+                    + parameters.size() + " parameters, got " + segments.size());
         }
     }
 }

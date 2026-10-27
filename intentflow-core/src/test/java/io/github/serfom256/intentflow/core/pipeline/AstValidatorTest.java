@@ -15,17 +15,12 @@ import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
 import io.github.serfom256.intentflow.core.ast.factories.Takes;
-import io.github.serfom256.intentflow.core.catalog.ColumnName;
-import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
-import io.github.serfom256.intentflow.core.catalog.MaxTake;
 import io.github.serfom256.intentflow.core.catalog.ServiceCatalog;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.ServiceNotFoundException;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
-import io.github.serfom256.intentflow.core.catalog.TableName;
-import io.github.serfom256.intentflow.core.catalog.UriTemplate;
 import io.github.serfom256.intentflow.core.catalog.factories.ColumnNames;
 import io.github.serfom256.intentflow.core.catalog.factories.FieldMappings;
 import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
@@ -59,17 +54,12 @@ class AstValidatorTest {
     private static final LogicalFieldName GHOST = LogicalFieldNames.of("ghost");
 
     private static ServiceCatalog catalogWithBooks(int maxTake) {
-        ServiceDescriptor svc = ServiceDescriptors.of(
-                BOOKS, null, TableNames.of("book"),
-                List.of(
-                        FieldMappings.of(ID, ColumnNames.of("id"), true),
+        ServiceDescriptor svc = ServiceDescriptors.of(BOOKS, null, TableNames.of("book"),
+                List.of(FieldMappings.of(ID, ColumnNames.of("id"), true),
                         FieldMappings.of(TITLE, ColumnNames.of("title"), true),
                         FieldMappings.of(AUTHOR, ColumnNames.of("author_name"), true),
                         FieldMappings.of(SECRET, ColumnNames.of("secret_col"), false)),
-                List.of(),
-                MaxTakes.of(maxTake),
-                UriTemplates.of("/books?ids={{ids}}"),
-                Object.class);
+                List.of(), MaxTakes.of(maxTake), UriTemplates.of("/books?ids={{ids}}"), Object.class);
         Map<ServiceName, ServiceDescriptor> entries = Map.of(BOOKS, svc);
         return new ServiceCatalog() {
             @Override
@@ -89,48 +79,34 @@ class AstValidatorTest {
         };
     }
 
-    private static AstQuery query(FilterExpr filter, List<SortKey> sort,
-            Take take) {
+    private static AstQuery query(FilterExpr filter, List<SortKey> sort, Take take) {
         return AstQueries.of(BOOKS, filter, sort, null, take);
     }
 
     @Test
     void serviceOnlyQueryPasses() {
-        ValidatedQuery v = validator.validate(
-                AstQueries.of(BOOKS, null, List.of(), null, null),
-                catalogWithBooks(100));
+        ValidatedQuery v = validator.validate(AstQueries.of(BOOKS, null, List.of(), null, null), catalogWithBooks(100));
         assertThat(v.service().name()).isEqualTo(BOOKS);
-        assertThat(v.ast().filter()).isNull();
+        assertThat(v.ast().filter()).isEmpty();
     }
 
     @Test
     void filterWithQueryableFieldsPasses() {
-        FilterExpr filter = new And(
-                new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("Doe")),
+        FilterExpr filter = new And(new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("Doe")),
                 new Compare(TITLE, ComparisonOp.CONTAINS, new TextLiteral("ring")));
-        assertThat(validator.validate(
-                query(filter, List.of(), null),
-                catalogWithBooks(100)))
-                .isNotNull();
+        assertThat(validator.validate(query(filter, List.of(), null), catalogWithBooks(100))).isNotNull();
     }
 
     @Test
     void inListAndNullChecksTraverseCorrectly() {
-        FilterExpr filter = new And(
-                new In(TITLE, List.of(new TextLiteral("a"), new TextLiteral("b"))),
+        FilterExpr filter = new And(new In(TITLE, List.of(new TextLiteral("a"), new TextLiteral("b"))),
                 new Not(new IsNull(AUTHOR)));
-        assertThat(validator.validate(
-                query(filter, List.of(), null),
-                catalogWithBooks(100)))
-                .isNotNull();
+        assertThat(validator.validate(query(filter, List.of(), null), catalogWithBooks(100))).isNotNull();
     }
 
     @Test
     void takeEqualToMaxTakePasses() {
-        assertThat(validator.validate(
-                query(null, List.of(), Takes.of(100)),
-                catalogWithBooks(100)))
-                .isNotNull();
+        assertThat(validator.validate(query(null, List.of(), Takes.of(100)), catalogWithBooks(100))).isNotNull();
     }
 
     @Test
@@ -143,71 +119,51 @@ class AstValidatorTest {
     @Test
     void filterReferencingUndeclaredFieldFails() {
         FilterExpr filter = new Compare(GHOST, ComparisonOp.EQ, new TextLiteral("x"));
-        assertThatThrownBy(() -> validator.validate(
-                query(filter, List.of(), null),
-                catalogWithBooks(100)))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("ghost");
+        assertThatThrownBy(() -> validator.validate(query(filter, List.of(), null), catalogWithBooks(100)))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("ghost");
     }
 
     @Test
     void filterReferencingNonQueryableFieldFails() {
         FilterExpr filter = new Compare(SECRET, ComparisonOp.EQ, new TextLiteral("x"));
-        assertThatThrownBy(() -> validator.validate(
-                query(filter, List.of(), null),
-                catalogWithBooks(100)))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("secret");
+        assertThatThrownBy(() -> validator.validate(query(filter, List.of(), null), catalogWithBooks(100)))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("secret");
     }
 
     @Test
     void sortFieldUndeclaredFails() {
         SortKey badSort = SortKeys.of(GHOST, SortKey.Direction.ASC);
-        assertThatThrownBy(() -> validator.validate(
-                query(null, List.of(badSort), null),
-                catalogWithBooks(100)))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("sort");
+        assertThatThrownBy(() -> validator.validate(query(null, List.of(badSort), null), catalogWithBooks(100)))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("sort");
     }
 
     @Test
     void sortFieldNonQueryableFails() {
         SortKey badSort = SortKeys.of(SECRET, SortKey.Direction.ASC);
-        assertThatThrownBy(() -> validator.validate(
-                query(null, List.of(badSort), null),
-                catalogWithBooks(100)))
+        assertThatThrownBy(() -> validator.validate(query(null, List.of(badSort), null), catalogWithBooks(100)))
                 .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void takeExceedingMaxTakeFails() {
-        assertThatThrownBy(() -> validator.validate(
-                query(null, List.of(), Takes.of(101)),
-                catalogWithBooks(100)))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("maxTake");
+        assertThatThrownBy(() -> validator.validate(query(null, List.of(), Takes.of(101)), catalogWithBooks(100)))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("maxTake");
     }
 
     @Test
     void deepFilterTreeChecksAllLeaves() {
         FilterExpr filter = new And(
-                new Or(
-                        new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("X")),
+                new Or(new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("X")),
                         new Compare(TITLE, ComparisonOp.EQ, new TextLiteral("Y"))),
                 new Not(new Compare(GHOST, ComparisonOp.EQ, new NumberLiteral(BigDecimal.ONE))));
-        assertThatThrownBy(() -> validator.validate(
-                query(filter, List.of(), null),
-                catalogWithBooks(100)))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("ghost");
+        assertThatThrownBy(() -> validator.validate(query(filter, List.of(), null), catalogWithBooks(100)))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("ghost");
     }
 
     @Test
     void skipValueIsAllowedAtZero() {
-        ValidatedQuery v = validator.validate(
-                AstQueries.of(BOOKS, null, List.of(),
-                        Skips.of(0), null),
+        ValidatedQuery v = validator.validate(AstQueries.of(BOOKS, null, List.of(), Skips.of(0), null),
                 catalogWithBooks(100));
-        assertThat(v.ast().skip().value()).isZero();
+        assertThat(v.ast().skip().orElseThrow().value()).isZero();
     }
 }

@@ -55,8 +55,7 @@ public final class AnthropicLlmClient implements LlmClient {
     @Override
     public DslSource repairDsl(UserText normalizedText, ServiceCatalog catalog, DslSource failed, String error) {
         return complete(catalog, builder -> builder.addUserMessage(normalizedText.value())
-                .addAssistantMessage(failed.value())
-                .addUserMessage(LlmPrompts.repair(error)));
+                .addAssistantMessage(failed.value()).addUserMessage(LlmPrompts.repair(error)));
     }
 
     @Override
@@ -69,20 +68,17 @@ public final class AnthropicLlmClient implements LlmClient {
     }
 
     private DslSource complete(ServiceCatalog catalog, Consumer<MessageCreateParams.Builder> messages) {
-        MessageCreateParams.Builder request = MessageCreateParams.builder()
-                .model(model)
-                .maxTokens(maxTokens)
-                .systemOfTextBlockParams(List.of(TextBlockParam.builder()
-                        .text(LlmPrompts.system(catalog, LocalDate.now(clock)))
-                        .cacheControl(CacheControlEphemeral.builder().build())
-                        .build()));
+        MessageCreateParams.Builder request = MessageCreateParams.builder().model(model).maxTokens(maxTokens)
+                .systemOfTextBlockParams(
+                        List.of(TextBlockParam.builder().text(LlmPrompts.system(catalog, LocalDate.now(clock)))
+                                .cacheControl(CacheControlEphemeral.builder().build()).build()));
         messages.accept(request);
         if (effort != null) {
             request.outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.of(effort)).build());
         }
         if (refusalFallback) {
-            request.putAdditionalHeader("anthropic-beta", FALLBACK_BETA)
-                    .putAdditionalBodyProperty("fallbacks", JsonValue.from("default"));
+            request.putAdditionalHeader("anthropic-beta", FALLBACK_BETA).putAdditionalBodyProperty("fallbacks",
+                    JsonValue.from("default"));
         }
         Message message;
         try {
@@ -91,12 +87,12 @@ public final class AnthropicLlmClient implements LlmClient {
             throw new LlmException("Anthropic request failed: " + e.getMessage(), e);
         }
         if (message.stopReason().filter(StopReason.REFUSAL::equals).isPresent()) {
-            String category = message.stopDetails().flatMap(details -> details.category())
-                    .map(Object::toString).orElse("unspecified");
+            String category = message.stopDetails().flatMap(details -> details.category()).map(Object::toString)
+                    .orElse("unspecified");
             throw new LlmException("Claude declined to translate the question (" + category + ")");
         }
-        String text = message.content().stream().flatMap(block -> block.text().stream())
-                .map(block -> block.text()).collect(Collectors.joining());
+        String text = message.content().stream().flatMap(block -> block.text().stream()).map(block -> block.text())
+                .collect(Collectors.joining());
         String dsl = LlmPrompts.answer(text);
         if (dsl.isEmpty()) {
             throw new LlmException("LLM returned an empty answer");

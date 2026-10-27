@@ -1,8 +1,5 @@
 package io.github.serfom256.intentflow.core.ast;
 
-import io.github.serfom256.intentflow.core.ast.factories.DslSources;
-import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
-import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
 import io.github.serfom256.intentflow.core.ast.factories.Takes;
 import org.junit.jupiter.api.Test;
@@ -24,17 +21,14 @@ class SkipTakeTest {
 
     @Test
     void skipRejectsNegative() {
-        assertThatThrownBy(() -> Skips.of(-1))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> Skips.of(-1)).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining(">= 0");
     }
 
     @Test
     void takeMustBePositive() {
         assertThat(Takes.of(1).value()).isEqualTo(1);
-        assertThatThrownBy(() -> Takes.of(0))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> Takes.of(-5))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Takes.of(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Takes.of(-5)).isInstanceOf(IllegalArgumentException.class);
     }
 }

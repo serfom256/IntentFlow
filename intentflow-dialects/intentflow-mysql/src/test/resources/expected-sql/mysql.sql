@@ -125,7 +125,7 @@ SELECT * FROM (SELECT `product`.*, ROW_NUMBER() OVER (PARTITION BY `category` OR
 binds: []
 
 -- products | top 5 by price * stock desc
-SELECT * FROM (SELECT `product`.*, ROW_NUMBER() OVER (ORDER BY (`price` * `stock`) IS NULL, (`price` * `stock`) DESC, `id` IS NULL, `id` ASC) AS `intentflow_rank` FROM `product`) `product` WHERE `intentflow_rank` <= 5 ORDER BY `id` IS NULL, `id` ASC LIMIT 50
+SELECT * FROM (SELECT `product`.*, ROW_NUMBER() OVER (ORDER BY (`price` * `stock`) IS NULL, (`price` * `stock`) DESC, `id` IS NULL, `id` ASC) AS `intentflow_rank` FROM `product`) `product` WHERE `intentflow_rank` <= 5 ORDER BY (`price` * `stock`) IS NULL, (`price` * `stock`) DESC, `id` IS NULL, `id` ASC LIMIT 50
 binds: []
 
 -- orders

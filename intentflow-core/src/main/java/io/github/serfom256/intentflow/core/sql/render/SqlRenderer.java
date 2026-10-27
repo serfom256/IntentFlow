@@ -37,10 +37,8 @@ public final class SqlRenderer {
         BoundQuery query = sql.toBoundQuery(optimizations);
         int max = dialect.capabilities().maxParameters();
         if (query.parameters().size() > max) {
-            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
-                    "the query needs " + query.parameters().size() + " parameters, more than "
-                            + dialect.name() + " accepts (" + max + ")",
-                    Map.of());
+            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED, "the query needs " + query.parameters().size()
+                    + " parameters, more than " + dialect.name() + " accepts (" + max + ")", Map.of());
         }
         return query;
     }
@@ -69,37 +67,36 @@ public final class SqlRenderer {
 
     private void item(Select.Item item, SqlBuffer sql) {
         switch (item) {
-            case Select.AllColumns all ->
-                sql.text(all.qualifier() == null ? "*" : dialect.quote(all.qualifier()) + ".*");
-            case Select.Value value -> {
-                expr(value.expr(), sql);
-                if (value.alias() != null) {
-                    sql.text(" AS ").text(dialect.quote(value.alias()));
-                }
+        case Select.AllColumns all -> sql.text(all.qualifier() == null ? "*" : dialect.quote(all.qualifier()) + ".*");
+        case Select.Value value -> {
+            expr(value.expr(), sql);
+            if (value.alias() != null) {
+                sql.text(" AS ").text(dialect.quote(value.alias()));
             }
+        }
         }
     }
 
     private void from(Select.From from, SqlBuffer sql) {
         switch (from) {
-            case Select.Table table -> {
-                sql.text(tableName(table.name()));
-                if (table.alias() != null) {
-                    sql.text(" ").text(dialect.quote(table.alias()));
-                }
+        case Select.Table table -> {
+            sql.text(tableName(table.name()));
+            if (table.alias() != null) {
+                sql.text(" ").text(dialect.quote(table.alias()));
             }
-            case Select.LeftJoin join -> {
-                from(join.left(), sql);
-                sql.text(" LEFT JOIN ");
-                from(join.right(), sql);
-                sql.text(" ON ");
-                join(join.on(), " AND ", p -> predicate(p, sql), sql);
-            }
-            case Select.Derived derived -> {
-                sql.text("(");
-                select(derived.select(), sql);
-                sql.text(") ").text(dialect.quote(derived.alias()));
-            }
+        }
+        case Select.LeftJoin join -> {
+            from(join.left(), sql);
+            sql.text(" LEFT JOIN ");
+            from(join.right(), sql);
+            sql.text(" ON ");
+            join(join.on(), " AND ", p -> predicate(p, sql), sql);
+        }
+        case Select.Derived derived -> {
+            sql.text("(");
+            select(derived.select(), sql);
+            sql.text(") ").text(dialect.quote(derived.alias()));
+        }
         }
     }
 
@@ -116,45 +113,45 @@ public final class SqlRenderer {
 
     private void predicate(SqlPredicate predicate, SqlBuffer sql) {
         switch (predicate) {
-            case SqlPredicate.And and -> group(and.parts(), " AND ", sql);
-            case SqlPredicate.Or or -> group(or.parts(), " OR ", sql);
-            case SqlPredicate.Not not -> {
-                sql.text("NOT (");
-                predicate(not.inner(), sql);
-                sql.text(")");
+        case SqlPredicate.And and -> group(and.parts(), " AND ", sql);
+        case SqlPredicate.Or or -> group(or.parts(), " OR ", sql);
+        case SqlPredicate.Not not -> {
+            sql.text("NOT (");
+            predicate(not.inner(), sql);
+            sql.text(")");
+        }
+        case SqlPredicate.Compare compare -> {
+            expr(compare.left(), sql);
+            sql.text(" " + compare.operator() + " ");
+            expr(compare.right(), sql);
+        }
+        case SqlPredicate.IsNull isNull -> {
+            expr(isNull.value(), sql);
+            sql.text(isNull.negated() ? " IS NOT NULL" : " IS NULL");
+        }
+        case SqlPredicate.In in -> {
+            expr(in.value(), sql);
+            sql.text(" IN (");
+            join(in.values(), ", ", e -> expr(e, sql), sql);
+            sql.text(")");
+        }
+        case SqlPredicate.Contains contains -> dialect.contains(sql, column(contains.column()), contains.text());
+        case SqlPredicate.ContainsValue contains ->
+            dialect.contains(sql, () -> expr(contains.value(), sql), contains.text());
+        case SqlPredicate.Raw raw -> sql.text("(").text(raw.sql()).text(")");
+        case SqlPredicate.Bound bound -> {
+            sql.text("(");
+            for (int i = 0; i < bound.values().size(); i++) {
+                Object value = bound.values().get(i);
+                sql.text(bound.segments().get(i)).param(new TextLiteral(String.valueOf(value)), value);
             }
-            case SqlPredicate.Compare compare -> {
-                expr(compare.left(), sql);
-                sql.text(" " + compare.operator() + " ");
-                expr(compare.right(), sql);
-            }
-            case SqlPredicate.IsNull isNull -> {
-                expr(isNull.value(), sql);
-                sql.text(isNull.negated() ? " IS NOT NULL" : " IS NULL");
-            }
-            case SqlPredicate.In in -> {
-                expr(in.value(), sql);
-                sql.text(" IN (");
-                join(in.values(), ", ", e -> expr(e, sql), sql);
-                sql.text(")");
-            }
-            case SqlPredicate.Contains contains -> dialect.contains(sql, column(contains.column()), contains.text());
-            case SqlPredicate.ContainsValue contains -> dialect.contains(sql, () -> expr(contains.value(), sql),
-                    contains.text());
-            case SqlPredicate.Raw raw -> sql.text("(").text(raw.sql()).text(")");
-            case SqlPredicate.Bound bound -> {
-                sql.text("(");
-                for (int i = 0; i < bound.values().size(); i++) {
-                    Object value = bound.values().get(i);
-                    sql.text(bound.segments().get(i)).param(new TextLiteral(String.valueOf(value)), value);
-                }
-                sql.text(bound.segments().getLast()).text(")");
-            }
-            case SqlPredicate.Exists exists -> {
-                sql.text("EXISTS (");
-                select(exists.select(), sql);
-                sql.text(")");
-            }
+            sql.text(bound.segments().getLast()).text(")");
+        }
+        case SqlPredicate.Exists exists -> {
+            sql.text("EXISTS (");
+            select(exists.select(), sql);
+            sql.text(")");
+        }
         }
     }
 
@@ -166,67 +163,67 @@ public final class SqlRenderer {
 
     private void expr(SqlExpr expr, SqlBuffer sql) {
         switch (expr) {
-            case SqlExpr.Column column -> sql.text(column(column));
-            case SqlExpr.Param param -> dialect.literal(sql, bindable(param.value()));
-            case SqlExpr.TimestampParam timestamp -> {
-                if (timestamp.bound() != null) {
-                    dialect.timestamp(sql, timestamp.value(), timestamp.bound());
-                } else {
-                    dialect.timestamp(sql, timestamp.value());
-                }
+        case SqlExpr.Column column -> sql.text(column(column));
+        case SqlExpr.Param param -> dialect.literal(sql, bindable(param.value()));
+        case SqlExpr.TimestampParam timestamp -> {
+            if (timestamp.bound() != null) {
+                dialect.timestamp(sql, timestamp.value(), timestamp.bound());
+            } else {
+                dialect.timestamp(sql, timestamp.value());
             }
-            case SqlExpr.Value value -> sql.param(new TextLiteral(String.valueOf(value.value())), value.value());
-            case SqlExpr.InZone inZone -> dialect.inZone(sql, inZone.zone(), () -> expr(inZone.value(), sql));
-            case SqlExpr.Null n -> sql.text("NULL");
-            case SqlExpr.Inline inline -> sql.text(Long.toString(inline.value()));
-            case SqlExpr.Call call -> {
-                sql.text(dialect.function(call.function())).text("(");
-                join(call.args(), ", ", e -> expr(e, sql), sql);
-                sql.text(")");
+        }
+        case SqlExpr.Value value -> sql.param(new TextLiteral(String.valueOf(value.value())), value.value());
+        case SqlExpr.InZone inZone -> dialect.inZone(sql, inZone.zone(), () -> expr(inZone.value(), sql));
+        case SqlExpr.Null n -> sql.text("NULL");
+        case SqlExpr.Inline inline -> sql.text(Long.toString(inline.value()));
+        case SqlExpr.Call call -> {
+            sql.text(dialect.function(call.function())).text("(");
+            join(call.args(), ", ", e -> expr(e, sql), sql);
+            sql.text(")");
+        }
+        case SqlExpr.CountAll c -> sql.text("COUNT(*)");
+        case SqlExpr.Arithmetic arithmetic -> {
+            sql.text("(");
+            expr(arithmetic.left(), sql);
+            sql.text(" " + arithmetic.operator() + " ");
+            expr(arithmetic.right(), sql);
+            sql.text(")");
+        }
+        case SqlExpr.Cast cast when cast.value() instanceof SqlExpr.Param param && param.value() instanceof TextLiteral
+                && cast.type() == CastType.TIMESTAMP ->
+            dialect.timestamp(sql, param.value());
+        case SqlExpr.Cast cast when cast.value() instanceof SqlExpr.Param param && param.value() instanceof TextLiteral
+                && cast.type() == CastType.DATE ->
+            dialect.cast(sql, CastType.DATE, () -> dialect.timestamp(sql, param.value()));
+        case SqlExpr.Cast cast -> dialect.cast(sql, cast.type(), () -> expr(cast.value(), sql));
+        case SqlExpr.Extract extract -> dialect.extract(sql, extract.unit(), () -> expr(extract.value(), sql));
+        case SqlExpr.Truncate truncate -> dialect.truncate(sql, truncate.unit(), () -> expr(truncate.value(), sql));
+        case SqlExpr.Length length -> dialect.length(sql, () -> expr(length.value(), sql));
+        case SqlExpr.ExactText exact -> dialect.exactText(sql, () -> expr(exact.value(), sql));
+        case SqlExpr.EnumName name -> {
+            sql.text("CASE ");
+            expr(name.ordinal(), sql);
+            for (int i = 0; i < name.names().size(); i++) {
+                sql.text(" WHEN " + i + " THEN '" + name.names().get(i).replace("'", "''") + "'");
             }
-            case SqlExpr.CountAll c -> sql.text("COUNT(*)");
-            case SqlExpr.Arithmetic arithmetic -> {
-                sql.text("(");
-                expr(arithmetic.left(), sql);
-                sql.text(" " + arithmetic.operator() + " ");
-                expr(arithmetic.right(), sql);
-                sql.text(")");
+            sql.text(" END");
+        }
+        case SqlExpr.Subquery subquery -> {
+            sql.text("(");
+            select(subquery.select(), sql);
+            sql.text(")");
+        }
+        case SqlExpr.RowNumber rowNumber -> {
+            sql.text("ROW_NUMBER() OVER (");
+            if (!rowNumber.partition().isEmpty()) {
+                sql.text("PARTITION BY ");
+                join(rowNumber.partition(), ", ", e -> expr(e, sql), sql);
+                sql.text(" ");
             }
-            case SqlExpr.Cast cast when cast.value() instanceof SqlExpr.Param param
-                    && param.value() instanceof TextLiteral && cast.type() == CastType.TIMESTAMP ->
-                dialect.timestamp(sql, param.value());
-            case SqlExpr.Cast cast when cast.value() instanceof SqlExpr.Param param
-                    && param.value() instanceof TextLiteral && cast.type() == CastType.DATE ->
-                dialect.cast(sql, CastType.DATE, () -> dialect.timestamp(sql, param.value()));
-            case SqlExpr.Cast cast -> dialect.cast(sql, cast.type(), () -> expr(cast.value(), sql));
-            case SqlExpr.Extract extract -> dialect.extract(sql, extract.unit(), () -> expr(extract.value(), sql));
-            case SqlExpr.Truncate truncate -> dialect.truncate(sql, truncate.unit(), () -> expr(truncate.value(), sql));
-            case SqlExpr.Length length -> dialect.length(sql, () -> expr(length.value(), sql));
-            case SqlExpr.ExactText exact -> dialect.exactText(sql, () -> expr(exact.value(), sql));
-            case SqlExpr.EnumName name -> {
-                sql.text("CASE ");
-                expr(name.ordinal(), sql);
-                for (int i = 0; i < name.names().size(); i++) {
-                    sql.text(" WHEN " + i + " THEN '" + name.names().get(i).replace("'", "''") + "'");
-                }
-                sql.text(" END");
-            }
-            case SqlExpr.Subquery subquery -> {
-                sql.text("(");
-                select(subquery.select(), sql);
-                sql.text(")");
-            }
-            case SqlExpr.RowNumber rowNumber -> {
-                sql.text("ROW_NUMBER() OVER (");
-                if (!rowNumber.partition().isEmpty()) {
-                    sql.text("PARTITION BY ");
-                    join(rowNumber.partition(), ", ", e -> expr(e, sql), sql);
-                    sql.text(" ");
-                }
-                sql.text("ORDER BY ");
-                orders(rowNumber.order(), sql);
-                sql.text(")");
-            }
+            sql.text("ORDER BY ");
+            orders(rowNumber.order(), sql);
+            sql.text(")");
+        }
         }
     }
 

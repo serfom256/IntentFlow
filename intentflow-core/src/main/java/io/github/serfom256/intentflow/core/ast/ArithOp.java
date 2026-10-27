@@ -1,10 +1,7 @@
 package io.github.serfom256.intentflow.core.ast;
 
 public enum ArithOp {
-    ADD("+"),
-    SUBTRACT("-"),
-    MULTIPLY("*"),
-    DIVIDE("/");
+    ADD("+"), SUBTRACT("-"), MULTIPLY("*"), DIVIDE("/");
 
     private final String symbol;
 

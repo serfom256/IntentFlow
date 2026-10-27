@@ -80,18 +80,14 @@ class VisibleFieldsTest {
     private static final IntentContext CLERK = IntentContexts.of("clerk", null, Set.of());
 
     private static IntentPipelineBuilder pipeline(ServiceCatalog catalog, String dsl, List<?> rows) {
-        return IntentPipelines.builder()
-                .llm((text, scope) -> DslSources.of(dsl))
-                .sqlBuilder(SqlBuilders.create(new TestDialect()))
-                .executor(new QueryExecutor() {
+        return IntentPipelines.builder().llm((text, scope) -> DslSources.of(dsl))
+                .sqlBuilder(SqlBuilders.create(new TestDialect())).executor(new QueryExecutor() {
                     @Override
                     @SuppressWarnings("unchecked")
                     public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                         return (List<T>) rows;
                     }
-                })
-                .catalog(catalog)
-                .visibleFieldsOnly(true);
+                }).catalog(catalog).visibleFieldsOnly(true);
     }
 
     @Test
@@ -109,8 +105,7 @@ class VisibleFieldsTest {
         Book stored = new Book(7, "Dune", 12, "Acme Books");
 
         Book book = pipeline(ServiceCatalogs.fromAnnotated(Book.class), "books", List.of(stored))
-                .visibleFieldsOnly(false).build().resolve(IntentRequests.of("books"), Book.class).items()
-                .getFirst();
+                .visibleFieldsOnly(false).build().resolve(IntentRequests.of("books"), Book.class).items().getFirst();
 
         assertThat(book).isSameAs(stored);
     }
@@ -166,9 +161,7 @@ class VisibleFieldsTest {
 
     @Test
     void entitiesThatCannotBeCopiedFailAtBuild() {
-        assertThatThrownBy(() -> pipeline(ServiceCatalogs.fromAnnotated(Gadget.class), "gadgets", List.of())
-                .build())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining(Gadget.class.getName());
+        assertThatThrownBy(() -> pipeline(ServiceCatalogs.fromAnnotated(Gadget.class), "gadgets", List.of()).build())
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining(Gadget.class.getName());
     }
 }

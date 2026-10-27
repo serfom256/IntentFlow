@@ -98,8 +98,7 @@ final class PlainJdbcExecutor implements QueryExecutor {
             return name == null ? null : Enum.valueOf((Class) type, name);
         }
         Class<?> boxed = type == long.class ? Long.class
-                : type == int.class ? Integer.class
-                        : type == boolean.class ? Boolean.class : type;
+                : type == int.class ? Integer.class : type == boolean.class ? Boolean.class : type;
         return rs.getObject(column, boxed);
     }
 }

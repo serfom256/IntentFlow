@@ -57,11 +57,11 @@ public final class PostgresDialect implements SqlDialect {
         sql.text("CAST(");
         value.run();
         sql.text(switch (type) {
-            case NUMBER -> " AS NUMERIC)";
-            case INTEGER -> " AS BIGINT)";
-            case TEXT -> " AS TEXT)";
-            case TIMESTAMP -> " AS TIMESTAMP)";
-            case DATE -> " AS DATE)";
+        case NUMBER -> " AS NUMERIC)";
+        case INTEGER -> " AS BIGINT)";
+        case TEXT -> " AS TEXT)";
+        case TIMESTAMP -> " AS TIMESTAMP)";
+        case DATE -> " AS DATE)";
         });
     }
 

@@ -14,8 +14,7 @@ final class Timestamps {
 
     static boolean isValid(String text) {
         String s = text.strip().replace(' ', 'T');
-        return parses(() -> LocalDate.parse(s))
-                || parses(() -> LocalDateTime.parse(s))
+        return parses(() -> LocalDate.parse(s)) || parses(() -> LocalDateTime.parse(s))
                 || parses(() -> OffsetDateTime.parse(s));
     }
 

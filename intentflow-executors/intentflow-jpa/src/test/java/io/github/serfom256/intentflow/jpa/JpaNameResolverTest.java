@@ -63,13 +63,13 @@ class JpaNameResolverTest {
         ServiceDescriptor d = ServiceDescriptors.fromAnnotated(Account.class, List.of(new JpaNameResolver()));
 
         assertThat(d.table().value()).isEqualTo("customer_account");
-        assertThat(d.fields()).extracting(FieldMapping::column).extracting(c -> c.value())
-                .containsExactly("id", "display_name", "country_code", "is_vip");
+        assertThat(d.fields()).extracting(FieldMapping::column).extracting(c -> c.value()).containsExactly("id",
+                "display_name", "country_code", "is_vip");
     }
 
     @Test
     void withoutTableAnnotationSnakeCaseMatchesSpringBootNaming() {
-        assertThat(ServiceDescriptors.fromAnnotated(AuditNote.class, List.of(new JpaNameResolver()))
-                .table().value()).isEqualTo("audit_note");
+        assertThat(ServiceDescriptors.fromAnnotated(AuditNote.class, List.of(new JpaNameResolver())).table().value())
+                .isEqualTo("audit_note");
     }
 }

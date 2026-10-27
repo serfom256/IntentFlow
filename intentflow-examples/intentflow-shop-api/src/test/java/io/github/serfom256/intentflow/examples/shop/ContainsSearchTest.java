@@ -55,8 +55,8 @@ class ContainsSearchTest extends ApiTestSupport {
     @Test
     void containsMatchesAnywhereInTheValueIgnoringCase() {
         List<Long> expected = products.findAll().stream()
-                .filter(p -> p.getName().toLowerCase(Locale.ROOT).contains("ultra"))
-                .map(Product::getId).sorted().limit(50).toList();
+                .filter(p -> p.getName().toLowerCase(Locale.ROOT).contains("ultra")).map(Product::getId).sorted()
+                .limit(50).toList();
 
         llm.answer("anything ultra", "products | filter name ~ \"ULTRA\"");
         MvcTestResult r = mvc.get().uri("/api/products/search").queryParam("q", "anything ultra").exchange();

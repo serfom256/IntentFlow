@@ -12,9 +12,7 @@ import java.util.ServiceLoader;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class SqlDialects {
 
-    private static final Map<String, String> ALIASES = Map.of(
-            "postgres", "postgresql",
-            "mariadb", "mysql");
+    private static final Map<String, String> ALIASES = Map.of("postgres", "postgresql", "mariadb", "mysql");
 
     public static SqlDialect named(String name) {
         return named(name, Thread.currentThread().getContextClassLoader());
@@ -24,12 +22,10 @@ public final class SqlDialects {
         String key = name.strip().toLowerCase(Locale.ROOT);
         String wanted = ALIASES.getOrDefault(key, key);
         List<SqlDialect> available = available(classLoader);
-        return available.stream()
-                .filter(d -> d.name().equals(wanted))
-                .findFirst()
+        return available.stream().filter(d -> d.name().equals(wanted)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown SQL dialect '" + name + "'; available: "
-                        + available.stream().map(SqlDialect::name).sorted().toList()
-                        + ". Add the intentflow-" + wanted + " module."));
+                        + available.stream().map(SqlDialect::name).sorted().toList() + ". Add the intentflow-" + wanted
+                        + " module."));
     }
 
     public static List<SqlDialect> available(ClassLoader classLoader) {

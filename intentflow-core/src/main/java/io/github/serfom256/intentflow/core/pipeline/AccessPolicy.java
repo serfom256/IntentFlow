@@ -3,17 +3,16 @@ package io.github.serfom256.intentflow.core.pipeline;
 import io.github.serfom256.intentflow.core.api.IntentContext;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Decides what a caller may ask about. The LLM is shown only the services and
- * fields the caller may query, the
- * validator rejects anything else, and every query of a service, including
- * relation subqueries, gets the
- * service's restrictions. Every method has a permissive default, so a policy
- * overrides only what it limits.
+ * fields the caller may query, the validator rejects anything else, and every
+ * query of a service, including relation subqueries, gets the service's
+ * restrictions. Every method has a permissive default, so a policy overrides
+ * only what it limits.
  *
  * <pre>{@code
  * @Bean
@@ -29,8 +28,9 @@ import java.util.List;
  *                     : List.of();
  *         }
  *
- *         public String scope(ServiceDescriptor service, IntentContext caller) {
- *             return service.name().value().equals("orders") ? "only the current customer's own orders" : null;
+ *         public Optional<String> scope(ServiceDescriptor service, IntentContext caller) {
+ *             return service.name().value().equals("orders") ? Optional.of("only the current customer's own orders")
+ *                     : Optional.empty();
  *         }
  *     };
  * }
@@ -65,11 +65,10 @@ public interface AccessPolicy {
 
     /**
      * Which rows the caller sees, in words for the LLM, such as "only the current
-     * user's own orders". With it,
-     * "my orders" is answered as "orders"; without it, a question about the
-     * caller's own records is declined.
+     * user's own orders". With it, "my orders" is answered as "orders"; without it,
+     * a question about the caller's own records is declined.
      */
-    default @Nullable String scope(ServiceDescriptor service, IntentContext caller) {
-        return null;
+    default Optional<String> scope(ServiceDescriptor service, IntentContext caller) {
+        return Optional.empty();
     }
 }

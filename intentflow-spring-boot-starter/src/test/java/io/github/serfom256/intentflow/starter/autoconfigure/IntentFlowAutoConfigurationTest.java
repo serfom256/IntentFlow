@@ -4,7 +4,6 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import io.github.serfom256.intentflow.cassandra.CassandraQueryBuilder;
 import io.github.serfom256.intentflow.core.api.IntentResponse;
 import io.github.serfom256.intentflow.core.api.factories.IntentRequests;
-import io.github.serfom256.intentflow.core.api.factories.UserTexts;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.factories.DslSources;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
@@ -79,15 +78,11 @@ class IntentFlowAutoConfigurationTest {
     private static final String FIXTURES = "io.github.serfom256.intentflow.starter.autoconfigure.fixtures";
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withConfiguration(AutoConfigurations.of(
-                    BootAutoConfigurations.DATA_SOURCE,
-                    BootAutoConfigurations.JDBC_TEMPLATE,
-                    BootAutoConfigurations.JDBC_CLIENT,
-                    IntentFlowAutoConfiguration.class))
-            .withPropertyValues(
-                    "spring.datasource.url=jdbc:h2:mem:af;DB_CLOSE_DELAY=-1",
-                    "intentflow.llm.model=test-model",
-                    "intentflow.catalog.packages=" + FIXTURES);
+            .withConfiguration(
+                    AutoConfigurations.of(BootAutoConfigurations.DATA_SOURCE, BootAutoConfigurations.JDBC_TEMPLATE,
+                            BootAutoConfigurations.JDBC_CLIENT, IntentFlowAutoConfiguration.class))
+            .withPropertyValues("spring.datasource.url=jdbc:h2:mem:af;DB_CLOSE_DELAY=-1",
+                    "intentflow.llm.model=test-model", "intentflow.catalog.packages=" + FIXTURES);
 
     private static List<String> serviceNames(ServiceCatalog catalog) {
         return catalog.names().stream().map(ServiceName::value).sorted().toList();
@@ -97,14 +92,9 @@ class IntentFlowAutoConfigurationTest {
     void wiresTheWholePipeline() {
         runner.run(ctx -> {
             assertThat(ctx).hasNotFailed();
-            assertThat(ctx).hasSingleBean(IntentPipeline.class)
-                    .hasSingleBean(ServiceCatalog.class)
-                    .hasSingleBean(TextNormalizer.class)
-                    .hasSingleBean(DslCache.class)
-                    .hasSingleBean(DslParser.class)
-                    .hasSingleBean(AstValidator.class)
-                    .hasSingleBean(SqlBuilder.class)
-                    .hasSingleBean(UriBuilder.class)
+            assertThat(ctx).hasSingleBean(IntentPipeline.class).hasSingleBean(ServiceCatalog.class)
+                    .hasSingleBean(TextNormalizer.class).hasSingleBean(DslCache.class).hasSingleBean(DslParser.class)
+                    .hasSingleBean(AstValidator.class).hasSingleBean(SqlBuilder.class).hasSingleBean(UriBuilder.class)
                     .hasSingleBean(QueryExecutor.class);
             assertThat(ctx.getBean(LlmClient.class)).isInstanceOf(CircuitBreakerLlmClient.class);
         });
@@ -115,8 +105,8 @@ class IntentFlowAutoConfigurationTest {
         runner.run(ctx -> {
             ServiceCatalog catalog = ctx.getBean(ServiceCatalog.class);
             assertThat(serviceNames(catalog)).containsExactly("authors", "books");
-            assertThat(catalog.get(ServiceNames.of("books")).fields())
-                    .extracting(f -> f.type()).containsExactly(FieldType.NUMBER, FieldType.TEXT, FieldType.NUMBER);
+            assertThat(catalog.get(ServiceNames.of("books")).fields()).extracting(f -> f.type())
+                    .containsExactly(FieldType.NUMBER, FieldType.TEXT, FieldType.NUMBER);
         });
     }
 
@@ -124,32 +114,29 @@ class IntentFlowAutoConfigurationTest {
     void scansMultipleConfiguredPackages() {
         runner.withPropertyValues("intentflow.catalog.packages=" + FIXTURES
                 + ",io.github.serfom256.intentflow.starter.autoconfigure.other")
-                .run(ctx -> assertThat(serviceNames(ctx.getBean(ServiceCatalog.class)))
-                        .containsExactly("authors", "books", "magazines"));
+                .run(ctx -> assertThat(serviceNames(ctx.getBean(ServiceCatalog.class))).containsExactly("authors",
+                        "books", "magazines"));
     }
 
     @Test
     void defaultsToAutoConfigurationPackages() {
-        new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
+        new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
                 .withUserConfiguration(OtherPackageApp.class, StubExecutor.class)
                 .withPropertyValues("intentflow.llm.model=m")
-                .run(ctx -> assertThat(serviceNames(ctx.getBean(ServiceCatalog.class)))
-                        .containsExactly("magazines"));
+                .run(ctx -> assertThat(serviceNames(ctx.getBean(ServiceCatalog.class))).containsExactly("magazines"));
     }
 
     @Test
     void programmaticDescriptorBeansAreMergedWithAnnotatedOnes() {
         runner.withUserConfiguration(ManualDescriptor.class)
-                .run(ctx -> assertThat(serviceNames(ctx.getBean(ServiceCatalog.class)))
-                        .containsExactly("authors", "books", "orders"));
+                .run(ctx -> assertThat(serviceNames(ctx.getBean(ServiceCatalog.class))).containsExactly("authors",
+                        "books", "orders"));
     }
 
     @Test
     void duplicateServiceNamesFailStartup() {
         runner.withBean("dup", ServiceDescriptor.class, () -> ServiceDescriptors.fromAnnotated(Book.class))
-                .run(ctx -> assertThat(ctx).getFailure().rootCause()
-                        .hasMessageContaining("duplicate service: books"));
+                .run(ctx -> assertThat(ctx).getFailure().rootCause().hasMessageContaining("duplicate service: books"));
     }
 
     @Test
@@ -161,19 +148,16 @@ class IntentFlowAutoConfigurationTest {
     @Test
     void userLlmClientMeansNoModelIsRequired() {
         LlmClient custom = (text, catalog) -> DslSources.of("books");
-        runner.withPropertyValues("intentflow.llm.model=")
-                .withBean(LlmClient.class, () -> custom)
-                .run(ctx -> {
-                    assertThat(ctx).hasNotFailed();
-                    assertThat(ctx.getBean(LlmClient.class)).isSameAs(custom);
-                });
+        runner.withPropertyValues("intentflow.llm.model=").withBean(LlmClient.class, () -> custom).run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            assertThat(ctx.getBean(LlmClient.class)).isSameAs(custom);
+        });
     }
 
     @Test
     void missingModelFailsFastWithAHint() {
         runner.withPropertyValues("intentflow.llm.model=")
-                .run(ctx -> assertThat(ctx).getFailure().rootCause()
-                        .hasMessageContaining("Set intentflow.llm.model"));
+                .run(ctx -> assertThat(ctx).getFailure().rootCause().hasMessageContaining("Set intentflow.llm.model"));
     }
 
     @Test
@@ -186,20 +170,16 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void noDataSourceAndNoExecutorFailsFastWithAHint() {
-        new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
+        new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
                 .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES)
-                .run(ctx -> assertThat(ctx).getFailure().rootCause()
-                        .hasMessageContaining("No QueryExecutor"));
+                .run(ctx -> assertThat(ctx).getFailure().rootCause().hasMessageContaining("No QueryExecutor"));
     }
 
     @Test
     void customExecutorWorksWithoutJdbc() {
-        new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
+        new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
                 .withUserConfiguration(StubExecutor.class)
-                .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES)
-                .run(ctx -> {
+                .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES).run(ctx -> {
                     assertThat(ctx).hasNotFailed().doesNotHaveBean(JdbcClient.class);
                     assertThat(ctx.getBean(QueryExecutor.class)).isSameAs(ctx.getBean(StubExecutor.class).executor);
                 });
@@ -207,21 +187,14 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void canBeDisabled() {
-        runner.withPropertyValues("intentflow.enabled=false")
-                .run(ctx -> assertThat(ctx).hasNotFailed()
-                        .doesNotHaveBean(IntentPipeline.class)
-                        .doesNotHaveBean(ServiceCatalog.class));
+        runner.withPropertyValues("intentflow.enabled=false").run(ctx -> assertThat(ctx).hasNotFailed()
+                .doesNotHaveBean(IntentPipeline.class).doesNotHaveBean(ServiceCatalog.class));
     }
 
     @Test
     void bindsProperties() {
-        runner.withPropertyValues(
-                "intentflow.llm.base-url=http://ollama:11434/v1",
-                "intentflow.llm.api-key=secret",
-                "intentflow.llm.timeout=5s",
-                "intentflow.cache.ttl=1h",
-                "intentflow.cache.max-size=42")
-                .run(ctx -> {
+        runner.withPropertyValues("intentflow.llm.base-url=http://ollama:11434/v1", "intentflow.llm.api-key=secret",
+                "intentflow.llm.timeout=5s", "intentflow.cache.ttl=1h", "intentflow.cache.max-size=42").run(ctx -> {
                     IntentFlowProperties p = ctx.getBean(IntentFlowProperties.class);
                     assertThat(p.llm().baseUrl()).hasToString("http://ollama:11434/v1");
                     assertThat(p.llm().apiKey()).isEqualTo("secret");
@@ -258,8 +231,7 @@ class IntentFlowAutoConfigurationTest {
         runner.withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books | filter title == \"DUNE\""))
                 .run(ctx -> {
                     JdbcClient jdbc = ctx.getBean(JdbcClient.class);
-                    jdbc.sql("CREATE TABLE book (id BIGINT, title VARCHAR(100), price DECIMAL(6,2))")
-                            .update();
+                    jdbc.sql("CREATE TABLE book (id BIGINT, title VARCHAR(100), price DECIMAL(6,2))").update();
                     jdbc.sql("INSERT INTO book VALUES (7, 'Dune', 9.99), (8, 'Emma', 5.00)").update();
 
                     IntentResponse<Book> response = ctx.getBean(IntentPipeline.class)
@@ -280,14 +252,14 @@ class IntentFlowAutoConfigurationTest {
                 .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("mysql"));
         runner.withPropertyValues("spring.datasource.url=jdbc:oracle:thin:@//localhost:1521/FREEPDB1")
                 .run(ctx -> assertThat(ctx.getBean(SqlDialect.class).name()).isEqualTo("oracle"));
-        assertThat(SqlDialectConfigurations.Jdbc.dialectOf("jdbc:clickhouse://localhost:8123/default",
-                getClass().getClassLoader()).name()).isEqualTo("clickhouse");
+        assertThat(SqlDialectConfigurations.Jdbc
+                .dialectOf("jdbc:clickhouse://localhost:8123/default", getClass().getClassLoader()).name())
+                .isEqualTo("clickhouse");
     }
 
     @Test
     void dialectComesFromDatabaseMetadataWithoutConnectionDetails() {
-        new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
+        new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
                 .withUserConfiguration(StubExecutor.class)
                 .withBean(DataSource.class, () -> new DriverManagerDataSource("jdbc:h2:mem:meta"))
                 .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES)
@@ -302,10 +274,8 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void unknownDialectPropertyFailsStartup() {
-        runner.withPropertyValues("intentflow.dialect=sqlserver")
-                .run(ctx -> assertThat(ctx).getFailure().rootCause()
-                        .hasMessageContaining("Unknown SQL dialect 'sqlserver'")
-                        .hasMessageContaining("intentflow-sqlserver"));
+        runner.withPropertyValues("intentflow.dialect=sqlserver").run(ctx -> assertThat(ctx).getFailure().rootCause()
+                .hasMessageContaining("Unknown SQL dialect 'sqlserver'").hasMessageContaining("intentflow-sqlserver"));
     }
 
     @Test
@@ -344,37 +314,33 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void openMapperWinsWhenItsProceduresBeanIsPresent() {
-        runner.withBean(Procedures.class, () -> mock(Procedures.class))
-                .run(ctx -> {
-                    assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(OpenMapperQueryExecutor.class);
-                    assertThat(ctx.getBeansOfType(NameResolver.class).values())
-                            .hasAtLeastOneElementOfType(OpenMapperNameResolver.class);
-                });
+        runner.withBean(Procedures.class, () -> mock(Procedures.class)).run(ctx -> {
+            assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(OpenMapperQueryExecutor.class);
+            assertThat(ctx.getBeansOfType(NameResolver.class).values())
+                    .hasAtLeastOneElementOfType(OpenMapperNameResolver.class);
+        });
     }
 
     @Test
     void jpaWinsWhenAnEntityManagerFactoryIsPresent() {
-        runner.withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
-                .run(ctx -> {
-                    assertThat(ctx).hasNotFailed();
-                    assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JpaQueryExecutor.class);
-                    assertThat(ctx.getBeansOfType(NameResolver.class).values())
-                            .hasAtLeastOneElementOfType(JpaNameResolver.class);
-                });
+        runner.withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA)).run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JpaQueryExecutor.class);
+            assertThat(ctx.getBeansOfType(NameResolver.class).values())
+                    .hasAtLeastOneElementOfType(JpaNameResolver.class);
+        });
     }
 
     @Test
     void executorPropertyForcesTheChoice() {
         runner.withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
-                .withBean(Procedures.class, () -> mock(Procedures.class))
-                .withPropertyValues("intentflow.executor=jdbc")
+                .withBean(Procedures.class, () -> mock(Procedures.class)).withPropertyValues("intentflow.executor=jdbc")
                 .run(ctx -> assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class));
     }
 
     @Test
     void cassandraRunsQueriesWhenASessionAndConverterExist() {
-        new ApplicationContextRunner()
-                .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
+        new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
                 .withBean(CqlSession.class, () -> mock(CqlSession.class))
                 .withBean(CassandraConverter.class, MappingCassandraConverter::new)
                 .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES,
@@ -396,8 +362,7 @@ class IntentFlowAutoConfigurationTest {
                 .run(ctx -> assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(CassandraQueryExecutor.class));
         runner.withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
                 .withBean(CqlSession.class, () -> mock(CqlSession.class))
-                .withBean(CassandraConverter.class, MappingCassandraConverter::new)
-                .run(ctx -> {
+                .withBean(CassandraConverter.class, MappingCassandraConverter::new).run(ctx -> {
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JpaQueryExecutor.class);
                     assertThat(ctx.getBean(SqlBuilder.class)).isNotInstanceOf(CassandraQueryBuilder.class);
                 });
@@ -407,8 +372,7 @@ class IntentFlowAutoConfigurationTest {
     void executorPropertyCanPickJdbcOverCassandra() {
         runner.withBean(CqlSession.class, () -> mock(CqlSession.class))
                 .withBean(CassandraConverter.class, MappingCassandraConverter::new)
-                .withPropertyValues("intentflow.executor=jdbc")
-                .run(ctx -> {
+                .withPropertyValues("intentflow.executor=jdbc").run(ctx -> {
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class);
                     assertThat(ctx.getBean(SqlBuilder.class)).isNotInstanceOf(CassandraQueryBuilder.class);
                 });
@@ -416,13 +380,12 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void jimmerRunsQueriesWhenAJSqlClientExists() {
-        runner.withBean(JSqlClient.class, () -> mock(JSqlClientImplementor.class))
-                .run(ctx -> {
-                    assertThat(ctx).hasNotFailed();
-                    assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JimmerQueryExecutor.class);
-                    assertThat(ctx.getBeansOfType(NameResolver.class).values())
-                            .hasAtLeastOneElementOfType(JimmerNameResolver.class);
-                });
+        runner.withBean(JSqlClient.class, () -> mock(JSqlClientImplementor.class)).run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JimmerQueryExecutor.class);
+            assertThat(ctx.getBeansOfType(NameResolver.class).values())
+                    .hasAtLeastOneElementOfType(JimmerNameResolver.class);
+        });
         runner.withBean(JSqlClient.class, () -> mock(JSqlClientImplementor.class))
                 .withPropertyValues("intentflow.executor=jdbc")
                 .run(ctx -> assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class));
@@ -430,9 +393,8 @@ class IntentFlowAutoConfigurationTest {
 
     @Test
     void springDataJdbcWinsOverPlainJdbcWhenItsConverterIsPresent() {
-        runner.withBean(JdbcConverter.class, () -> new MappingJdbcConverter(new JdbcMappingContext(),
-                (identifier, path) -> List.of()))
-                .run(ctx -> {
+        runner.withBean(JdbcConverter.class,
+                () -> new MappingJdbcConverter(new JdbcMappingContext(), (identifier, path) -> List.of())).run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(SpringDataJdbcQueryExecutor.class);
                     assertThat(ctx.getBeansOfType(NameResolver.class).values())
@@ -447,8 +409,7 @@ class IntentFlowAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(IntentFlowAutoConfiguration.class))
                 .withBean(CqlSession.class, () -> mock(CqlSession.class))
                 .withBean(CassandraConverter.class, MappingCassandraConverter::new)
-                .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES)
-                .run(ctx -> {
+                .withPropertyValues("intentflow.llm.model=m", "intentflow.catalog.packages=" + FIXTURES).run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(CassandraQueryExecutor.class);
                     assertThat(ctx).doesNotHaveBean(SqlDialect.class);
@@ -459,8 +420,7 @@ class IntentFlowAutoConfigurationTest {
     void missingAdapterJarsFallBackToJdbc() {
         runner.withClassLoader(new FilteredClassLoader(OpenMapperQueryExecutor.class, JpaQueryExecutor.class))
                 .withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
-                .withBean(Procedures.class, () -> mock(Procedures.class))
-                .run(ctx -> {
+                .withBean(Procedures.class, () -> mock(Procedures.class)).run(ctx -> {
                     assertThat(ctx).hasNotFailed();
                     assertThat(ctx.getBean(QueryExecutor.class)).isInstanceOf(JdbcQueryExecutor.class);
                     assertThat(ctx).doesNotHaveBean(OpenMapperNameResolver.class)
@@ -472,12 +432,11 @@ class IntentFlowAutoConfigurationTest {
     void nameResolversFeedTheCatalogScan() {
         runner.withPropertyValues(
                 "intentflow.catalog.packages=io.github.serfom256.intentflow.starter.autoconfigure.jpa")
-                .withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA))
-                .run(ctx -> {
+                .withConfiguration(AutoConfigurations.of(BootAutoConfigurations.HIBERNATE_JPA)).run(ctx -> {
                     ServiceDescriptor service = ctx.getBean(ServiceCatalog.class).get(ServiceNames.of("shelves"));
                     assertThat(service.table().value()).isEqualTo("library_shelf");
-                    assertThat(service.fields()).extracting(f -> f.column().value())
-                            .containsExactly("shelf_id", "label_text");
+                    assertThat(service.fields()).extracting(f -> f.column().value()).containsExactly("shelf_id",
+                            "label_text");
                 });
     }
 
@@ -485,10 +444,9 @@ class IntentFlowAutoConfigurationTest {
     static class ManualDescriptor {
         @Bean
         ServiceDescriptor ordersService() {
-            return ServiceDescriptors.of(
-                    ServiceNames.of("orders"), null, TableNames.of("orders"),
-                    List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true)),
-                    List.of(), MaxTakes.of(10), UriTemplates.of("/orders/{{id}}"), Object.class);
+            return ServiceDescriptors.of(ServiceNames.of("orders"), null, TableNames.of("orders"),
+                    List.of(FieldMappings.of(LogicalFieldNames.of("id"), ColumnNames.of("id"), true)), List.of(),
+                    MaxTakes.of(10), UriTemplates.of("/orders/{{id}}"), Object.class);
         }
     }
 

@@ -28,15 +28,14 @@ public final class LlmRateLimiters {
     }
 
     public static Function<IntentContext, String> byTenant() {
-        return caller -> caller.tenant() != null ? caller.tenant() : principal(caller);
+        return caller -> caller.tenant().orElseGet(() -> principal(caller));
     }
 
-    public static LlmRateLimiter of(int questions, Duration period, Function<IntentContext, String> key,
-            Clock clock) {
+    public static LlmRateLimiter of(int questions, Duration period, Function<IntentContext, String> key, Clock clock) {
         return new TokenBucketRateLimiter(questions, period, key, clock);
     }
 
     private static String principal(IntentContext caller) {
-        return caller.principal() != null ? caller.principal() : ANONYMOUS;
+        return caller.principal().orElse(ANONYMOUS);
     }
 }

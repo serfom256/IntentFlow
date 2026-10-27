@@ -26,35 +26,34 @@ public final class CqlValues {
 
     public static @Nullable Comparable<?> comparable(@Nullable Object value, ZoneId zone) {
         return switch (value) {
-            case null -> null;
-            case String s -> s;
-            case BigDecimal n -> n;
-            case BigInteger n -> new BigDecimal(n);
-            case Integer n -> BigDecimal.valueOf(n);
-            case Long n -> BigDecimal.valueOf(n);
-            case Short n -> BigDecimal.valueOf(n);
-            case Byte n -> BigDecimal.valueOf(n);
-            case Double n -> Double.isFinite(n) ? BigDecimal.valueOf(n) : null;
-            case Float n -> Float.isFinite(n) ? new BigDecimal(Float.toString(n)) : null;
-            case Boolean b -> b;
-            case Instant t -> LocalDateTime.ofInstant(t, zone);
-            case LocalDate d -> d.atStartOfDay();
-            case LocalDateTime t -> t;
-            default -> value.toString();
+        case null -> null;
+        case String s -> s;
+        case BigDecimal n -> n;
+        case BigInteger n -> new BigDecimal(n);
+        case Integer n -> BigDecimal.valueOf(n);
+        case Long n -> BigDecimal.valueOf(n);
+        case Short n -> BigDecimal.valueOf(n);
+        case Byte n -> BigDecimal.valueOf(n);
+        case Double n -> Double.isFinite(n) ? BigDecimal.valueOf(n) : null;
+        case Float n -> Float.isFinite(n) ? new BigDecimal(Float.toString(n)) : null;
+        case Boolean b -> b;
+        case Instant t -> LocalDateTime.ofInstant(t, zone);
+        case LocalDate d -> d.atStartOfDay();
+        case LocalDateTime t -> t;
+        default -> value.toString();
         };
     }
 
     static @Nullable Integer compare(Comparable<?> column, DslLiteral literal, boolean equality,
             boolean caseSensitive) {
         return switch (column) {
-            case String s when literal instanceof TextLiteral t -> equality && !caseSensitive
-                    ? lower(s).compareTo(lower(t.value()))
-                    : s.compareTo(t.value());
-            case BigDecimal n when literal instanceof NumberLiteral l -> n.compareTo(l.value());
-            case Boolean b when literal instanceof BoolLiteral l -> Boolean.compare(b, l.value());
-            case LocalDateTime d when literal instanceof TextLiteral t ->
-                parseTimestamp(t.value()).map(d::compareTo).orElse(null);
-            case null, default -> null;
+        case String s when literal instanceof TextLiteral t ->
+            equality && !caseSensitive ? lower(s).compareTo(lower(t.value())) : s.compareTo(t.value());
+        case BigDecimal n when literal instanceof NumberLiteral l -> n.compareTo(l.value());
+        case Boolean b when literal instanceof BoolLiteral l -> Boolean.compare(b, l.value());
+        case LocalDateTime d when literal instanceof TextLiteral t ->
+            parseTimestamp(t.value()).map(d::compareTo).orElse(null);
+        case null, default -> null;
         };
     }
 

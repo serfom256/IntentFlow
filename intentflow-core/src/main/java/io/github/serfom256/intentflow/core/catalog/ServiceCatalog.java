@@ -5,9 +5,9 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Read-only view of the service registry loaded at application start.
- * The {@link #version()} should increment whenever the catalog is rebuilt
- * so dependent caches (e.g. NL → DSL) can scope their keys.
+ * Read-only view of the service registry loaded at application start. The
+ * {@link #version()} should increment whenever the catalog is rebuilt so
+ * dependent caches (e.g. NL → DSL) can scope their keys.
  */
 public interface ServiceCatalog {
 
@@ -25,8 +25,7 @@ public interface ServiceCatalog {
      *                               by name instead)
      */
     default Optional<ServiceDescriptor> findByType(Class<?> type) {
-        List<ServiceDescriptor> matches = names().stream().map(this::get)
-                .filter(d -> d.resultType() == type).toList();
+        List<ServiceDescriptor> matches = names().stream().map(this::get).filter(d -> d.resultType() == type).toList();
         if (matches.size() > 1) {
             throw new IllegalStateException("Several services map to " + type.getName() + ": "
                     + matches.stream().map(d -> d.name().value()).sorted().toList());

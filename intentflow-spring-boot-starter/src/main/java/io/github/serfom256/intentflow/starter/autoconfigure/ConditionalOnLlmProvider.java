@@ -9,9 +9,8 @@ import java.lang.annotation.Target;
 
 /**
  * Matches when {@code intentflow.llm.provider} names this provider, or when it
- * is unset and this is the only
- * provider module on the classpath; {@code openai} counts only when no other
- * provider brings it in.
+ * is unset and this is the only provider module on the classpath;
+ * {@code openai} counts only when no other provider brings it in.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)

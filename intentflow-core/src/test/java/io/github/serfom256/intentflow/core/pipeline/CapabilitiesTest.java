@@ -87,8 +87,8 @@ class CapabilitiesTest {
     }
 
     private static BoundQuery sql(String dsl) {
-        return SqlBuilders.create(new LimitedDialect()).build(AstValidators.create()
-                .validate(DslParsers.create().parse(DslSources.of(dsl)), CATALOG));
+        return SqlBuilders.create(new LimitedDialect())
+                .build(AstValidators.create().validate(DslParsers.create().parse(DslSources.of(dsl)), CATALOG));
     }
 
     @Test
@@ -106,8 +106,9 @@ class CapabilitiesTest {
 
     @Test
     void tooManyParametersAreRejected() {
-        assertThatThrownBy(() -> sql("books | filter year == 1 or year == 2 or year == 3 or year == 4 "
-                + "or year == 5 or year == 6")).isInstanceOf(ValidationException.class)
+        assertThatThrownBy(() -> sql(
+                "books | filter year == 1 or year == 2 or year == 3 or year == 4 " + "or year == 5 or year == 6"))
+                .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("needs 6 parameters, more than limited accepts (5)");
     }
 
@@ -121,7 +122,6 @@ class CapabilitiesTest {
     void theValidatorCapsInListsEverywhere() {
         assertThatThrownBy(() -> AstValidators.create(AstValidators.DEFAULT_MAX_SKIP, 2)
                 .validate(DslParsers.create().parse(DslSources.of("books | filter year in (1, 2, 3)")), CATALOG))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("'in' takes at most 2 values, got 3");
+                .isInstanceOf(ValidationException.class).hasMessageContaining("'in' takes at most 2 values, got 3");
     }
 }

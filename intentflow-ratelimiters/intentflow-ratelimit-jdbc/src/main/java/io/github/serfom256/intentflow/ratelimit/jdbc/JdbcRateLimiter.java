@@ -94,8 +94,8 @@ public final class JdbcRateLimiter implements LlmRateLimiter {
         double tokens;
         long refilledAt;
         long revision;
-        try (PreparedStatement select = connection.prepareStatement(
-                "SELECT tokens, refilled_at, revision FROM " + table + " WHERE bucket = ?")) {
+        try (PreparedStatement select = connection
+                .prepareStatement("SELECT tokens, refilled_at, revision FROM " + table + " WHERE bucket = ?")) {
             select.setString(1, bucket);
             try (ResultSet row = select.executeQuery()) {
                 if (!row.next()) {
@@ -110,8 +110,8 @@ public final class JdbcRateLimiter implements LlmRateLimiter {
         double available = Math.min(questions, tokens + Math.max(0, now - refilledAt) * perMilli);
         if (available < 1) {
             long waitMillis = (long) Math.ceil((1 - available) / perMilli);
-            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period
-                    + " reached", Duration.ofMillis(waitMillis));
+            throw new RateLimitExceededException("Rate limit of " + questions + " questions per " + period + " reached",
+                    Duration.ofMillis(waitMillis));
         }
         try (PreparedStatement update = connection.prepareStatement("UPDATE " + table
                 + " SET tokens = ?, refilled_at = ?, revision = ? WHERE bucket = ? AND revision = ?")) {
@@ -145,8 +145,8 @@ public final class JdbcRateLimiter implements LlmRateLimiter {
         if (now - last < period.toMillis() || !cleanedAt.compareAndSet(last, now)) {
             return;
         }
-        try (PreparedStatement delete = connection.prepareStatement(
-                "DELETE FROM " + table + " WHERE refilled_at < ?")) {
+        try (PreparedStatement delete = connection
+                .prepareStatement("DELETE FROM " + table + " WHERE refilled_at < ?")) {
             delete.setLong(1, now - period.toMillis());
             delete.executeUpdate();
         }

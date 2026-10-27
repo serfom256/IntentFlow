@@ -26,9 +26,7 @@ final class ObservationPipelineTracer implements PipelineTracer {
         }
         String name = stage.name().toLowerCase(Locale.ROOT);
         Observation observation = Observation.createNotStarted("intentflow.stage", observations)
-                .contextualName("intentflow " + name)
-                .lowCardinalityKeyValue("stage", name)
-                .start();
+                .contextualName("intentflow " + name).lowCardinalityKeyValue("stage", name).start();
         return new ObservedSpan(observation, observation.openScope());
     }
 
@@ -37,8 +35,7 @@ final class ObservationPipelineTracer implements PipelineTracer {
         @Override
         public void usage(TokenUsage tokens, @Nullable String model) {
             observation.highCardinalityKeyValue("gen_ai.usage.input_tokens", String.valueOf(tokens.promptTokens()))
-                    .highCardinalityKeyValue("gen_ai.usage.output_tokens",
-                            String.valueOf(tokens.completionTokens()));
+                    .highCardinalityKeyValue("gen_ai.usage.output_tokens", String.valueOf(tokens.completionTokens()));
             if (model != null) {
                 observation.highCardinalityKeyValue("gen_ai.response.model", model);
             }

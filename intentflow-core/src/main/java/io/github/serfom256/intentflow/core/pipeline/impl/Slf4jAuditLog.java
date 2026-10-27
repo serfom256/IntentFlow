@@ -68,8 +68,9 @@ public final class Slf4jAuditLog implements AuditLog {
         }
         line.append(' ').append(name).append('=');
         if (value.chars().anyMatch(c -> c == ' ' || c == '"' || c == '=' || c < 0x20)) {
-            line.append('"').append(value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
-                    .replace("\r", "\\r")).append('"');
+            line.append('"')
+                    .append(value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r"))
+                    .append('"');
         } else {
             line.append(value);
         }

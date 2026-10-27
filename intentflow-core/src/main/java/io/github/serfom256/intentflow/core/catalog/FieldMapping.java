@@ -1,8 +1,7 @@
 package io.github.serfom256.intentflow.core.catalog;
 
-import org.jspecify.annotations.Nullable;
-
 import java.util.List;
+import java.util.Optional;
 
 public interface FieldMapping {
 
@@ -18,17 +17,17 @@ public interface FieldMapping {
     }
 
     /** Hint for the LLM (unit, meaning, format). */
-    default @Nullable String description() {
-        return null;
+    default Optional<String> description() {
+        return Optional.empty();
     }
 
     /**
-     * Java property of the result type holding this field's value (used to
-     * render URI placeholders from an entity). {@code null} means the logical
-     * name converted to camelCase.
+     * Java property of the result type holding this field's value (used to render
+     * URI placeholders from an entity). Empty means the logical name converted to
+     * camelCase.
      */
-    default @Nullable String property() {
-        return null;
+    default Optional<String> property() {
+        return Optional.empty();
     }
 
     /**
@@ -40,9 +39,8 @@ public interface FieldMapping {
 
     /**
      * {@code true} compares text with {@code ==}, {@code !=} and {@code in} exactly
-     * as written
-     * instead of ignoring case, so plain column indexes apply. {@code ~} always
-     * ignores case.
+     * as written instead of ignoring case, so plain column indexes apply. {@code ~}
+     * always ignores case.
      */
     default boolean caseSensitive() {
         return false;

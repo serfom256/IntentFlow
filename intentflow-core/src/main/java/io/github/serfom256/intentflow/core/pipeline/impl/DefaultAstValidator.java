@@ -23,6 +23,8 @@ import io.github.serfom256.intentflow.core.ast.Not;
 import io.github.serfom256.intentflow.core.ast.NullLiteral;
 import io.github.serfom256.intentflow.core.ast.NumberLiteral;
 import io.github.serfom256.intentflow.core.ast.Or;
+import io.github.serfom256.intentflow.core.ast.Skip;
+import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.TopN;
 import io.github.serfom256.intentflow.core.ast.ValueExpr;
@@ -70,10 +72,8 @@ public final class DefaultAstValidator implements AstValidator {
         ServiceDescriptor service = catalog.get(ast.service());
         Fields fields = new Fields(service, catalog);
 
-        if (ast.filter() != null) {
-            validateFilter(ast.filter(), fields);
-        }
-        Aggregate aggregate = ast.aggregate();
+        ast.filter().ifPresent(filter -> validateFilter(filter, fields));
+        Aggregate aggregate = ast.aggregate().orElse(null);
         if (aggregate == null) {
             for (SortKey sk : ast.sort()) {
                 if (sk instanceof ExprSortKey e) {
@@ -86,18 +86,16 @@ public final class DefaultAstValidator implements AstValidator {
             validateAggregate(aggregate, ast.sort(), fields);
         }
 
-        if (ast.top() != null) {
-            validateTop(ast, service, fields);
-        }
-        if (ast.skip() != null && ast.skip().value() > maxSkip) {
+        ast.top().ifPresent(top -> validateTop(top, ast, service, fields));
+        int skip = ast.skip().map(Skip::value).orElse(0);
+        if (skip > maxSkip) {
             throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
-                    "skip value " + ast.skip().value() + " exceeds the maximum of " + maxSkip,
-                    Map.of("limit", maxSkip));
+                    "skip value " + skip + " exceeds the maximum of " + maxSkip, Map.of("limit", maxSkip));
         }
-        if (ast.take() != null && ast.take().value() > service.maxTake().value()) {
-            throw new ValidationException(ErrorCode.LIMIT_EXCEEDED,
-                    "take value " + ast.take().value()
-                            + " exceeds maxTake " + service.maxTake().value()
+        int take = ast.take().map(Take::value).orElse(0);
+        if (take > service.maxTake().value()) {
+            throw new ValidationException(
+                    ErrorCode.LIMIT_EXCEEDED, "take value " + take + " exceeds maxTake " + service.maxTake().value()
                             + " for service '" + service.name().value() + "'",
                     Map.of("limit", service.maxTake().value()));
         }
@@ -105,9 +103,8 @@ public final class DefaultAstValidator implements AstValidator {
         return ValidatedQueries.of(service, ast, fields.related);
     }
 
-    private static void validateTop(AstQuery ast, ServiceDescriptor service, Fields fields) {
-        TopN top = ast.top();
-        if (ast.aggregate() != null) {
+    private static void validateTop(TopN top, AstQuery ast, ServiceDescriptor service, Fields fields) {
+        if (ast.aggregate().isPresent()) {
             throw new ValidationException(ErrorCode.UNSUPPORTED,
                     "'top' cannot be combined with group or count/sum/avg/min/max", Map.of());
         }
@@ -147,9 +144,10 @@ public final class DefaultAstValidator implements AstValidator {
             boolean numeric = type == ExprTypes.Type.NUMBER || type == ExprTypes.Type.ANY;
             if ((aggregate.function() == AggregateFunction.SUM || aggregate.function() == AggregateFunction.AVG)
                     && !numeric) {
-                throw new ValidationException(ErrorCode.TYPE_MISMATCH, "field '"
-                        + Expressions.print(aggregate.argument()) + "' (" + ExprTypes.name(type) + "): "
-                        + aggregate.function().keyword() + " needs a number field", Map.of());
+                throw new ValidationException(ErrorCode.TYPE_MISMATCH,
+                        "field '" + Expressions.print(aggregate.argument()) + "' (" + ExprTypes.name(type) + "): "
+                                + aggregate.function().keyword() + " needs a number field",
+                        Map.of());
             }
         }
         String value = ValidatedQuery.valueField(aggregate).value();
@@ -157,8 +155,7 @@ public final class DefaultAstValidator implements AstValidator {
         for (SortKey sk : sort) {
             if (!groups.contains(sk.field().value()) && !sk.field().value().equals(value)) {
                 throw new ValidationException(ErrorCode.UNSUPPORTED,
-                        "aggregate queries sort by '" + value + "' or a group field, not '"
-                                + sk.field().value() + "'",
+                        "aggregate queries sort by '" + value + "' or a group field, not '" + sk.field().value() + "'",
                         Map.of());
             }
         }
@@ -193,12 +190,12 @@ public final class DefaultAstValidator implements AstValidator {
                 return own(name, stage);
             }
             String relationName = name.value().substring(0, dot);
-            ServiceRelation relation = service.relations().stream()
-                    .filter(r -> r.name().equals(relationName))
+            ServiceRelation relation = service.relations().stream().filter(r -> r.name().equals(relationName))
                     .findFirst()
-                    .orElseThrow(() -> new ValidationException(ErrorCode.UNKNOWN_RELATION, "'" + relationName
-                            + "' is not a relation of '" + service.name().value() + "' (referenced in '" + stage
-                            + "')", Map.of("relation", relationName)));
+                    .orElseThrow(() -> new ValidationException(
+                            ErrorCode.UNKNOWN_RELATION, "'" + relationName + "' is not a relation of '"
+                                    + service.name().value() + "' (referenced in '" + stage + "')",
+                            Map.of("relation", relationName)));
             ServiceDescriptor target = catalog.find(relation.target()).orElseThrow(() -> new ValidationException(
                     "relation '" + relationName + "' targets unknown service '" + relation.target().value() + "'"));
             if (target.fields().stream().noneMatch(f -> f.logical().value().equals(relation.to().value()))) {
@@ -239,33 +236,33 @@ public final class DefaultAstValidator implements AstValidator {
 
     private void validateFilter(FilterExpr expr, Fields fields) {
         switch (expr) {
-            case And a -> {
-                validateFilter(a.left(), fields);
-                validateFilter(a.right(), fields);
+        case And a -> {
+            validateFilter(a.left(), fields);
+            validateFilter(a.right(), fields);
+        }
+        case Or o -> {
+            validateFilter(o.left(), fields);
+            validateFilter(o.right(), fields);
+        }
+        case Not n -> validateFilter(n.inner(), fields);
+        case Compare c -> checkCompare(c, fields.any(c.field(), "filter"));
+        case In i -> {
+            checkInSize(i.values().size());
+            FieldMapping fm = fields.any(i.field(), "filter");
+            for (DslLiteral v : i.values()) {
+                checkValue(fm, ComparisonOp.EQ, v);
             }
-            case Or o -> {
-                validateFilter(o.left(), fields);
-                validateFilter(o.right(), fields);
+        }
+        case IsNull i -> fields.any(i.field(), "filter");
+        case IsNotNull i -> fields.any(i.field(), "filter");
+        case ExprCompare c -> checkExprCompare(c, fields.types);
+        case ExprIn i -> {
+            checkInSize(i.values().size());
+            ExprTypes.Type type = fields.types.check(i.value());
+            for (DslLiteral v : i.values()) {
+                checkOperands(fields.types, i.value(), type, ComparisonOp.EQ, new LiteralExpr(v));
             }
-            case Not n -> validateFilter(n.inner(), fields);
-            case Compare c -> checkCompare(c, fields.any(c.field(), "filter"));
-            case In i -> {
-                checkInSize(i.values().size());
-                FieldMapping fm = fields.any(i.field(), "filter");
-                for (DslLiteral v : i.values()) {
-                    checkValue(fm, ComparisonOp.EQ, v);
-                }
-            }
-            case IsNull i -> fields.any(i.field(), "filter");
-            case IsNotNull i -> fields.any(i.field(), "filter");
-            case ExprCompare c -> checkExprCompare(c, fields.types);
-            case ExprIn i -> {
-                checkInSize(i.values().size());
-                ExprTypes.Type type = fields.types.check(i.value());
-                for (DslLiteral v : i.values()) {
-                    checkOperands(fields.types, i.value(), type, ComparisonOp.EQ, new LiteralExpr(v));
-                }
-            }
+        }
         }
     }
 
@@ -302,8 +299,9 @@ public final class DefaultAstValidator implements AstValidator {
                 || (temporal && rightType == ExprTypes.Type.TEXT && ExprTypes.literalTimestamp(right))
                 || (temporal && (rightType == ExprTypes.Type.TIMESTAMP || rightType == ExprTypes.Type.DATE));
         if (!compatible) {
-            throw new ValidationException(ErrorCode.TYPE_MISMATCH, "cannot compare " + ExprTypes.name(left) + " with "
-                    + ExprTypes.name(rightType) + ": " + where, Map.of());
+            throw new ValidationException(ErrorCode.TYPE_MISMATCH,
+                    "cannot compare " + ExprTypes.name(left) + " with " + ExprTypes.name(rightType) + ": " + where,
+                    Map.of());
         }
         if (left == ExprTypes.Type.BOOLEAN && op != ComparisonOp.EQ && op != ComparisonOp.NE) {
             throw new ValidationException(ErrorCode.TYPE_MISMATCH, "booleans only support '==' and '!=': " + where,
@@ -330,50 +328,51 @@ public final class DefaultAstValidator implements AstValidator {
             throw mismatch(fm, "use '== null' / '!= null' to test for missing values");
         }
         switch (fm.type()) {
-            case ANY -> {
+        case ANY -> {
+        }
+        case TEXT -> {
+            if (!(value instanceof TextLiteral t)) {
+                throw mismatch(fm, "expected a \"text\" value, got " + describe(value));
             }
-            case TEXT -> {
-                if (!(value instanceof TextLiteral t)) {
-                    throw mismatch(fm, "expected a \"text\" value, got " + describe(value));
-                }
-                if (op != ComparisonOp.CONTAINS && !fm.allowedValues().isEmpty()
-                        && fm.allowedValues().stream().noneMatch(v -> v.equalsIgnoreCase(t.value()))) {
-                    throw mismatch(fm, "'" + t.value() + "' is not one of " + fm.allowedValues());
-                }
+            if (op != ComparisonOp.CONTAINS && !fm.allowedValues().isEmpty()
+                    && fm.allowedValues().stream().noneMatch(v -> v.equalsIgnoreCase(t.value()))) {
+                throw mismatch(fm, "'" + t.value() + "' is not one of " + fm.allowedValues());
             }
-            case NUMBER -> {
-                if (!(value instanceof NumberLiteral)) {
-                    throw mismatch(fm, "expected a number, got " + describe(value));
-                }
+        }
+        case NUMBER -> {
+            if (!(value instanceof NumberLiteral)) {
+                throw mismatch(fm, "expected a number, got " + describe(value));
             }
-            case BOOLEAN -> {
-                if (!(value instanceof BoolLiteral)) {
-                    throw mismatch(fm, "expected true or false, got " + describe(value));
-                }
-                if (op != ComparisonOp.EQ && op != ComparisonOp.NE) {
-                    throw mismatch(fm, "booleans only support '==' and '!='");
-                }
+        }
+        case BOOLEAN -> {
+            if (!(value instanceof BoolLiteral)) {
+                throw mismatch(fm, "expected true or false, got " + describe(value));
             }
-            case TIMESTAMP -> {
-                if (!(value instanceof TextLiteral t) || !Timestamps.isValid(t.value())) {
-                    throw mismatch(fm, "expected a date like \"2026-01-31\" or \"2026-01-31T10:15:00\", got "
-                            + describe(value));
-                }
+            if (op != ComparisonOp.EQ && op != ComparisonOp.NE) {
+                throw mismatch(fm, "booleans only support '==' and '!='");
             }
+        }
+        case TIMESTAMP -> {
+            if (!(value instanceof TextLiteral t) || !Timestamps.isValid(t.value())) {
+                throw mismatch(fm,
+                        "expected a date like \"2026-01-31\" or \"2026-01-31T10:15:00\", got " + describe(value));
+            }
+        }
         }
     }
 
     private static String describe(DslLiteral value) {
         return switch (value) {
-            case TextLiteral t -> "\"" + t.value() + "\"";
-            case NumberLiteral n -> n.value().toPlainString();
-            case BoolLiteral b -> Boolean.toString(b.value());
-            case NullLiteral n -> "null";
+        case TextLiteral t -> "\"" + t.value() + "\"";
+        case NumberLiteral n -> n.value().toPlainString();
+        case BoolLiteral b -> Boolean.toString(b.value());
+        case NullLiteral n -> "null";
         };
     }
 
     private static ValidationException mismatch(FieldMapping fm, String detail) {
-        return new ValidationException(ErrorCode.TYPE_MISMATCH, "field '" + fm.logical().value() + "' ("
-                + fm.type().name().toLowerCase(Locale.ROOT) + "): " + detail, Map.of("field", fm.logical().value()));
+        return new ValidationException(ErrorCode.TYPE_MISMATCH,
+                "field '" + fm.logical().value() + "' (" + fm.type().name().toLowerCase(Locale.ROOT) + "): " + detail,
+                Map.of("field", fm.logical().value()));
     }
 }

@@ -39,16 +39,14 @@ class AdminLiquibaseTest {
     private final WebApplicationContextRunner runner = new WebApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(LIQUIBASE, IntentFlowAutoConfiguration.class,
                     IntentFlowAdminAutoConfiguration.class))
-            .withUserConfiguration(Mvc.class)
-            .withBean(DataSource.class, () -> dataSource)
+            .withUserConfiguration(Mvc.class).withBean(DataSource.class, () -> dataSource)
             .withBean(LlmClient.class, () -> (text, catalog) -> DslSources.of("books | take 1"))
             .withBean(QueryExecutor.class, () -> new QueryExecutor() {
                 @Override
                 public <T> List<T> execute(BoundQuery query, Class<T> resultType) {
                     return List.of();
                 }
-            })
-            .withPropertyValues("intentflow.catalog.packages=io.github.serfom256.intentflow.admin",
+            }).withPropertyValues("intentflow.catalog.packages=io.github.serfom256.intentflow.admin",
                     "intentflow.admin.security.enabled=false", "intentflow.admin.create-table=false",
                     "intentflow.schema.introspect=false", "intentflow.dialect=h2",
                     "spring.liquibase.change-log=classpath:" + JdbcCatalogOverrides.CHANGELOG);
@@ -60,8 +58,8 @@ class AdminLiquibaseTest {
             CatalogOverrides overrides = ctx.getBean(CatalogOverrides.class);
             overrides.put(ServiceNames.of("books"), new ServiceOverride("Every book", null, Map.of()));
 
-            assertThat(new JdbcTemplate(dataSource).queryForObject(
-                    "SELECT text_value FROM intentflow_catalog_override", String.class)).isEqualTo("Every book");
+            assertThat(new JdbcTemplate(dataSource).queryForObject("SELECT text_value FROM intentflow_catalog_override",
+                    String.class)).isEqualTo("Every book");
         });
     }
 
@@ -70,8 +68,8 @@ class AdminLiquibaseTest {
         runner.withPropertyValues("intentflow.admin.table=catalog_edits",
                 "spring.liquibase.parameters.intentflow.admin.table=catalog_edits").run(ctx -> {
                     assertThat(ctx).hasNotFailed();
-                    assertThat(new JdbcTemplate(dataSource).queryForObject(
-                            "SELECT COUNT(*) FROM catalog_edits", Integer.class)).isZero();
+                    assertThat(new JdbcTemplate(dataSource).queryForObject("SELECT COUNT(*) FROM catalog_edits",
+                            Integer.class)).isZero();
                 });
     }
 

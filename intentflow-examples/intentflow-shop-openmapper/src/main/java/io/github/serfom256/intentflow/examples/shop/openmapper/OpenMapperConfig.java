@@ -12,10 +12,10 @@ class OpenMapperConfig {
     @Bean
     EntityMapper entityMapper() {
         return entity -> switch (entity) {
-            case ProductEntity p -> p.toDomain();
-            case CustomerEntity c -> c.toDomain();
-            case OrderEntity o -> o.toDomain();
-            default -> entity;
+        case ProductEntity p -> p.toDomain();
+        case CustomerEntity c -> c.toDomain();
+        case OrderEntity o -> o.toDomain();
+        default -> entity;
         };
     }
 }

@@ -6,7 +6,6 @@ import io.github.serfom256.intentflow.core.ast.BoolLiteral;
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.ast.Compare;
 import io.github.serfom256.intentflow.core.ast.ComparisonOp;
-import io.github.serfom256.intentflow.core.ast.DslLiteral;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.In;
 import io.github.serfom256.intentflow.core.ast.IsNotNull;
@@ -20,15 +19,10 @@ import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
 import io.github.serfom256.intentflow.core.ast.factories.Skips;
 import io.github.serfom256.intentflow.core.ast.factories.Takes;
-import io.github.serfom256.intentflow.core.catalog.ColumnName;
-import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
-import io.github.serfom256.intentflow.core.catalog.MaxTake;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
-import io.github.serfom256.intentflow.core.catalog.TableName;
-import io.github.serfom256.intentflow.core.catalog.UriTemplate;
 import io.github.serfom256.intentflow.core.catalog.factories.ColumnNames;
 import io.github.serfom256.intentflow.core.catalog.factories.FieldMappings;
 import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
@@ -62,24 +56,17 @@ class SqlBuilderTest {
     private static final LogicalFieldName SECRET = LogicalFieldNames.of("secret");
 
     private static ServiceDescriptor booksService(int maxTake, List<SortKey> defaultSort) {
-        return ServiceDescriptors.of(
-                BOOKS, null, TableNames.of("book"),
-                List.of(
-                        FieldMappings.of(ID, ColumnNames.of("id"), true),
+        return ServiceDescriptors.of(BOOKS, null, TableNames.of("book"),
+                List.of(FieldMappings.of(ID, ColumnNames.of("id"), true),
                         FieldMappings.of(TITLE, ColumnNames.of("title"), true),
                         FieldMappings.of(AUTHOR, ColumnNames.of("author_name"), true),
                         FieldMappings.of(YEAR, ColumnNames.of("year"), true),
                         FieldMappings.of(DELETED_AT, ColumnNames.of("deleted_at"), true),
                         FieldMappings.of(SECRET, ColumnNames.of("secret_col"), false)),
-                defaultSort,
-                MaxTakes.of(maxTake),
-                UriTemplates.of("/books?ids={{ids}}"),
-                Object.class);
+                defaultSort, MaxTakes.of(maxTake), UriTemplates.of("/books?ids={{ids}}"), Object.class);
     }
 
-    private BoundQuery build(FilterExpr filter, List<SortKey> sort,
-            Skip skip, Take take,
-            ServiceDescriptor svc) {
+    private BoundQuery build(FilterExpr filter, List<SortKey> sort, Skip skip, Take take, ServiceDescriptor svc) {
         AstQuery ast = AstQueries.of(BOOKS, filter, sort, skip, take);
         return sqlBuilder.build(ValidatedQueries.of(svc, ast));
     }
@@ -92,25 +79,23 @@ class SqlBuilderTest {
 
     @Test
     void identifiersAreDoubleQuotedAndEscaped() {
-        ServiceDescriptor svc = ServiceDescriptors.of(
-                BOOKS, null, TableNames.of("we\"ird"),
-                List.of(FieldMappings.of(ID, ColumnNames.of("i\"d"), true)),
-                List.of(), MaxTakes.of(10), UriTemplates.of("/x"), Object.class);
+        ServiceDescriptor svc = ServiceDescriptors.of(BOOKS, null, TableNames.of("we\"ird"),
+                List.of(FieldMappings.of(ID, ColumnNames.of("i\"d"), true)), List.of(), MaxTakes.of(10),
+                UriTemplates.of("/x"), Object.class);
         BoundQuery r = build(null, List.of(SortKeys.of(ID, SortKey.Direction.ASC)), null, null, svc);
         assertThat(r.sql()).isEqualTo("SELECT * FROM \"we\"\"ird\" ORDER BY \"i\"\"d\" ASC LIMIT 10");
     }
 
     @Test
     void segmentsSplitAroundEachParameter() {
-        FilterExpr f = new And(
-                new Compare(YEAR, ComparisonOp.GE, new NumberLiteral(new BigDecimal("2000"))),
+        FilterExpr f = new And(new Compare(YEAR, ComparisonOp.GE, new NumberLiteral(new BigDecimal("2000"))),
                 new Compare(YEAR, ComparisonOp.LT, new NumberLiteral(new BigDecimal("2010"))));
         BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
 
         assertThat(r.segments()).hasSize(3);
         assertThat(r.render(i -> "?" + i)).contains("\"year\" >= ?1 AND \"year\" < ?2");
         assertThat(r.render(i -> "[p" + i + "]")).contains("\"year\" >= [p1] AND \"year\" < [p2]");
-        assertThat(r.values()).containsExactly(new BigDecimal("2000"), new BigDecimal("2010"));
+        assertThat(r.values()).containsExactly(2000L, 2010L);
     }
 
     @Test
@@ -125,19 +110,16 @@ class SqlBuilderTest {
 
     private void assertOp(ComparisonOp op, String sqlOp) {
         FilterExpr f = new Compare(YEAR, op, new NumberLiteral(new BigDecimal("2000")));
-        BoundQuery r = build(f, List.of(), null, null,
-                booksService(100, List.of()));
-        assertThat(r.sql()).contains(op == ComparisonOp.NE
-                ? "WHERE (\"year\" <> ? OR \"year\" IS NULL)"
-                : "WHERE \"year\" " + sqlOp + " ?");
+        BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
+        assertThat(r.sql()).contains(
+                op == ComparisonOp.NE ? "WHERE (\"year\" <> ? OR \"year\" IS NULL)" : "WHERE \"year\" " + sqlOp + " ?");
         assertThat(r.parameters()).containsExactly(new NumberLiteral(new BigDecimal("2000")));
     }
 
     @Test
     void containsBecomesIlikeWithWrappedAndEscapedParam() {
         FilterExpr f = new Compare(TITLE, ComparisonOp.CONTAINS, new TextLiteral("ring"));
-        BoundQuery r = build(f, List.of(), null, null,
-                booksService(100, List.of()));
+        BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
         assertThat(r.sql()).contains("\"title\" ILIKE ? ESCAPE '\\'");
         assertThat(r.parameters()).containsExactly(new TextLiteral("%ring%"));
     }
@@ -145,29 +127,23 @@ class SqlBuilderTest {
     @Test
     void containsEscapesLikeMetaInUserValue() {
         FilterExpr f = new Compare(TITLE, ComparisonOp.CONTAINS, new TextLiteral("50%_off\\sale"));
-        BoundQuery r = build(f, List.of(), null, null,
-                booksService(100, List.of()));
+        BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
         assertThat(r.parameters()).containsExactly(new TextLiteral("%50\\%\\_off\\\\sale%"));
     }
 
     @Test
     void containsWithNonTextValueIsRejected() {
         FilterExpr f = new Compare(YEAR, ComparisonOp.CONTAINS, new NumberLiteral(BigDecimal.ONE));
-        assertThatThrownBy(() -> build(f, List.of(), null, null,
-                booksService(100, List.of())))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("CONTAINS");
+        assertThatThrownBy(() -> build(f, List.of(), null, null, booksService(100, List.of())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("CONTAINS");
     }
 
     @Test
     void andOrNotCompose() {
-        FilterExpr f = new And(
-                new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("Doe")),
-                new Or(
-                        new Compare(YEAR, ComparisonOp.GE, new NumberLiteral(new BigDecimal("2000"))),
+        FilterExpr f = new And(new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("Doe")),
+                new Or(new Compare(YEAR, ComparisonOp.GE, new NumberLiteral(new BigDecimal("2000"))),
                         new Not(new Compare(YEAR, ComparisonOp.EQ, new NumberLiteral(BigDecimal.ONE)))));
-        BoundQuery r = build(f, List.of(), null, null,
-                booksService(100, List.of()));
+        BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
         assertThat(r.sql()).contains(
                 "WHERE (LOWER(\"author_name\") = LOWER(?) AND (\"year\" >= ? OR (NOT (\"year\" = ?) OR \"year\" IS NULL)))");
         assertThat(r.parameters()).hasSize(3);
@@ -175,46 +151,41 @@ class SqlBuilderTest {
 
     @Test
     void textNotEqualIsCaseInsensitive() {
-        BoundQuery r = build(new Compare(AUTHOR, ComparisonOp.NE, new TextLiteral("Doe")),
-                List.of(), null, null, booksService(100, List.of()));
+        BoundQuery r = build(new Compare(AUTHOR, ComparisonOp.NE, new TextLiteral("Doe")), List.of(), null, null,
+                booksService(100, List.of()));
         assertThat(r.sql()).contains("WHERE (LOWER(\"author_name\") <> LOWER(?) OR \"author_name\" IS NULL)");
     }
 
     @Test
     void textOrderingComparisonIsLeftAsIs() {
-        BoundQuery r = build(new Compare(TITLE, ComparisonOp.LT, new TextLiteral("M")),
-                List.of(), null, null, booksService(100, List.of()));
+        BoundQuery r = build(new Compare(TITLE, ComparisonOp.LT, new TextLiteral("M")), List.of(), null, null,
+                booksService(100, List.of()));
         assertThat(r.sql()).contains("WHERE \"title\" < ?");
     }
 
     @Test
     void numericInListIsNotLowered() {
-        FilterExpr f = new In(YEAR, List.of(
-                new NumberLiteral(new BigDecimal("1999")), new NumberLiteral(new BigDecimal("2000"))));
-        BoundQuery r = build(f, List.of(), null, null,
-                booksService(100, List.of()));
+        FilterExpr f = new In(YEAR,
+                List.of(new NumberLiteral(new BigDecimal("1999")), new NumberLiteral(new BigDecimal("2000"))));
+        BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
         assertThat(r.sql()).contains("WHERE \"year\" IN (?, ?)");
     }
 
     @Test
     void inListGeneratesPlaceholdersForEachValue() {
-        FilterExpr f = new In(TITLE,
-                List.of(new TextLiteral("a"), new TextLiteral("b"), new TextLiteral("c")));
-        BoundQuery r = build(f, List.of(), null, null,
-                booksService(100, List.of()));
+        FilterExpr f = new In(TITLE, List.of(new TextLiteral("a"), new TextLiteral("b"), new TextLiteral("c")));
+        BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
         assertThat(r.sql()).contains("LOWER(\"title\") IN (LOWER(?), LOWER(?), LOWER(?))");
         assertThat(r.parameters()).hasSize(3);
     }
 
     @Test
     void isNullAndIsNotNullEmitWithoutParams() {
-        BoundQuery n1 = build(new IsNull(DELETED_AT), List.of(), null, null,
-                booksService(100, List.of()));
+        BoundQuery n1 = build(new IsNull(DELETED_AT), List.of(), null, null, booksService(100, List.of()));
         assertThat(n1.sql()).contains("\"deleted_at\" IS NULL");
         assertThat(n1.parameters()).isEmpty();
 
-        BoundQuery n2 = build(new IsNotNull(DELETED_AT), List.of(), null, null,
-                booksService(100, List.of()));
+        BoundQuery n2 = build(new IsNotNull(DELETED_AT), List.of(), null, null, booksService(100, List.of()));
         assertThat(n2.sql()).contains("\"deleted_at\" IS NOT NULL");
         assertThat(n2.parameters()).isEmpty();
     }
@@ -223,113 +194,87 @@ class SqlBuilderTest {
     void astSortBeatsCatalogDefaultSort() {
         List<SortKey> catalogDefault = List.of(SortKeys.of(ID, SortKey.Direction.ASC));
         BoundQuery r = build(null,
-                List.of(SortKeys.of(YEAR, SortKey.Direction.DESC),
-                        SortKeys.of(TITLE, SortKey.Direction.ASC)),
-                null, null, booksService(100, catalogDefault));
+                List.of(SortKeys.of(YEAR, SortKey.Direction.DESC), SortKeys.of(TITLE, SortKey.Direction.ASC)), null,
+                null, booksService(100, catalogDefault));
         assertThat(r.sql()).contains("ORDER BY \"year\" DESC NULLS LAST, \"title\" ASC");
     }
 
     @Test
     void emptyAstSortFallsBackToCatalogDefault() {
         List<SortKey> catalogDefault = List.of(SortKeys.of(ID, SortKey.Direction.ASC));
-        BoundQuery r = build(null, List.of(), null, null,
-                booksService(100, catalogDefault));
+        BoundQuery r = build(null, List.of(), null, null, booksService(100, catalogDefault));
         assertThat(r.sql()).contains("ORDER BY \"id\" ASC");
     }
 
     @Test
     void noSortAnywhereOmitsOrderBy() {
-        BoundQuery r = build(null, List.of(), null, null,
-                booksService(100, List.of()));
+        BoundQuery r = build(null, List.of(), null, null, booksService(100, List.of()));
         assertThat(r.sql()).doesNotContain("ORDER BY");
     }
 
     @Test
     void astTakeBeatsCatalogMaxTake() {
-        BoundQuery r = build(null, List.of(), null, Takes.of(20),
-                booksService(100, List.of()));
+        BoundQuery r = build(null, List.of(), null, Takes.of(20), booksService(100, List.of()));
         assertThat(r.sql()).contains("LIMIT 20");
     }
 
     @Test
     void missingTakeFallsBackToMaxTake() {
-        BoundQuery r = build(null, List.of(), null, null,
-                booksService(50, List.of()));
+        BoundQuery r = build(null, List.of(), null, null, booksService(50, List.of()));
         assertThat(r.sql()).contains("LIMIT 50");
     }
 
     @Test
     void skipEmitsOffsetWhenPositive() {
-        BoundQuery r = build(null, List.of(), Skips.of(40), Takes.of(20),
-                booksService(100, List.of()));
+        BoundQuery r = build(null, List.of(), Skips.of(40), Takes.of(20), booksService(100, List.of()));
         assertThat(r.sql()).contains("LIMIT 20").contains("OFFSET 40");
     }
 
     @Test
     void skipZeroOmitsOffset() {
-        BoundQuery r = build(null, List.of(), Skips.of(0), Takes.of(20),
-                booksService(100, List.of()));
+        BoundQuery r = build(null, List.of(), Skips.of(0), Takes.of(20), booksService(100, List.of()));
         assertThat(r.sql()).doesNotContain("OFFSET");
     }
 
     @Test
     void missingSkipOmitsOffset() {
-        BoundQuery r = build(null, List.of(), null, Takes.of(20),
-                booksService(100, List.of()));
+        BoundQuery r = build(null, List.of(), null, Takes.of(20), booksService(100, List.of()));
         assertThat(r.sql()).doesNotContain("OFFSET");
     }
 
     @Test
     void fullQueryAssemblesInCanonicalOrder() {
-        FilterExpr f = new And(
-                new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("Doe")),
+        FilterExpr f = new And(new Compare(AUTHOR, ComparisonOp.EQ, new TextLiteral("Doe")),
                 new Compare(YEAR, ComparisonOp.GE, new NumberLiteral(new BigDecimal("2000"))));
-        BoundQuery r = build(
-                f,
-                List.of(SortKeys.of(YEAR, SortKey.Direction.DESC)),
-                Skips.of(20),
-                Takes.of(10),
+        BoundQuery r = build(f, List.of(SortKeys.of(YEAR, SortKey.Direction.DESC)), Skips.of(20), Takes.of(10),
                 booksService(100, List.of()));
 
-        assertThat(r.sql()).isEqualTo(
-                "SELECT * FROM \"book\""
-                        + " WHERE (LOWER(\"author_name\") = LOWER(?) AND \"year\" >= ?)"
-                        + " ORDER BY \"year\" DESC NULLS LAST"
-                        + " LIMIT 10 OFFSET 20");
-        assertThat(r.parameters()).containsExactly(
-                new TextLiteral("Doe"),
-                new NumberLiteral(new BigDecimal("2000")));
+        assertThat(r.sql())
+                .isEqualTo("SELECT * FROM \"book\"" + " WHERE (LOWER(\"author_name\") = LOWER(?) AND \"year\" >= ?)"
+                        + " ORDER BY \"year\" DESC NULLS LAST" + " LIMIT 10 OFFSET 20");
+        assertThat(r.parameters()).containsExactly(new TextLiteral("Doe"), new NumberLiteral(new BigDecimal("2000")));
     }
 
     @Test
     void boolParameterFlowsThrough() {
-        FilterExpr f = new Compare(LogicalFieldNames.of("year"),
-                ComparisonOp.EQ, new BoolLiteral(true));
-        BoundQuery r = build(f, List.of(), null, null,
-                booksService(100, List.of()));
+        FilterExpr f = new Compare(LogicalFieldNames.of("year"), ComparisonOp.EQ, new BoolLiteral(true));
+        BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
         assertThat(r.parameters()).containsExactly(new BoolLiteral(true));
     }
 
     @Test
     void parametersListIsImmutable() {
-        BoundQuery r = build(new Compare(YEAR, ComparisonOp.EQ, new NumberLiteral(BigDecimal.ONE)),
-                List.of(), null, null, booksService(100, List.of()));
+        BoundQuery r = build(new Compare(YEAR, ComparisonOp.EQ, new NumberLiteral(BigDecimal.ONE)), List.of(), null,
+                null, booksService(100, List.of()));
         assertThatThrownBy(() -> r.parameters().add(new NumberLiteral(BigDecimal.TEN)))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void columnContainingDoubleQuoteIsEscaped() {
-        ServiceDescriptor svc = ServiceDescriptors.of(
-                BOOKS, null, TableNames.of("book"),
-                List.of(FieldMappings.of(
-                        LogicalFieldNames.of("weird"),
-                        ColumnNames.of("we\"ird"),
-                        true)),
-                List.of(),
-                MaxTakes.of(10),
-                UriTemplates.of("/x"),
-                Object.class);
+        ServiceDescriptor svc = ServiceDescriptors.of(BOOKS, null, TableNames.of("book"),
+                List.of(FieldMappings.of(LogicalFieldNames.of("weird"), ColumnNames.of("we\"ird"), true)), List.of(),
+                MaxTakes.of(10), UriTemplates.of("/x"), Object.class);
         BoundQuery r = sqlBuilder.build(ValidatedQueries.of(svc, AstQueries.of(BOOKS, null,
                 List.of(SortKeys.of(LogicalFieldNames.of("weird"), SortKey.Direction.ASC)), null, null)));
         assertThat(r.sql()).contains("ORDER BY \"we\"\"ird\" ASC");

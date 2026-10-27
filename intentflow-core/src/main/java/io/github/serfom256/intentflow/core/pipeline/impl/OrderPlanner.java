@@ -24,10 +24,9 @@ final class OrderPlanner {
     }
 
     static boolean joinsForSort(List<SortKey> keys, SqlScope scope) {
-        return scope.context().enabled(Optimization.TO_ONE_JOIN) && keys.stream()
-                .filter(k -> !(k instanceof ExprSortKey))
-                .map(k -> RelationPaths.prefix(k.field()))
-                .anyMatch(relation -> relation != null && scope.canJoin(relation));
+        return scope.context().enabled(Optimization.TO_ONE_JOIN)
+                && keys.stream().filter(k -> !(k instanceof ExprSortKey)).map(k -> RelationPaths.prefix(k.field()))
+                        .anyMatch(relation -> relation != null && scope.canJoin(relation));
     }
 
     private static Select.Order order(SortKey key, @Nullable Aggregate aggregate, SqlScope scope) {
@@ -61,9 +60,11 @@ final class OrderPlanner {
             return outer.join(relation).value(RelationPaths.strip(key.field(), relation));
         }
         if (!outer.context().capabilities().sortBySubquery()) {
-            throw new ValidationException(ErrorCode.UNSUPPORTED, "sorting by '" + key.field().value()
-                    + "' needs a correlated subquery in ORDER BY, which " + outer.context().dialectName()
-                    + " does not support; sort by a field of the service itself", Map.of());
+            throw new ValidationException(ErrorCode.UNSUPPORTED,
+                    "sorting by '" + key.field().value() + "' needs a correlated subquery in ORDER BY, which "
+                            + outer.context().dialectName()
+                            + " does not support; sort by a field of the service itself",
+                    Map.of());
         }
         SqlScope inner = outer.inner(relation);
         SqlExpr value = new SqlExpr.Call(key.direction() == SortKey.Direction.DESC ? "MAX" : "MIN",

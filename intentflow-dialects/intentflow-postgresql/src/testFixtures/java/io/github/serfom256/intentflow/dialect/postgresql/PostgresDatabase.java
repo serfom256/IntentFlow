@@ -15,8 +15,9 @@ public enum PostgresDatabase implements TestDatabase {
     public synchronized Endpoint endpoint() {
         if (endpoint == null) {
             if (ComposeDatabases.enabled()) {
-                endpoint = new Endpoint("jdbc:postgresql://localhost:" + ComposeDatabases.port("POSTGRES_PORT", 15432)
-                        + "/intentflow", "intentflow", "intentflow");
+                endpoint = new Endpoint(
+                        "jdbc:postgresql://localhost:" + ComposeDatabases.port("POSTGRES_PORT", 15432) + "/intentflow",
+                        "intentflow", "intentflow");
             } else {
                 PostgreSQLContainer container = new PostgreSQLContainer("postgres:17.4");
                 container.start();

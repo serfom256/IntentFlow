@@ -1,7 +1,6 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
-import io.github.serfom256.intentflow.core.catalog.ServiceName;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlCapabilities;
@@ -9,13 +8,13 @@ import io.github.serfom256.intentflow.core.pipeline.SqlDialect;
 import io.github.serfom256.intentflow.core.schema.SchemaFacts;
 import io.github.serfom256.intentflow.core.schema.TableFacts;
 import io.github.serfom256.intentflow.core.sql.Optimization;
-import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 final class PlanContext {
 
@@ -41,9 +40,9 @@ final class PlanContext {
         return facts.table(table);
     }
 
-    @Nullable
-    String restriction(ServiceName service) {
-        return facts.restriction(service);
+    List<String> restrictions(ServiceDescriptor service) {
+        return Stream.concat(service.restriction().stream(), facts.restriction(service.name()).stream()).distinct()
+                .toList();
     }
 
     List<RuntimeRestriction> runtimeRestrictions(ServiceDescriptor service) {

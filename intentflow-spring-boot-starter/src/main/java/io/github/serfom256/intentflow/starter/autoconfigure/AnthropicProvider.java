@@ -18,14 +18,13 @@ import java.time.Clock;
 class AnthropicProvider {
 
     @Bean
-    LlmClientFactory intentFlowAnthropicClientFactory(IntentFlowProperties properties,
-            ObjectProvider<Clock> clock) {
+    LlmClientFactory intentFlowAnthropicClientFactory(IntentFlowProperties properties, ObjectProvider<Clock> clock) {
         IntentFlowProperties.Llm llm = properties.llm();
         AnthropicSettings settings = new AnthropicSettings(llm.maxTokens(), llm.anthropic().effort(),
                 llm.anthropic().refusalFallback());
         Clock today = clock.getIfAvailable(Clock::systemDefaultZone);
-        return (baseUrl, model, apiKey) -> AnthropicLlmClients.of(baseUrl, model, apiKey, settings,
-                llm.timeout(), llm.maxRetries(), proxy(llm), today);
+        return (baseUrl, model, apiKey) -> AnthropicLlmClients.of(baseUrl, model, apiKey, settings, llm.timeout(),
+                llm.maxRetries(), proxy(llm), today);
     }
 
     private static @Nullable Proxy proxy(IntentFlowProperties.Llm llm) {

@@ -34,8 +34,19 @@ class BoundQueryTest {
         BoundQuery withNull = BoundQueries.of(List.of("a ", " b ", ""),
                 List.of(new NullLiteral(), new TextLiteral("x")));
 
-        assertThat(QUERY.values()).containsExactly(new BigDecimal("2000"), "Dune", true);
+        assertThat(QUERY.values()).containsExactly(2000L, "Dune", true);
         assertThat(withNull.values()).isEqualTo(Arrays.asList(null, "x"));
+    }
+
+    @Test
+    void wholeNumbersOfUpTo18DigitsBindAsLong() {
+        BoundQuery numbers = BoundQueries.of(List.of("a ", " b ", " c ", " d ", ""),
+                List.of(new NumberLiteral(new BigDecimal("9.99")), new NumberLiteral(new BigDecimal("1E+3")),
+                        new NumberLiteral(new BigDecimal("999999999999999999")),
+                        new NumberLiteral(new BigDecimal("9223372036854775808"))));
+
+        assertThat(numbers.values()).containsExactly(new BigDecimal("9.99"), 1000L, 999_999_999_999_999_999L,
+                new BigDecimal("9223372036854775808"));
     }
 
     @Test

@@ -15,8 +15,9 @@ public enum MySqlDatabase implements TestDatabase {
     public synchronized Endpoint endpoint() {
         if (endpoint == null) {
             if (ComposeDatabases.enabled()) {
-                endpoint = new Endpoint("jdbc:mysql://localhost:" + ComposeDatabases.port("MYSQL_PORT", 13306)
-                        + "/intentflow", "intentflow", "intentflow");
+                endpoint = new Endpoint(
+                        "jdbc:mysql://localhost:" + ComposeDatabases.port("MYSQL_PORT", 13306) + "/intentflow",
+                        "intentflow", "intentflow");
             } else {
                 MySQLContainer container = new MySQLContainer("mysql:8.4");
                 container.start();

@@ -33,61 +33,56 @@ final class MultilingualQuestions {
 
         String in(Lang lang) {
             return switch (lang) {
-                case EN -> en;
-                case RU -> ru;
-                case ZH -> zh;
-                case JA -> ja;
+            case EN -> en;
+            case RU -> ru;
+            case ZH -> zh;
+            case JA -> ja;
             };
         }
     }
 
-    private static final Map<Category, Phrase> CATEGORIES = Map.of(
-            Category.LAPTOP, new Phrase("laptops", "ноутбуки", "笔记本电脑", "ノートパソコン"),
-            Category.PHONE, new Phrase("phones", "телефоны", "手机", "スマートフォン"),
-            Category.TABLET, new Phrase("tablets", "планшеты", "平板电脑", "タブレット"),
-            Category.HEADPHONES, new Phrase("headphones", "наушники", "耳机", "ヘッドホン"),
-            Category.MONITOR, new Phrase("monitors", "мониторы", "显示器", "モニター"),
-            Category.ACCESSORY, new Phrase("accessories", "аксессуары", "配件", "アクセサリー"));
+    private static final Map<Category, Phrase> CATEGORIES = Map.of(Category.LAPTOP,
+            new Phrase("laptops", "ноутбуки", "笔记本电脑", "ノートパソコン"), Category.PHONE,
+            new Phrase("phones", "телефоны", "手机", "スマートフォン"), Category.TABLET,
+            new Phrase("tablets", "планшеты", "平板电脑", "タブレット"), Category.HEADPHONES,
+            new Phrase("headphones", "наушники", "耳机", "ヘッドホン"), Category.MONITOR,
+            new Phrase("monitors", "мониторы", "显示器", "モニター"), Category.ACCESSORY,
+            new Phrase("accessories", "аксессуары", "配件", "アクセサリー"));
 
-    private static final Map<String, Phrase> COUNTRIES = Map.of(
-            "DE", new Phrase("Germany", "Германии", "德国", "ドイツ"),
-            "FR", new Phrase("France", "Франции", "法国", "フランス"),
-            "US", new Phrase("the United States", "США", "美国", "アメリカ"),
-            "GB", new Phrase("the United Kingdom", "Великобритании", "英国", "イギリス"),
-            "JP", new Phrase("Japan", "Японии", "日本", "日本"),
-            "IT", new Phrase("Italy", "Италии", "意大利", "イタリア"));
+    private static final Map<String, Phrase> COUNTRIES = Map.of("DE", new Phrase("Germany", "Германии", "德国", "ドイツ"),
+            "FR", new Phrase("France", "Франции", "法国", "フランス"), "US",
+            new Phrase("the United States", "США", "美国", "アメリカ"), "GB",
+            new Phrase("the United Kingdom", "Великобритании", "英国", "イギリス"), "JP",
+            new Phrase("Japan", "Японии", "日本", "日本"), "IT", new Phrase("Italy", "Италии", "意大利", "イタリア"));
 
-    private static final Map<String, Phrase> CITIES = Map.of(
-            "Berlin", new Phrase("Berlin", "Берлин", "柏林", "ベルリン"),
-            "Paris", new Phrase("Paris", "Париж", "巴黎", "パリ"),
-            "Tokyo", new Phrase("Tokyo", "Токио", "东京", "東京"),
-            "London", new Phrase("London", "Лондон", "伦敦", "ロンドン"),
-            "Madrid", new Phrase("Madrid", "Мадрид", "马德里", "マドリード"));
+    private static final Map<String, Phrase> CITIES = Map.of("Berlin", new Phrase("Berlin", "Берлин", "柏林", "ベルリン"),
+            "Paris", new Phrase("Paris", "Париж", "巴黎", "パリ"), "Tokyo", new Phrase("Tokyo", "Токио", "东京", "東京"),
+            "London", new Phrase("London", "Лондон", "伦敦", "ロンドン"), "Madrid",
+            new Phrase("Madrid", "Мадрид", "马德里", "マドリード"));
 
-    private static final Map<OrderStatus, Phrase> STATUSES = Map.of(
-            OrderStatus.NEW, new Phrase("new", "новые", "新", "新規"),
-            OrderStatus.PAID, new Phrase("paid", "оплаченные", "已支付", "支払い済み"),
-            OrderStatus.SHIPPED, new Phrase("shipped", "отправленные", "已发货", "発送済み"),
-            OrderStatus.DELIVERED, new Phrase("delivered", "доставленные", "已送达", "配達済み"),
-            OrderStatus.CANCELLED, new Phrase("cancelled", "отменённые", "已取消", "キャンセル済み"));
+    private static final Map<OrderStatus, Phrase> STATUSES = Map.of(OrderStatus.NEW,
+            new Phrase("new", "новые", "新", "新規"), OrderStatus.PAID, new Phrase("paid", "оплаченные", "已支付", "支払い済み"),
+            OrderStatus.SHIPPED, new Phrase("shipped", "отправленные", "已发货", "発送済み"), OrderStatus.DELIVERED,
+            new Phrase("delivered", "доставленные", "已送达", "配達済み"), OrderStatus.CANCELLED,
+            new Phrase("cancelled", "отменённые", "已取消", "キャンセル済み"));
 
-    private static final Map<OrderStatus, Phrase> STATUS_SINGULAR = Map.of(
-            OrderStatus.NEW, new Phrase("new", "новый", "新", "新規"),
-            OrderStatus.DELIVERED, new Phrase("delivered", "доставленный", "已送达", "配達済み"),
-            OrderStatus.CANCELLED, new Phrase("cancelled", "отменённый", "已取消", "キャンセル済み"));
+    private static final Map<OrderStatus, Phrase> STATUS_SINGULAR = Map.of(OrderStatus.NEW,
+            new Phrase("new", "новый", "新", "新規"), OrderStatus.DELIVERED,
+            new Phrase("delivered", "доставленный", "已送达", "配達済み"), OrderStatus.CANCELLED,
+            new Phrase("cancelled", "отменённый", "已取消", "キャンセル済み"));
 
-    private static final Map<OrderStatus, Phrase> STATUS_GENITIVE = Map.of(
-            OrderStatus.PAID, new Phrase("paid", "оплаченных", "已支付", "支払い済み"),
-            OrderStatus.DELIVERED, new Phrase("delivered", "доставленных", "已送达", "配達済み"),
-            OrderStatus.CANCELLED, new Phrase("cancelled", "отменённых", "已取消", "キャンセル済み"));
+    private static final Map<OrderStatus, Phrase> STATUS_GENITIVE = Map.of(OrderStatus.PAID,
+            new Phrase("paid", "оплаченных", "已支付", "支払い済み"), OrderStatus.DELIVERED,
+            new Phrase("delivered", "доставленных", "已送达", "配達済み"), OrderStatus.CANCELLED,
+            new Phrase("cancelled", "отменённых", "已取消", "キャンセル済み"));
 
-    private static final List<Phrase> MONTHS = List.of(
-            new Phrase("January", "январь", "1", "1"), new Phrase("February", "февраль", "2", "2"),
-            new Phrase("March", "март", "3", "3"), new Phrase("April", "апрель", "4", "4"),
-            new Phrase("May", "май", "5", "5"), new Phrase("June", "июнь", "6", "6"),
-            new Phrase("July", "июль", "7", "7"), new Phrase("August", "август", "8", "8"),
-            new Phrase("September", "сентябрь", "9", "9"), new Phrase("October", "октябрь", "10", "10"),
-            new Phrase("November", "ноябрь", "11", "11"), new Phrase("December", "декабрь", "12", "12"));
+    private static final List<Phrase> MONTHS = List.of(new Phrase("January", "январь", "1", "1"),
+            new Phrase("February", "февраль", "2", "2"), new Phrase("March", "март", "3", "3"),
+            new Phrase("April", "апрель", "4", "4"), new Phrase("May", "май", "5", "5"),
+            new Phrase("June", "июнь", "6", "6"), new Phrase("July", "июль", "7", "7"),
+            new Phrase("August", "август", "8", "8"), new Phrase("September", "сентябрь", "9", "9"),
+            new Phrase("October", "октябрь", "10", "10"), new Phrase("November", "ноябрь", "11", "11"),
+            new Phrase("December", "декабрь", "12", "12"));
 
     private final LlmEvaluationSupport data;
     private final ZoneId zone = ZoneId.systemDefault();
@@ -106,10 +101,10 @@ final class MultilingualQuestions {
     }
 
     private void products() {
-        List<Object[]> brands = List.of(
-                new Object[] { "Apple", Category.LAPTOP }, new Object[] { "Lenovo", Category.LAPTOP },
-                new Object[] { "Samsung", Category.PHONE }, new Object[] { "Google", Category.PHONE },
-                new Object[] { "Apple", Category.TABLET }, new Object[] { "Sony", Category.HEADPHONES });
+        List<Object[]> brands = List.of(new Object[] { "Apple", Category.LAPTOP },
+                new Object[] { "Lenovo", Category.LAPTOP }, new Object[] { "Samsung", Category.PHONE },
+                new Object[] { "Google", Category.PHONE }, new Object[] { "Apple", Category.TABLET },
+                new Object[] { "Sony", Category.HEADPHONES });
         Phrase brandCategory = new Phrase("{brand} {cat}", "{cat} {brand}", "{brand}的{cat}", "{brand}の{cat}");
         for (Object[] pair : brands) {
             String brand = (String) pair[0];
@@ -132,17 +127,16 @@ final class MultilingualQuestions {
         over.forEach((category, price) -> set(dearerThan, Map.of("cat", category, "price", price),
                 () -> data.productIds(p -> p.getCategory() == category && p.getPrice().compareTo(dec(price)) > 0)));
 
-        Phrase rated = new Phrase("{cat} rated {r} or higher", "{cat} с рейтингом {r} и выше",
-                "评分{r}及以上的{cat}", "評価{r}以上の{cat}");
-        Phrase outOfStock = new Phrase("{cat} that are out of stock", "{cat}, которых нет в наличии",
-                "缺货的{cat}", "在庫切れの{cat}");
+        Phrase rated = new Phrase("{cat} rated {r} or higher", "{cat} с рейтингом {r} и выше", "评分{r}及以上的{cat}",
+                "評価{r}以上の{cat}");
+        Phrase outOfStock = new Phrase("{cat} that are out of stock", "{cat}, которых нет в наличии", "缺货的{cat}",
+                "在庫切れの{cat}");
         Phrase mostExpensive = new Phrase("the {n} most expensive {cat}",
-                "{n} самых дорогих {items} в категории «{cat}»",
-                "最贵的{n}款{cat}", "最も高価な{cat}を{n}件");
+                "{n} самых дорогих {items} в категории «{cat}»", "最贵的{n}款{cat}", "最も高価な{cat}を{n}件");
         Phrase cheapest = new Phrase("the {n} cheapest {cat}", "{n} самых дешёвых {items} в категории «{cat}»",
                 "最便宜的{n}款{cat}", "最も安い{cat}を{n}件");
-        Phrase average = new Phrase("average price of {cat}", "средняя цена в категории «{cat}»",
-                "{cat}的平均价格", "{cat}の平均価格");
+        Phrase average = new Phrase("average price of {cat}", "средняя цена в категории «{cat}»", "{cat}的平均价格",
+                "{cat}の平均価格");
         Phrase highest = new Phrase("the highest price among {cat}", "максимальная цена в категории «{cat}»",
                 "{cat}的最高价格", "{cat}の最高価格");
         int i = 0;
@@ -163,49 +157,48 @@ final class MultilingualQuestions {
                     .max(Comparator.naturalOrder()).orElseThrow());
         }
 
-        set(new Phrase("products that are no longer sold", "товары, снятые с продажи", "已停售的商品", "販売終了した商品"),
-                Map.of(), () -> data.productIds(p -> !p.isActive()));
-        Phrase discontinued = new Phrase("discontinued {cat}", "снятые с продажи {cat}", "已停售的{cat}",
-                "販売終了した{cat}");
+        set(new Phrase("products that are no longer sold", "товары, снятые с продажи", "已停售的商品", "販売終了した商品"), Map.of(),
+                () -> data.productIds(p -> !p.isActive()));
+        Phrase discontinued = new Phrase("discontinued {cat}", "снятые с продажи {cat}", "已停售的{cat}", "販売終了した{cat}");
         for (Category category : List.of(Category.LAPTOP, Category.PHONE, Category.MONITOR)) {
             set(discontinued, Map.of("cat", category),
                     () -> data.productIds(p -> p.getCategory() == category && !p.isActive()));
         }
 
-        Phrase named = new Phrase("products with {w} in the name", "товары со словом {w} в названии",
-                "名称中包含{w}的商品", "名前に「{w}」を含む商品");
+        Phrase named = new Phrase("products with {w} in the name", "товары со словом {w} в названии", "名称中包含{w}的商品",
+                "名前に「{w}」を含む商品");
         for (String word : List.of("Pro", "Ultra", "Max", "Air", "Mini")) {
-            set(named, Map.of("w", word), () -> data.productIds(
-                    p -> p.getName().toLowerCase(Locale.ROOT).contains(word.toLowerCase(Locale.ROOT))));
+            set(named, Map.of("w", word), () -> data
+                    .productIds(p -> p.getName().toLowerCase(Locale.ROOT).contains(word.toLowerCase(Locale.ROOT))));
         }
 
         groups(new Phrase("how many products are there in each category?", "сколько товаров в каждой категории?",
                 "每个类别有多少商品？", "カテゴリごとの商品数は？"), Map.of(),
                 () -> count(data.products.findAll(), p -> p.getCategory().name()));
-        groups(new Phrase("average price per category", "средняя цена по категориям", "各类别的平均价格",
-                "カテゴリ別の平均価格"), Map.of(),
-                () -> data.products.findAll().stream().collect(Collectors.groupingBy(
-                        p -> p.getCategory().name(), Collectors.collectingAndThen(Collectors.toList(),
-                                list -> average(list, Product::getPrice)))));
+        groups(new Phrase("average price per category", "средняя цена по категориям", "各类别的平均价格", "カテゴリ別の平均価格"),
+                Map.of(),
+                () -> data.products.findAll().stream().collect(Collectors.groupingBy(p -> p.getCategory().name(),
+                        Collectors.collectingAndThen(Collectors.toList(), list -> average(list, Product::getPrice)))));
 
         set(new Phrase("the best rated product in each category", "товар с самым высоким рейтингом в каждой категории",
                 "每个类别中评分最高的商品", "各カテゴリで最も評価の高い商品"), Map.of(),
                 () -> data.products.findAll().stream()
-                        .collect(Collectors.groupingBy(Product::getCategory, Collectors.minBy(
-                                Comparator.comparing(Product::getRating).reversed().thenComparing(Product::getId))))
+                        .collect(Collectors.groupingBy(Product::getCategory,
+                                Collectors.minBy(Comparator.comparing(Product::getRating).reversed()
+                                        .thenComparing(Product::getId))))
                         .values().stream().map(p -> p.orElseThrow().getId()).sorted().limit(LlmEvaluationSupport.PAGE)
                         .toList());
-        set(new Phrase("the cheapest product of each brand", "самый дешёвый товар каждого бренда",
-                "每个品牌最便宜的商品", "各ブランドで最も安い商品"), Map.of(),
+        set(new Phrase("the cheapest product of each brand", "самый дешёвый товар каждого бренда", "每个品牌最便宜的商品",
+                "各ブランドで最も安い商品"), Map.of(),
                 () -> data.products.findAll().stream()
-                        .collect(Collectors.groupingBy(Product::getBrand, Collectors.minBy(
-                                Comparator.comparing(Product::getPrice).thenComparing(Product::getId))))
+                        .collect(Collectors.groupingBy(Product::getBrand,
+                                Collectors
+                                        .minBy(Comparator.comparing(Product::getPrice).thenComparing(Product::getId))))
                         .values().stream().map(p -> p.orElseThrow().getId()).sorted().limit(LlmEvaluationSupport.PAGE)
                         .toList());
 
         Phrase afterDiscount = new Phrase("{cat} under {price} dollars after discount",
-                "{cat} дешевле {price} долларов с учётом скидки", "折后价格低于{price}美元的{cat}",
-                "割引後の価格が{price}ドル未満の{cat}");
+                "{cat} дешевле {price} долларов с учётом скидки", "折后价格低于{price}美元的{cat}", "割引後の価格が{price}ドル未満の{cat}");
         for (Object[] pair : List.of(new Object[] { Category.PHONE, 500 }, new Object[] { Category.LAPTOP, 1000 },
                 new Object[] { Category.TABLET, 400 })) {
             Category category = (Category) pair[0];
@@ -237,23 +230,21 @@ final class MultilingualQuestions {
             String brand = (String) triple[0];
             Category category = (Category) triple[1];
             int price = (Integer) triple[2];
-            set(inStock, Map.of("brand", brand, "cat", category, "price", price), () -> data.productIds(
-                    p -> p.getBrand().equals(brand) && p.getCategory() == category && below(p.getPrice(), price)
-                            && p.getStock() > 0));
+            set(inStock, Map.of("brand", brand, "cat", category, "price", price),
+                    () -> data.productIds(p -> p.getBrand().equals(brand) && p.getCategory() == category
+                            && below(p.getPrice(), price) && p.getStock() > 0));
         }
         Phrase addedIn = new Phrase("products added to the catalog in {year}",
-                "товары, добавленные в каталог в {year} году",
-                "{year}年上架的商品", "{year}年に追加された商品");
+                "товары, добавленные в каталог в {year} году", "{year}年上架的商品", "{year}年に追加された商品");
         for (int year : List.of(2024, 2025)) {
             set(addedIn, Map.of("year", year), () -> data.productIds(p -> inYear(p.getCreatedAt(), year)));
         }
     }
 
     private void customers() {
-        Phrase from = new Phrase("customers from {country}", "клиенты из {country}", "来自{country}的客户",
-                "{country}の顧客");
-        Phrase vipFrom = new Phrase("VIP customers from {country}", "VIP-клиенты из {country}",
-                "来自{country}的VIP客户", "{country}のVIP顧客");
+        Phrase from = new Phrase("customers from {country}", "клиенты из {country}", "来自{country}的客户", "{country}の顧客");
+        Phrase vipFrom = new Phrase("VIP customers from {country}", "VIP-клиенты из {country}", "来自{country}的VIP客户",
+                "{country}のVIP顧客");
         for (String country : List.of("DE", "FR", "US", "GB", "JP", "IT")) {
             set(from, Map.of("country", COUNTRIES.get(country)),
                     () -> customerIds(c -> c.getCountry().equals(country)));
@@ -265,8 +256,7 @@ final class MultilingualQuestions {
         CITIES.forEach((city, phrase) -> set(livingIn, Map.of("city", phrase),
                 () -> customerIds(c -> c.getCity().equals(city))));
         groups(new Phrase("how many customers do we have in each country?", "сколько клиентов в каждой стране?",
-                "每个国家有多少客户？", "国ごとの顧客数は？"), Map.of(),
-                () -> count(data.customers.findAll(), Customer::getCountry));
+                "每个国家有多少客户？", "国ごとの顧客数は？"), Map.of(), () -> count(data.customers.findAll(), Customer::getCountry));
         single(new Phrase("how many VIP customers are there?", "сколько у нас VIP-клиентов?", "有多少VIP客户？",
                 "VIP顧客は何人いますか？"), Map.of(),
                 () -> BigDecimal.valueOf(data.customers.findAll().stream().filter(Customer::isVip).count()));
@@ -278,11 +268,11 @@ final class MultilingualQuestions {
             return customerIds(c -> ids.contains(c.getId()));
         }));
         ordered(new Phrase("customers with an order over 5000, biggest order first",
-                "клиенты с заказом дороже 5000, сначала с самым крупным заказом",
-                "有超过5000的订单的客户，按最大订单排序", "5000を超える注文がある顧客を最大の注文順に"), Map.of(),
+                "клиенты с заказом дороже 5000, сначала с самым крупным заказом", "有超过5000的订单的客户，按最大订单排序",
+                "5000を超える注文がある顧客を最大の注文順に"), Map.of(),
                 () -> data.orders.findAll().stream()
-                        .collect(Collectors.toMap(Order::getCustomerId, Order::getTotal, BigDecimal::max))
-                        .entrySet().stream().filter(e -> e.getValue().compareTo(dec(5000)) > 0)
+                        .collect(Collectors.toMap(Order::getCustomerId, Order::getTotal, BigDecimal::max)).entrySet()
+                        .stream().filter(e -> e.getValue().compareTo(dec(5000)) > 0)
                         .sorted(Map.Entry.<Long, BigDecimal>comparingByValue().reversed()
                                 .thenComparing(Map.Entry.comparingByKey()))
                         .map(Map.Entry::getKey).limit(LlmEvaluationSupport.PAGE).toList());
@@ -334,23 +324,22 @@ final class MultilingualQuestions {
                 return data.orderIds(o -> ids.contains(o.getCustomerId()));
             });
         }
-        groups(new Phrase("how many orders are there per status?", "сколько заказов в каждом статусе?",
-                "每种状态的订单有多少？", "ステータス別の注文数は？"), Map.of(),
-                () -> count(data.orders.findAll(), o -> o.getStatus().name()));
+        groups(new Phrase("how many orders are there per status?", "сколько заказов в каждом статусе?", "每种状态的订单有多少？",
+                "ステータス別の注文数は？"), Map.of(), () -> count(data.orders.findAll(), o -> o.getStatus().name()));
         Phrase revenue = new Phrase("total revenue of {status} orders", "общая сумма {status} заказов",
                 "{status}订单的总金额", "{status}の注文の合計金額");
         STATUS_GENITIVE.forEach((status, phrase) -> single(revenue, Map.of("status", phrase),
                 () -> data.orders.findAll().stream().filter(o -> o.getStatus() == status).map(Order::getTotal)
                         .reduce(BigDecimal.ZERO, BigDecimal::add)));
-        set(new Phrase("the latest order of every VIP customer", "последний заказ каждого VIP-клиента",
-                "每个VIP客户的最新订单", "各VIP顧客の最新の注文"), Map.of(), () -> {
+        set(new Phrase("the latest order of every VIP customer", "последний заказ каждого VIP-клиента", "每个VIP客户的最新订单",
+                "各VIP顧客の最新の注文"), Map.of(), () -> {
                     Set<Long> vip = data.customers.findAll().stream().filter(Customer::isVip).map(Customer::getId)
                             .collect(Collectors.toSet());
                     Comparator<Order> newest = Comparator.comparing(Order::getCreatedAt).reversed()
                             .thenComparing(Order::getId, Comparator.reverseOrder());
                     return data.orders.findAll().stream().filter(o -> vip.contains(o.getCustomerId()))
-                            .collect(Collectors.groupingBy(Order::getCustomerId, Collectors.minBy(newest)))
-                            .values().stream().map(o -> o.orElseThrow()).sorted(newest).map(Order::getId)
+                            .collect(Collectors.groupingBy(Order::getCustomerId, Collectors.minBy(newest))).values()
+                            .stream().map(o -> o.orElseThrow()).sorted(newest).map(Order::getId)
                             .limit(LlmEvaluationSupport.PAGE).toList();
                 });
         ordered(new Phrase("paid orders sorted by customer name", "оплаченные заказы, отсортированные по имени клиента",
@@ -363,8 +352,7 @@ final class MultilingualQuestions {
     }
 
     private void declined() {
-        for (Phrase phrase : List.of(
-                new Phrase("my orders", "мои заказы", "我的订单", "私の注文"),
+        for (Phrase phrase : List.of(new Phrase("my orders", "мои заказы", "我的订单", "私の注文"),
                 new Phrase("orders near me", "заказы рядом со мной", "我附近的订单", "近くの注文"),
                 new Phrase("which employees work in the warehouse?", "какие сотрудники работают на складе?",
                         "哪些员工在仓库工作？", "倉庫で働いている従業員は？"),
@@ -407,10 +395,10 @@ final class MultilingualQuestions {
 
     private static String word(Object value, Lang lang) {
         return switch (value) {
-            case Category category -> CATEGORIES.get(category).in(lang);
-            case Phrase phrase -> phrase.in(lang);
-            case Items items -> lang == Lang.RU ? items.russian() : "";
-            default -> String.valueOf(value);
+        case Category category -> CATEGORIES.get(category).in(lang);
+        case Phrase phrase -> phrase.in(lang);
+        case Items items -> lang == Lang.RU ? items.russian() : "";
+        default -> String.valueOf(value);
         };
     }
 
@@ -427,8 +415,8 @@ final class MultilingualQuestions {
     }
 
     private List<Long> top(Category category, int n, Comparator<Product> order) {
-        return inCategory(category).stream().sorted(order.thenComparing(Product::getId)).limit(n)
-                .map(Product::getId).toList();
+        return inCategory(category).stream().sorted(order.thenComparing(Product::getId)).limit(n).map(Product::getId)
+                .toList();
     }
 
     private List<Long> customerIds(Predicate<Customer> predicate) {
@@ -441,13 +429,13 @@ final class MultilingualQuestions {
     }
 
     private static <T> Map<String, BigDecimal> count(List<T> rows, Function<T, String> key) {
-        return rows.stream().collect(Collectors.groupingBy(key,
-                Collectors.collectingAndThen(Collectors.counting(), BigDecimal::valueOf)));
+        return rows.stream().collect(
+                Collectors.groupingBy(key, Collectors.collectingAndThen(Collectors.counting(), BigDecimal::valueOf)));
     }
 
     private static BigDecimal average(List<Product> rows, Function<Product, BigDecimal> value) {
-        return rows.stream().map(value).reduce(BigDecimal.ZERO, BigDecimal::add)
-                .divide(BigDecimal.valueOf(rows.size()), 6, RoundingMode.HALF_UP);
+        return rows.stream().map(value).reduce(BigDecimal.ZERO, BigDecimal::add).divide(BigDecimal.valueOf(rows.size()),
+                6, RoundingMode.HALF_UP);
     }
 
     private static boolean below(BigDecimal value, int limit) {

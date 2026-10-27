@@ -100,8 +100,8 @@ public record TableFacts(List<String> primaryKey, List<List<String>> uniqueKeys,
     }
 
     private static List<String> lookup(Map<String, List<String>> values, String column) {
-        return values.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(column))
-                .map(Map.Entry::getValue).findFirst().orElse(List.of());
+        return values.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(column)).map(Map.Entry::getValue)
+                .findFirst().orElse(List.of());
     }
 
     private static boolean contains(Collection<String> columns, String column) {

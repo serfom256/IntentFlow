@@ -1,10 +1,5 @@
 package io.github.serfom256.intentflow.core.ast;
 
-import io.github.serfom256.intentflow.core.ast.factories.DslSources;
-import io.github.serfom256.intentflow.core.ast.factories.AstQueries;
-import io.github.serfom256.intentflow.core.ast.factories.BoundQueries;
-import io.github.serfom256.intentflow.core.ast.factories.Skips;
-import io.github.serfom256.intentflow.core.ast.factories.Takes;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -15,18 +10,14 @@ class DslLiteralTest {
 
     @Test
     void sealedHierarchyIsExhaustiveInSwitch() {
-        DslLiteral[] literals = {
-                new TextLiteral("ring"),
-                new NumberLiteral(new BigDecimal("42")),
-                new BoolLiteral(true),
-                new NullLiteral(),
-        };
+        DslLiteral[] literals = { new TextLiteral("ring"), new NumberLiteral(new BigDecimal("42")),
+                new BoolLiteral(true), new NullLiteral(), };
         for (DslLiteral lit : literals) {
             String label = switch (lit) {
-                case TextLiteral t -> "text:" + t.value();
-                case NumberLiteral n -> "num:" + n.value();
-                case BoolLiteral b -> "bool:" + b.value();
-                case NullLiteral __ -> "null";
+            case TextLiteral t -> "text:" + t.value();
+            case NumberLiteral n -> "num:" + n.value();
+            case BoolLiteral b -> "bool:" + b.value();
+            case NullLiteral __ -> "null";
             };
             assertThat(label).isNotBlank();
         }

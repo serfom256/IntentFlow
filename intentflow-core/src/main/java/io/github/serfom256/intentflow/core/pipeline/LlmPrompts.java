@@ -21,62 +21,58 @@ public final class LlmPrompts {
     private static final Pattern CODE_FENCE = Pattern.compile("(?s)^```[a-zA-Z]*\\s*(.*?)\\s*```$");
 
     private static final String GRAMMAR = """
-            You translate a user's natural-language request into a single IntentFlow DSL query.
-            Reply with the DSL query only: no explanation, no markdown, no code fences.
+            Translate the user's request into one IntentFlow DSL query. Reply with the query only: no explanation,
+            no markdown, no code fences.
 
-            DSL grammar:
+            Grammar:
               <service> [| filter <expr>] [| top <n> [per <field>, ...] by <field> [asc|desc], ...]
                         [| sort <field> [asc|desc], ...] [| skip <int>] [| take <int>]
-            Best or latest rows within each group ("top 3 products per category", "latest order of each
-            customer") use top: it keeps the first <n> rows of every 'per' group in the 'by' order and still
-            returns whole records. It cannot be combined with group or count/sum/avg/min/max.
-            Counting and totals ("how many", "total", "average", "per", "by"):
               <service> [| filter <expr>] [| group <field>, ...] | count|sum <field>|avg <field>|min <field>|max <field>
-                        [| sort <group field or the function name> [asc|desc]] [| take <int>]
-            - Each stage appears at most once.
-            - <expr> combines comparisons with and / or / not and parentheses.
-            - Comparisons: <field> == != < <= > >= <value>
-                           <field> ~ "text"          (case-insensitive substring match)
-                           <field> in (<value>, ...)
-                           <field> == null  /  <field> != null
-            - Values: "double-quoted text" (no double quotes inside), numbers like 42 or 9.99, true, false, null.
-            - Wherever a field can appear (filter, sort, group, sum/avg/min/max) you may also use an expression:
-                arithmetic + - * / and parentheses, casts cast(x as number|integer|text|timestamp|date) or x::bigint,
-                coalesce(a, b, ...), year(t), month(t), day(t), hour(t), date_trunc("month", t),
-                length(s), lower(s), upper(s), round(n), round(n, 2), abs(n).
-              Use expressions only on fields of the service itself, not on relation fields.
-            - Respect field types: text fields take "text", number fields take numbers, boolean fields
-              take true/false, timestamp fields take quoted ISO dates like "2026-01-31" or "2026-01-31T10:15:00".
-            - A date without a time means that whole day: created_at == "2026-10-10" matches any time on that
-              day, > "2026-10-10" means after it and <= "2026-10-10" includes it.
-            - For fields with a fixed list of values, use one of the listed values.
-            - Compare text with values as they are stored, which is usually English: translate names the user
-              writes in another language or script, e.g. "Мадрид" -> "Madrid", "東京" -> "Tokyo".
-            - Every condition in the request becomes part of the filter: "Google phones" is the brand Google and
-              the category of phones, not only the brand.
-            - Only use services and fields listed below. Omit 'take' unless the user asks for a specific count.
-            - Text comparisons with == != in are case-insensitive, except for fields marked case-sensitive.
-            - A service's relations let filters use the related service's fields as <relation>.<field>,
-              e.g. customer.country == "DE", and sort by them, e.g. sort customer.name. Not group by them.
-            - If the request needs a service or field that is not listed, or cannot be expressed
-              with this grammar, reply exactly: unsupported "<short reason>"
-              Never substitute a different field for the one the user asked about, and never answer a
-              narrower question by dropping a condition you cannot express (for example "my", "near me",
-              or a field that is not listed): reply unsupported instead.
-            - When a service's description says which records the caller sees, its rows are already limited
-              to them: answer "my orders" with that service and no extra filter.
+                        [| sort <group field or function name> [asc|desc]] [| take <int>]
+            - Each stage appears at most once. Use the second form for counts, totals and averages, overall or
+              per group ("how many", "total by").
+            - top is only for the first rows within each group ("top 3 products per category", "latest order of
+              each customer"): it keeps the first <n> rows of each 'per' group in 'by' order and returns whole
+              records. It cannot be used with group or count. For the first rows overall use sort and take.
+            - <expr>: comparisons combined with and, or, not and parentheses: <field> == != < <= > >= <value>,
+              <field> ~ "text" (case-insensitive substring), <field> in (<value>, ...), <field> == null, != null.
+            - Values: "text" (no double quotes inside), 42, 9.99, true, false, null, matching the field's type.
+            - Any field may also be an expression on the service's own fields: + - * / and parentheses,
+              cast(x as number|integer|text|timestamp|date), x::bigint, coalesce(a, b, ...), year(t), month(t),
+              day(t), hour(t), date_trunc("month", t), length(s), lower(s), upper(s), round(n), round(n, 2), abs(n).
+            - Use only the services, fields and listed values below. Omit take unless the user asks for a number of
+              rows ("the 5 cheapest").
+            - == != in ignore case unless a field is case-sensitive. Values are stored as listed, usually in
+              English: translate names from other languages or scripts, e.g. "Мадрид" -> "Madrid".
+            - Keep every condition of the request: "Google phones" filters both brand and category.
+            - When a service's description says which records the caller sees, its rows are already limited:
+              "my orders" needs no extra filter.
+            - If the request needs anything not listed, or cannot be expressed, reply exactly
+              unsupported "<short reason>". Never use a different field or drop a condition (such as "my" or
+              "near me") to answer a narrower question.
+            """;
+
+    private static final String DATES = """
+            - Timestamps are quoted ISO dates, "2026-01-31" or "2026-01-31T10:15:00". A date without a time is the
+              whole day: == matches any time on it, > means after it, <= includes it.
+            """;
+
+    private static final String RELATIONS = """
+            - <relation>.<field> filters and sorts by a related service's field, e.g. customer.country == "DE".
+              Not in group or expressions.
+            """;
+
+    private static final String EXAMPLES = """
 
             Examples:
               books | filter author ~ "tolkien" | sort year desc
-              books | filter price < 20 and in_stock == true | take 5
-              books | filter genre in ("fantasy", "sci-fi") | sort title
-              books | filter author.country == "UK" | sort year desc
+              books | filter genre in ("fantasy", "sci-fi") | sort price | take 5
               books | group genre | count | sort count desc
-              books | top 3 per genre by rating desc | sort genre
-              books | filter in_stock == true | avg price
+              books | top 3 per genre by rating desc
               books | filter coalesce(discount, 0) > 10 and year(published_at) == 2025
               books | group month(published_at) | sum price * copies_sold
               unsupported "books have no publisher field"
+              unsupported "books are not limited to the caller, so my books cannot be listed"
             """;
 
     private LlmPrompts() {
@@ -88,27 +84,29 @@ public final class LlmPrompts {
     }
 
     public static String system(ServiceCatalog catalog, LocalDate today) {
-        StringBuilder sb = new StringBuilder(GRAMMAR).append("\nAvailable services:\n");
-        catalog.names().stream()
-                .sorted(Comparator.comparing(ServiceName::value))
-                .map(catalog::get)
-                .forEach(service -> appendService(sb, service));
+        List<ServiceDescriptor> services = catalog.names().stream().sorted(Comparator.comparing(ServiceName::value))
+                .map(catalog::get).toList();
+        StringBuilder sb = new StringBuilder(GRAMMAR);
+        if (services.stream().flatMap(s -> s.fields().stream()).anyMatch(f -> f.type() == FieldType.TIMESTAMP)) {
+            sb.append(DATES);
+        }
+        if (services.stream().anyMatch(s -> !s.relations().isEmpty())) {
+            sb.append(RELATIONS);
+        }
+        sb.append(EXAMPLES).append("\nAvailable services:\n");
+        services.forEach(service -> appendService(sb, service));
         return sb.append("\nToday is ").append(today).append(".\n").toString();
     }
 
     private static void appendService(StringBuilder sb, ServiceDescriptor service) {
         sb.append("- ").append(service.name().value());
-        if (service.description() != null) {
-            sb.append(": ").append(service.description().value());
-        }
+        service.description().ifPresent(description -> sb.append(": ").append(description.value()));
         sb.append('\n');
-        service.fields().stream()
-                .filter(FieldMapping::queryable)
-                .forEach(f -> sb.append("    ").append(describe(f)).append('\n'));
+        service.fields().stream().filter(FieldMapping::queryable)
+                .forEach(f -> sb.append("  ").append(describe(f)).append('\n'));
         for (ServiceRelation relation : service.relations()) {
-            sb.append("    relation ").append(relation.name()).append(" -> service ")
-                    .append(relation.target().value()).append(" (filter as ").append(relation.name())
-                    .append(".<field of ").append(relation.target().value()).append(">)\n");
+            sb.append("  relation ").append(relation.name()).append(" -> ").append(relation.target().value())
+                    .append('\n');
         }
     }
 
@@ -127,9 +125,7 @@ public final class LlmPrompts {
         if (!attrs.isEmpty()) {
             sb.append(" (").append(String.join(", ", attrs)).append(')');
         }
-        if (f.description() != null) {
-            sb.append(" - ").append(f.description());
-        }
+        f.description().ifPresent(description -> sb.append(" - ").append(description));
         return sb.toString();
     }
 

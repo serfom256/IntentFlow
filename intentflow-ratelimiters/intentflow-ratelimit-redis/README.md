@@ -7,7 +7,7 @@ Lua scripting, which managed services such as Amazon ElastiCache, Azure Cache fo
 provide.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-ratelimit-redis:0.5.2")
+implementation("io.github.serfom256:intentflow-ratelimit-redis:0.9.0")
 implementation("org.springframework.boot:spring-boot-starter-data-redis")
 ```
 

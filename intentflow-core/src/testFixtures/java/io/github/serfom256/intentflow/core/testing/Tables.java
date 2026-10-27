@@ -23,8 +23,8 @@ public final class Tables {
 
     public static void insert(Connection connection, String table, List<List<Object>> rows) throws SQLException {
         String values = String.join(", ", Collections.nCopies(rows.getFirst().size(), "?"));
-        try (PreparedStatement insert = connection.prepareStatement(
-                "INSERT INTO " + table + " VALUES (" + values + ")")) {
+        try (PreparedStatement insert = connection
+                .prepareStatement("INSERT INTO " + table + " VALUES (" + values + ")")) {
             for (List<Object> row : rows) {
                 for (int i = 0; i < row.size(); i++) {
                     Object value = row.get(i);

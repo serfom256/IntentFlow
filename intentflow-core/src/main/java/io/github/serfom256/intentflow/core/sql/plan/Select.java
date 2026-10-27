@@ -5,8 +5,8 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
-public record Select(List<Item> items, From from, List<SqlPredicate> where, List<SqlExpr> groupBy,
-        List<Order> orderBy, @Nullable Paging paging) {
+public record Select(List<Item> items, From from, List<SqlPredicate> where, List<SqlExpr> groupBy, List<Order> orderBy,
+        @Nullable Paging paging) {
 
     public Select {
         items = List.copyOf(items);

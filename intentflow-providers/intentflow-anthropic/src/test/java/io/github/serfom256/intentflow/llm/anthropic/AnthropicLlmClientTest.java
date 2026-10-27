@@ -62,16 +62,14 @@ class AnthropicLlmClientTest {
         DslSource dsl = client(AnthropicSettings.defaults()).generateDsl(UserTexts.of("one book"), CATALOG);
 
         assertThat(dsl.value()).isEqualTo("books | take 1");
-        assertThat(dsl.model()).isEqualTo("claude-opus-5-5");
+        assertThat(dsl.model()).hasValue("claude-opus-5-5");
         assertThat(dsl.usage()).isEqualTo(new TokenUsage(912, 30));
         String request = requests.getFirst();
-        assertThat(request).startsWith("POST /v1/messages x-api-key=sk-test version=true "
-                + "beta=server-side-fallback-2026-07-01 ")
-                .contains("\"cache_control\":{\"type\":\"ephemeral\"}")
-                .contains("\"max_tokens\":16000")
-                .contains("\"fallbacks\":\"default\"")
-                .contains("Available services:")
-                .doesNotContain("temperature");
+        assertThat(request)
+                .startsWith(
+                        "POST /v1/messages x-api-key=sk-test version=true " + "beta=server-side-fallback-2026-07-01 ")
+                .contains("\"cache_control\":{\"type\":\"ephemeral\"}").contains("\"max_tokens\":16000")
+                .contains("\"fallbacks\":\"default\"").contains("Available services:").doesNotContain("temperature");
     }
 
     @Test
@@ -96,8 +94,7 @@ class AnthropicLlmClientTest {
         reply = REFUSAL;
 
         assertThatThrownBy(() -> client(AnthropicSettings.defaults()).generateDsl(UserTexts.of("books"), CATALOG))
-                .isInstanceOf(LlmException.class)
-                .hasMessage("Claude declined to translate the question (cyber)");
+                .isInstanceOf(LlmException.class).hasMessage("Claude declined to translate the question (cyber)");
     }
 
     @Test
