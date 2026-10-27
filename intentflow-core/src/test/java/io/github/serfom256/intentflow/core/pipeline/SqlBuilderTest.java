@@ -256,10 +256,11 @@ class SqlBuilderTest {
     }
 
     @Test
-    void boolParameterFlowsThrough() {
+    void aComparisonWithABooleanIsTheBareColumn() {
         FilterExpr f = new Compare(LogicalFieldNames.of("year"), ComparisonOp.EQ, new BoolLiteral(true));
         BoundQuery r = build(f, List.of(), null, null, booksService(100, List.of()));
-        assertThat(r.parameters()).containsExactly(new BoolLiteral(true));
+        assertThat(r.sql()).isEqualTo("SELECT * FROM \"book\" WHERE \"year\" LIMIT 100");
+        assertThat(r.parameters()).isEmpty();
     }
 
     @Test

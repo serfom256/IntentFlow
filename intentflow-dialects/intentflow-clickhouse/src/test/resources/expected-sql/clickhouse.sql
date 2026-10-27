@@ -27,8 +27,8 @@ SELECT * FROM "product" WHERE positionCaseInsensitiveUTF8("name", ?) > 0 ORDER B
 binds: [50%_off]
 
 -- products | filter price >= 10 and price < 99.5 and active == true
-SELECT * FROM "product" WHERE ("price" >= ? AND "price" < CAST(? AS Decimal(38, 10)) AND "active" = ?) ORDER BY "id" ASC NULLS LAST LIMIT 50
-binds: [10, 99.5, true]
+SELECT * FROM "product" WHERE ("price" >= ? AND "price" < CAST(? AS Decimal(38, 10)) AND "active") ORDER BY "id" ASC NULLS LAST LIMIT 50
+binds: [10, 99.5]
 
 -- products | filter not (stock == 0 or discount == null)
 SELECT * FROM "product" WHERE NOT (("stock" = ? OR "discount" IS NULL)) ORDER BY "id" ASC NULLS LAST LIMIT 50
@@ -117,8 +117,8 @@ SELECT EXTRACT(YEAR FROM "created_at") AS "intentflow_g0", "category", sumOrNull
 binds: []
 
 -- products | filter active == true | max price
-SELECT maxOrNull("price") FROM "product" WHERE "active" = ? LIMIT 50
-binds: [true]
+SELECT maxOrNull("price") FROM "product" WHERE "active" LIMIT 50
+binds: []
 
 -- products | top 3 per category by price desc | sort category
 SELECT * FROM (SELECT "product".*, ROW_NUMBER() OVER (PARTITION BY "category" ORDER BY "price" DESC NULLS LAST, "id" ASC NULLS LAST) AS "intentflow_rank" FROM "product") "product" WHERE "intentflow_rank" <= 3 ORDER BY "category" ASC NULLS LAST, "id" ASC NULLS LAST LIMIT 50
@@ -133,8 +133,8 @@ SELECT * FROM "orders" ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LA
 binds: []
 
 -- orders | filter customer.vip == true and status == "paid"
-SELECT * FROM "orders" WHERE (EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "orders"."customer_id" AND "intentflow_r"."vip" = ?) AND lowerUTF8("status") = lowerUTF8(?)) ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 50
-binds: [true, paid]
+SELECT * FROM "orders" WHERE (EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "orders"."customer_id" AND "intentflow_r"."vip") AND lowerUTF8("status") = lowerUTF8(?)) ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 50
+binds: [paid]
 
 -- orders | filter customer.country in ("DE", "FR") or total > 1000
 SELECT * FROM "orders" WHERE (EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "orders"."customer_id" AND lowerUTF8("intentflow_r"."country") IN (lowerUTF8(?), lowerUTF8(?))) OR "total" > ?) ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 50
@@ -155,8 +155,8 @@ rejected: sorting by 'customer.name' needs a correlated subquery in ORDER BY, wh
 rejected: sorting by 'orders.total' needs a correlated subquery in ORDER BY, which clickhouse does not support; sort by a field of the service itself
 
 -- orders | filter customer.vip == true | top 1 per customer_id by created_at desc
-SELECT * FROM (SELECT "orders".*, ROW_NUMBER() OVER (PARTITION BY "customer_id" ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST) AS "intentflow_rank" FROM "orders" WHERE EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "orders"."customer_id" AND "intentflow_r"."vip" = ?)) "orders" WHERE "intentflow_rank" <= 1 ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 50
-binds: [true]
+SELECT * FROM (SELECT "orders".*, ROW_NUMBER() OVER (PARTITION BY "customer_id" ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST) AS "intentflow_rank" FROM "orders" WHERE EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "orders"."customer_id" AND "intentflow_r"."vip")) "orders" WHERE "intentflow_rank" <= 1 ORDER BY "created_at" DESC NULLS LAST, "id" DESC NULLS LAST LIMIT 50
+binds: []
 
 -- orders | group status | count | sort status
 SELECT "status", COUNT(*) FROM "orders" GROUP BY "status" ORDER BY "status" ASC NULLS LAST LIMIT 50

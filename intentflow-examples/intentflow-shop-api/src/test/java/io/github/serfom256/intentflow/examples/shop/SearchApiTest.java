@@ -361,7 +361,7 @@ class SearchApiTest extends ApiTestSupport {
         void sortsByARelatedFieldLikeAJoinWould() {
             List<Long> joined = jdbc
                     .sql("SELECT o.id FROM orders o JOIN customer c ON c.id = o.customer_id "
-                            + "WHERE o.status = 'PAID' ORDER BY c.full_name, o.created_at DESC, o.id DESC LIMIT 50")
+                            + "WHERE o.status = 'PAID' ORDER BY c.full_name, o.id DESC LIMIT 50")
                     .query(Long.class).list();
 
             assertThat(ids(search("paid orders sorted by customer name",

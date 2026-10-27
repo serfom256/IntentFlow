@@ -27,8 +27,8 @@ SELECT * FROM product WHERE name ILIKE ? ESCAPE '\' ORDER BY id ASC NULLS LAST F
 binds: [%50\%\_off%]
 
 -- products | filter price >= 10 and price < 99.5 and active == true
-SELECT * FROM product WHERE (price >= ? AND price < CAST(? AS NUMERIC(3, 1)) AND active = ?) ORDER BY id ASC NULLS LAST FETCH FIRST 50 ROWS ONLY
-binds: [10, 99.5, true]
+SELECT * FROM product WHERE (price >= ? AND price < CAST(? AS NUMERIC(3, 1)) AND active) ORDER BY id ASC NULLS LAST FETCH FIRST 50 ROWS ONLY
+binds: [10, 99.5]
 
 -- products | filter not (stock == 0 or discount == null)
 SELECT * FROM product WHERE NOT ((stock = ? OR discount IS NULL)) ORDER BY id ASC NULLS LAST FETCH FIRST 50 ROWS ONLY
@@ -117,8 +117,8 @@ SELECT EXTRACT(YEAR FROM created_at) AS intentflow_g0, category, SUM((price * st
 binds: []
 
 -- products | filter active == true | max price
-SELECT MAX(price) FROM product WHERE active = ? FETCH FIRST 50 ROWS ONLY
-binds: [true]
+SELECT MAX(price) FROM product WHERE active FETCH FIRST 50 ROWS ONLY
+binds: []
 
 -- products | top 3 per category by price desc | sort category
 SELECT * FROM (SELECT product.*, ROW_NUMBER() OVER (PARTITION BY category ORDER BY price DESC NULLS LAST, id ASC NULLS LAST) AS intentflow_rank FROM product) product WHERE intentflow_rank <= 3 ORDER BY category ASC NULLS LAST, id ASC NULLS LAST FETCH FIRST 50 ROWS ONLY
@@ -133,8 +133,8 @@ SELECT * FROM orders ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST FET
 binds: []
 
 -- orders | filter customer.vip == true and status == "paid"
-SELECT * FROM orders WHERE (EXISTS (SELECT 1 FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id AND intentflow_r.vip = ?) AND LOWER(status) = LOWER(?)) ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST FETCH FIRST 50 ROWS ONLY
-binds: [true, paid]
+SELECT * FROM orders WHERE (EXISTS (SELECT 1 FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id AND intentflow_r.vip) AND LOWER(status) = LOWER(?)) ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST FETCH FIRST 50 ROWS ONLY
+binds: [paid]
 
 -- orders | filter customer.country in ("DE", "FR") or total > 1000
 SELECT * FROM orders WHERE (EXISTS (SELECT 1 FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id AND LOWER(intentflow_r.country) IN (LOWER(?), LOWER(?))) OR total > ?) ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST FETCH FIRST 50 ROWS ONLY
@@ -157,8 +157,8 @@ SELECT * FROM customer ORDER BY (SELECT MAX(intentflow_r.total) FROM orders inte
 binds: []
 
 -- orders | filter customer.vip == true | top 1 per customer_id by created_at desc
-SELECT * FROM (SELECT orders.*, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST) AS intentflow_rank FROM orders WHERE EXISTS (SELECT 1 FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id AND intentflow_r.vip = ?)) orders WHERE intentflow_rank <= 1 ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST FETCH FIRST 50 ROWS ONLY
-binds: [true]
+SELECT * FROM (SELECT orders.*, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST) AS intentflow_rank FROM orders WHERE EXISTS (SELECT 1 FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id AND intentflow_r.vip)) orders WHERE intentflow_rank <= 1 ORDER BY created_at DESC NULLS LAST, id DESC NULLS LAST FETCH FIRST 50 ROWS ONLY
+binds: []
 
 -- orders | group status | count | sort status
 SELECT status, COUNT(*) FROM orders GROUP BY status ORDER BY status ASC NULLS LAST FETCH FIRST 50 ROWS ONLY

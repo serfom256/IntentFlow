@@ -6,7 +6,7 @@ never exceed the limit; rows of callers idle for a whole period are deleted. It 
 on PostgreSQL, MySQL, Oracle and H2.
 
 ```kotlin
-implementation("io.github.serfom256:intentflow-ratelimit-jdbc:0.9.0")
+implementation("io.github.serfom256:intentflow-ratelimit-jdbc:0.9.2")
 ```
 
 ```yaml

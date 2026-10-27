@@ -450,7 +450,7 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         if (paging != null && items.size() > paging.size()) {
             items = new ArrayList<>(items.subList(0, paging.size()));
             List<Object> last = sqlBuilder.supportsKeyset(validated)
-                    ? PageCursor.values(items.getLast(), validated.effectiveSort(), validated.service())
+                    ? PageCursor.values(items.getLast(), sqlBuilder.order(validated), validated.service())
                     : null;
             nextCursor = new PageCursor(paging.question(), compiled.dsl().value(), paging.offset() + paging.size(),
                     last, true).encode(cursorKey);

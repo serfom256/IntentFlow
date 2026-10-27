@@ -2,6 +2,7 @@ package io.github.serfom256.intentflow.core.pipeline.impl;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
+import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import io.github.serfom256.intentflow.core.pipeline.RuntimeRestriction;
 import io.github.serfom256.intentflow.core.pipeline.SqlBuilder;
@@ -68,6 +69,12 @@ public final class DefaultSqlBuilder implements SqlBuilder {
     @Override
     public @Nullable Object read(@Nullable Object value) {
         return dialect.read(value);
+    }
+
+    @Override
+    public List<SortKey> order(ValidatedQuery query) {
+        return QueryPlanner.order(query,
+                new PlanContext(facts, optimizations, ResultShape.ROWS, dialect, zone, type -> List.of()));
     }
 
     @Override

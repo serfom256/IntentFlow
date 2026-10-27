@@ -38,7 +38,7 @@ binds: []
 optimizations: not-null-ordering
 
 -- orders | sort customer.name
-SELECT * FROM orders WHERE (deleted_at IS NULL) ORDER BY (SELECT MIN(intentflow_r.name) FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id) ASC NULLS LAST, created_at DESC, id DESC FETCH FIRST 50 ROWS ONLY
+SELECT * FROM orders WHERE (deleted_at IS NULL) ORDER BY (SELECT MIN(intentflow_r.name) FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id) ASC NULLS LAST, id DESC FETCH FIRST 50 ROWS ONLY
 binds: []
 optimizations: not-null-ordering
 
@@ -58,8 +58,8 @@ binds: []
 optimizations: not-null-ordering, to-one-join
 
 -- invoices | filter customer.vip == true | sort issued_at desc
-SELECT * FROM billing.invoice WHERE EXISTS (SELECT 1 FROM customer intentflow_r WHERE intentflow_r.id = invoice.customer_id AND intentflow_r.vip = ?) ORDER BY issued_at DESC, id ASC FETCH FIRST 50 ROWS ONLY
-binds: [true]
+SELECT * FROM billing.invoice WHERE EXISTS (SELECT 1 FROM customer intentflow_r WHERE intentflow_r.id = invoice.customer_id AND intentflow_r.vip) ORDER BY issued_at DESC, id ASC FETCH FIRST 50 ROWS ONLY
+binds: []
 optimizations: not-null-ordering
 
 -- keys: products | filter price > 10

@@ -13,6 +13,7 @@ import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.sql.plan.Select;
 import io.github.serfom256.intentflow.core.sql.plan.SqlExpr;
 import io.github.serfom256.intentflow.core.sql.plan.SqlPredicate;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -121,9 +122,15 @@ public final class SqlRenderer {
             sql.text(")");
         }
         case SqlPredicate.Compare compare -> {
-            expr(compare.left(), sql);
-            sql.text(" " + compare.operator() + " ");
-            expr(compare.right(), sql);
+            Boolean bare = bareBoolean(compare);
+            if (bare != null) {
+                sql.text(bare ? "" : "NOT ");
+                expr(compare.left(), sql);
+            } else {
+                expr(compare.left(), sql);
+                sql.text(" " + compare.operator() + " ");
+                expr(compare.right(), sql);
+            }
         }
         case SqlPredicate.IsNull isNull -> {
             expr(isNull.value(), sql);
@@ -225,6 +232,18 @@ public final class SqlRenderer {
             sql.text(")");
         }
         }
+    }
+
+    private @Nullable Boolean bareBoolean(SqlPredicate.Compare compare) {
+        if (!dialect.capabilities().booleans() || !(compare.left() instanceof SqlExpr.Column)
+                || !(compare.right() instanceof SqlExpr.Param param) || !(param.value() instanceof BoolLiteral b)) {
+            return null;
+        }
+        return switch (compare.operator()) {
+        case "=" -> b.value();
+        case "<>" -> !b.value();
+        default -> null;
+        };
     }
 
     private DslLiteral bindable(DslLiteral value) {

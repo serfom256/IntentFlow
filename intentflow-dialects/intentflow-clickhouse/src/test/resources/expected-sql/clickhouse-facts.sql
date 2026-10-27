@@ -52,8 +52,8 @@ optimizations: not-null-ordering, date-ranges
 rejected: sorting by 'customer.name' needs a correlated subquery in ORDER BY, which clickhouse does not support; sort by a field of the service itself
 
 -- invoices | filter customer.vip == true | sort issued_at desc
-SELECT * FROM "billing"."invoice" WHERE EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "invoice"."customer_id" AND "intentflow_r"."vip" = ?) ORDER BY "issued_at" DESC, "id" ASC LIMIT 50
-binds: [true]
+SELECT * FROM "billing"."invoice" WHERE EXISTS (SELECT 1 FROM "customer" "intentflow_r" WHERE "intentflow_r"."id" = "invoice"."customer_id" AND "intentflow_r"."vip") ORDER BY "issued_at" DESC, "id" ASC LIMIT 50
+binds: []
 optimizations: not-null-ordering
 
 -- keys: products | filter price > 10

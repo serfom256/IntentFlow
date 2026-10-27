@@ -27,8 +27,8 @@ SELECT * FROM `product` WHERE LOWER(`name`) LIKE LOWER(?) ESCAPE '!' ORDER BY `i
 binds: [%50!%!_off%]
 
 -- products | filter price >= 10 and price < 99.5 and active == true
-SELECT * FROM `product` WHERE (`price` >= ? AND `price` < ? AND `active` = ?) ORDER BY `id` IS NULL, `id` ASC LIMIT 50
-binds: [10, 99.5, true]
+SELECT * FROM `product` WHERE (`price` >= ? AND `price` < ? AND `active`) ORDER BY `id` IS NULL, `id` ASC LIMIT 50
+binds: [10, 99.5]
 
 -- products | filter not (stock == 0 or discount == null)
 SELECT * FROM `product` WHERE NOT ((`stock` = ? OR `discount` IS NULL)) ORDER BY `id` IS NULL, `id` ASC LIMIT 50
@@ -117,8 +117,8 @@ SELECT EXTRACT(YEAR FROM `created_at`) AS `intentflow_g0`, `category`, SUM((`pri
 binds: []
 
 -- products | filter active == true | max price
-SELECT MAX(`price`) FROM `product` WHERE `active` = ? LIMIT 50
-binds: [true]
+SELECT MAX(`price`) FROM `product` WHERE `active` LIMIT 50
+binds: []
 
 -- products | top 3 per category by price desc | sort category
 SELECT * FROM (SELECT `product`.*, ROW_NUMBER() OVER (PARTITION BY `category` ORDER BY `price` IS NULL, `price` DESC, `id` IS NULL, `id` ASC) AS `intentflow_rank` FROM `product`) `product` WHERE `intentflow_rank` <= 3 ORDER BY `category` IS NULL, `category` ASC, `id` IS NULL, `id` ASC LIMIT 50
@@ -133,8 +133,8 @@ SELECT * FROM `orders` ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS
 binds: []
 
 -- orders | filter customer.vip == true and status == "paid"
-SELECT * FROM `orders` WHERE (EXISTS (SELECT 1 FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id` AND `intentflow_r`.`vip` = ?) AND LOWER(`status`) = LOWER(?)) ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS NULL, `id` DESC LIMIT 50
-binds: [true, paid]
+SELECT * FROM `orders` WHERE (EXISTS (SELECT 1 FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id` AND `intentflow_r`.`vip`) AND LOWER(`status`) = LOWER(?)) ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS NULL, `id` DESC LIMIT 50
+binds: [paid]
 
 -- orders | filter customer.country in ("DE", "FR") or total > 1000
 SELECT * FROM `orders` WHERE (EXISTS (SELECT 1 FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id` AND LOWER(`intentflow_r`.`country`) IN (LOWER(?), LOWER(?))) OR `total` > ?) ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS NULL, `id` DESC LIMIT 50
@@ -157,8 +157,8 @@ SELECT * FROM `customer` ORDER BY (SELECT MAX(`intentflow_r`.`total`) FROM `orde
 binds: []
 
 -- orders | filter customer.vip == true | top 1 per customer_id by created_at desc
-SELECT * FROM (SELECT `orders`.*, ROW_NUMBER() OVER (PARTITION BY `customer_id` ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS NULL, `id` DESC) AS `intentflow_rank` FROM `orders` WHERE EXISTS (SELECT 1 FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id` AND `intentflow_r`.`vip` = ?)) `orders` WHERE `intentflow_rank` <= 1 ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS NULL, `id` DESC LIMIT 50
-binds: [true]
+SELECT * FROM (SELECT `orders`.*, ROW_NUMBER() OVER (PARTITION BY `customer_id` ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS NULL, `id` DESC) AS `intentflow_rank` FROM `orders` WHERE EXISTS (SELECT 1 FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id` AND `intentflow_r`.`vip`)) `orders` WHERE `intentflow_rank` <= 1 ORDER BY `created_at` IS NULL, `created_at` DESC, `id` IS NULL, `id` DESC LIMIT 50
+binds: []
 
 -- orders | group status | count | sort status
 SELECT `status`, COUNT(*) FROM `orders` GROUP BY `status` ORDER BY `status` IS NULL, `status` ASC LIMIT 50

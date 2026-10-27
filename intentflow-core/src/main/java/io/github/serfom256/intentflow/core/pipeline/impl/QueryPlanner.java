@@ -7,9 +7,11 @@ import io.github.serfom256.intentflow.core.ast.ExprSortKey;
 import io.github.serfom256.intentflow.core.ast.FilterExpr;
 import io.github.serfom256.intentflow.core.ast.Take;
 import io.github.serfom256.intentflow.core.ast.TopN;
+import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
+import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
 import io.github.serfom256.intentflow.core.pipeline.ResultShape;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
@@ -20,8 +22,10 @@ import io.github.serfom256.intentflow.core.sql.plan.SqlPredicate;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 final class QueryPlanner {
 
@@ -41,7 +45,7 @@ final class QueryPlanner {
         }
         SqlScope scope = SqlScope.outer(context, query.service(), query.related(), false);
         List<String> columns = new ArrayList<>();
-        for (SortKey key : query.effectiveSort()) {
+        for (SortKey key : order(query, scope)) {
             if (key instanceof ExprSortKey || RelationPaths.prefix(key.field()) != null || !scope.notNull(key.field())
                     || !scope.ordinals(key.field()).isEmpty()) {
                 return false;
@@ -51,11 +55,41 @@ final class QueryPlanner {
         return !columns.isEmpty() && scope.unique(columns);
     }
 
+    static List<SortKey> order(ValidatedQuery query, PlanContext context) {
+        return order(query, SqlScope.outer(context, query.service(), query.related(), false));
+    }
+
+    private static List<SortKey> order(ValidatedQuery query, SqlScope scope) {
+        AstQuery ast = query.ast();
+        List<String> key = scope.primaryKey();
+        if (ast.aggregate().isPresent() || ast.sort().isEmpty() || key.isEmpty() || !scope.unique(key)) {
+            return query.effectiveSort();
+        }
+        List<SortKey> order = new ArrayList<>(ast.sort());
+        Set<String> used = new HashSet<>();
+        order.forEach(k -> used.add(k.field().value()));
+        for (String column : key) {
+            FieldMapping field = query.service().fields().stream()
+                    .filter(f -> f.column().value().equalsIgnoreCase(column)).findFirst().orElse(null);
+            if (field == null) {
+                return query.effectiveSort();
+            }
+            if (used.add(field.logical().value())) {
+                SortKey.Direction direction = query.service().defaultSort().stream()
+                        .filter(k -> k.field().equals(field.logical())).map(SortKey::direction).findFirst()
+                        .orElse(SortKey.Direction.ASC);
+                order.add(SortKeys.of(field.logical(), direction));
+            }
+        }
+        return List.copyOf(order);
+    }
+
     static Select plan(ValidatedQuery query, PlanContext context, @Nullable List<Object> after) {
         AstQuery ast = query.ast();
         Aggregate aggregate = ast.aggregate().orElse(null);
         SqlScope scope = SqlScope.outer(context, query.service(), query.related(), false);
-        if (aggregate == null && OrderPlanner.joinsForSort(query.effectiveSort(), scope)) {
+        List<SortKey> sort = order(query, scope);
+        if (aggregate == null && OrderPlanner.joinsForSort(sort, scope)) {
             scope = SqlScope.outer(context, query.service(), query.related(), true);
         }
 
@@ -63,10 +97,10 @@ final class QueryPlanner {
         List<SqlPredicate> where = new ArrayList<>(
                 scope.where(filter == null ? List.of() : List.of(FilterPlanner.plan(filter, scope))));
         if (after != null) {
-            where.add(after(query.effectiveSort(), after, scope));
+            where.add(after(sort, after, scope));
             context.applied(Optimization.KEYSET_PAGING);
         }
-        List<Select.Order> order = new ArrayList<>(OrderPlanner.plan(query.effectiveSort(), aggregate, scope));
+        List<Select.Order> order = new ArrayList<>(OrderPlanner.plan(sort, aggregate, scope));
 
         Select select;
         if (ast.top().isPresent()) {

@@ -38,7 +38,7 @@ binds: []
 optimizations: not-null-ordering
 
 -- orders | sort customer.name
-SELECT * FROM `orders` WHERE (deleted_at IS NULL) ORDER BY (SELECT MIN(`intentflow_r`.`name`) FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id`) IS NULL, (SELECT MIN(`intentflow_r`.`name`) FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id`) ASC, `created_at` DESC, `id` DESC LIMIT 50
+SELECT * FROM `orders` WHERE (deleted_at IS NULL) ORDER BY (SELECT MIN(`intentflow_r`.`name`) FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id`) IS NULL, (SELECT MIN(`intentflow_r`.`name`) FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `orders`.`customer_id`) ASC, `id` DESC LIMIT 50
 binds: []
 optimizations: not-null-ordering
 
@@ -58,8 +58,8 @@ binds: []
 optimizations: not-null-ordering, to-one-join
 
 -- invoices | filter customer.vip == true | sort issued_at desc
-SELECT * FROM `billing`.`invoice` WHERE EXISTS (SELECT 1 FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `invoice`.`customer_id` AND `intentflow_r`.`vip` = ?) ORDER BY `issued_at` DESC, `id` ASC LIMIT 50
-binds: [true]
+SELECT * FROM `billing`.`invoice` WHERE EXISTS (SELECT 1 FROM `customer` `intentflow_r` WHERE `intentflow_r`.`id` = `invoice`.`customer_id` AND `intentflow_r`.`vip`) ORDER BY `issued_at` DESC, `id` ASC LIMIT 50
+binds: []
 optimizations: not-null-ordering
 
 -- keys: products | filter price > 10

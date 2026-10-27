@@ -2,6 +2,7 @@ package io.github.serfom256.intentflow.core.pipeline;
 
 import io.github.serfom256.intentflow.core.ast.BoundQuery;
 import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
+import io.github.serfom256.intentflow.core.catalog.SortKey;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -27,9 +28,19 @@ public interface SqlBuilder {
     }
 
     /**
+     * The ordering {@link #build} applies to {@code query}, and whose values a
+     * keyset cursor records: {@code query.effectiveSort()} by default. A builder
+     * that knows the table's primary key may break ties of a requested sort by that
+     * key alone, so that an index on the sorted column can serve the order.
+     */
+    default List<SortKey> order(ValidatedQuery query) {
+        return query.effectiveSort();
+    }
+
+    /**
      * Whether {@link #buildAfter} can continue {@code query} after a row: its sort
-     * must be a total order of non-null columns. When it cannot, paged requests
-     * page by offset.
+     * ({@link #order}) must be a total order of non-null columns. When it cannot,
+     * paged requests page by offset.
      */
     default boolean supportsKeyset(ValidatedQuery query) {
         return false;
@@ -37,8 +48,8 @@ public interface SqlBuilder {
 
     /**
      * Builds {@code query} for the rows after the one whose sort keys
-     * ({@code ValidatedQuery.effectiveSort()}, in order) had the values
-     * {@code after}, instead of skipping rows by offset.
+     * ({@link #order}, in order) had the values {@code after}, instead of skipping
+     * rows by offset.
      */
     default BoundQuery buildAfter(ValidatedQuery query, ResultShape shape,
             Function<Class<?>, List<RuntimeRestriction>> restrictions, List<Object> after) {

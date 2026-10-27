@@ -38,7 +38,7 @@ binds: []
 optimizations: not-null-ordering
 
 -- orders | sort customer.name
-SELECT * FROM orders WHERE (deleted_at IS NULL) ORDER BY (SELECT MIN(intentflow_r.name) FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id) ASC NULLS LAST, created_at DESC, id DESC FETCH NEXT 50 ROWS ONLY
+SELECT * FROM orders WHERE (deleted_at IS NULL) ORDER BY (SELECT MIN(intentflow_r.name) FROM customer intentflow_r WHERE intentflow_r.id = orders.customer_id) ASC NULLS LAST, id DESC FETCH NEXT 50 ROWS ONLY
 binds: []
 optimizations: not-null-ordering
 

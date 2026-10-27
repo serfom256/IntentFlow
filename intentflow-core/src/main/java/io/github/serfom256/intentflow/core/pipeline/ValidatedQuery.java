@@ -33,7 +33,8 @@ public interface ValidatedQuery {
      * tie-breakers so pages never overlap. Entity queries append the service's
      * {@code defaultSort}, and a {@code top} query without {@code per} or a sort
      * keeps its {@code top} order; aggregate queries sort by the aggregated value
-     * (descending) and then by every group field.
+     * (descending) and then by every group field. {@code SqlBuilder.order} may
+     * replace the tie-breakers of a requested sort by the table's primary key.
      */
     default List<SortKey> effectiveSort() {
         Aggregate aggregate = ast().aggregate().orElse(null);

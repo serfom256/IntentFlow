@@ -166,7 +166,7 @@ public abstract class DifferentialTestBase {
                     data.stream().filter(row -> Boolean.TRUE.equals(eval(q.filter().orElse(null), row))).toList());
             List<List<Object>> got = actual.items().stream().map(e -> row(e, columns)).toList();
 
-            List<SortKey> sort = ValidatedQueries.of(gadgets, q).effectiveSort();
+            List<SortKey> sort = sqlBuilder().order(ValidatedQueries.of(gadgets, q));
             List<Map<String, Object>> sorted = new ArrayList<>(matching);
             sorted.sort(rowOrder(sort));
             List<List<Object>> ordered = sorted.stream().map(r -> project(r, columns)).toList();
@@ -238,7 +238,7 @@ public abstract class DifferentialTestBase {
         }
         List<String> columns = new ArrayList<>(groupBy);
         columns.add(ValidatedQuery.valueField(aggregate).value());
-        rows.sort(order(ValidatedQueries.of(gadgets, q).effectiveSort(), columns));
+        rows.sort(order(sqlBuilder().order(ValidatedQueries.of(gadgets, q)), columns));
         return rows;
     }
 

@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.9.0")
-    implementation("io.github.serfom256:intentflow-jdbc:0.9.0")
-    implementation("io.github.serfom256:intentflow-postgresql:0.9.0")
-    implementation("io.github.serfom256:intentflow-openai:0.9.0")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.9.2")
+    implementation("io.github.serfom256:intentflow-jdbc:0.9.2")
+    implementation("io.github.serfom256:intentflow-postgresql:0.9.2")
+    implementation("io.github.serfom256:intentflow-openai:0.9.2")
 }
 ```
 
@@ -133,7 +133,9 @@ public class Product {
   answer quality
 - **`caseSensitive = true`** compares `==`, `!=` and `in` exactly, which suits codes and keys
 - **`uri`** is the link returned with each answer, filled from the first result
-- **`defaultSort`** is appended to every sort as a tie-breaker; end it with a unique field so paging is stable
+- **`defaultSort`** orders results when the question asks for no order; end it with a unique field so paging is
+  stable. A requested sort is followed by the table's primary key when IntentFlow knows it, so an index on the
+  sorted column serves the query, and by `defaultSort` otherwise
 
 Interface entities, such as Jimmer's, put `@IntentField` on their property methods. The catalog can also be built
 in code with `ServiceDescriptors` and `ServiceCatalogs`.
