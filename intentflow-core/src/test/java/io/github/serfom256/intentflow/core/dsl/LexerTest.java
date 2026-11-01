@@ -87,6 +87,13 @@ class LexerTest {
     }
 
     @Test
+    void singleQuotedStringsAreTextToo() {
+        List<Token> t = lex("'O\\'Neil says \"hi\"'");
+        assertThat(t.get(0)).isInstanceOfSatisfying(StringToken.class,
+                s -> assertThat(s.value()).isEqualTo("O'Neil says \"hi\""));
+    }
+
+    @Test
     void stringWithQuoteEscape() {
         List<Token> t = lex("\"the \\\"king\\\"\"");
         assertThat(t.get(0)).isInstanceOfSatisfying(StringToken.class,

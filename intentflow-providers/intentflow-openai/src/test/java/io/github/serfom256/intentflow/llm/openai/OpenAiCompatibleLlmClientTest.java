@@ -158,7 +158,7 @@ class OpenAiCompatibleLlmClientTest {
         assertThat(dsl).isEqualTo("books | filter title ~ \"dune\"");
         assertThat(lastRequest.get()).contains("{\"role\":\"user\",\"content\":\"books about dune\"}")
                 .contains("{\"role\":\"assistant\",\"content\":\"books | filter name ~ \\\"dune\\\"\"}")
-                .contains("That query was rejected: field 'name' is not declared");
+                .contains("That query was rejected:\\n\\nfield 'name' is not declared");
     }
 
     @Test

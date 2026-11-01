@@ -10,21 +10,69 @@ import io.github.serfom256.intentflow.core.ast.IsNotNull;
 import io.github.serfom256.intentflow.core.ast.IsNull;
 import io.github.serfom256.intentflow.core.ast.Not;
 import io.github.serfom256.intentflow.core.ast.Or;
+import io.github.serfom256.intentflow.core.catalog.FieldMapping;
+import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
+import io.github.serfom256.intentflow.core.catalog.ServiceDescriptor;
+import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
+import io.github.serfom256.intentflow.core.catalog.factories.SortKeys;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 final class RelationPaths {
 
     private RelationPaths() {
     }
 
+    static final Set<String> MODIFIERS = Set.of("latest", "earliest");
+
     static @Nullable String prefix(LogicalFieldName field) {
-        int dot = field.value().indexOf('.');
-        return dot < 0 ? null : field.value().substring(0, dot);
+        String[] parts = field.value().split("\\.", 3);
+        if (parts.length < 2) {
+            return null;
+        }
+        return parts.length == 3 && MODIFIERS.contains(parts[1]) ? parts[0] + "." + parts[1] : parts[0];
+    }
+
+    static String base(String relation) {
+        int dot = relation.indexOf('.');
+        return dot < 0 ? relation : relation.substring(0, dot);
+    }
+
+    static @Nullable String modifier(String relation) {
+        int dot = relation.indexOf('.');
+        return dot < 0 ? null : relation.substring(dot + 1);
+    }
+
+    static Optional<List<SortKey>> recency(ServiceDescriptor target, String modifier) {
+        Map<String, FieldMapping> fields = new HashMap<>();
+        target.fields().forEach(f -> fields.put(f.logical().value(), f));
+        List<LogicalFieldName> dates = target.fields().stream()
+                .filter(f -> f.queryable() && f.type() == FieldType.TIMESTAMP).map(FieldMapping::logical).toList();
+        Optional<LogicalFieldName> date = target.defaultSort().stream().map(SortKey::field)
+                .filter(f -> fields.containsKey(f.value()) && fields.get(f.value()).type() == FieldType.TIMESTAMP)
+                .findFirst().or(() -> dates.size() == 1 ? Optional.of(dates.getFirst()) : Optional.empty());
+        return date.map(d -> {
+            boolean latest = modifier.equals("latest");
+            List<SortKey> keys = new ArrayList<>();
+            keys.add(SortKeys.of(d, latest ? SortKey.Direction.DESC : SortKey.Direction.ASC));
+            for (SortKey key : target.defaultSort()) {
+                if (!key.field().equals(d)) {
+                    SortKey.Direction direction = latest ? key.direction()
+                            : key.direction() == SortKey.Direction.DESC ? SortKey.Direction.ASC
+                                    : SortKey.Direction.DESC;
+                    keys.add(SortKeys.of(key.field(), direction));
+                }
+            }
+            return List.copyOf(keys);
+        });
     }
 
     static LogicalFieldName strip(LogicalFieldName field, String relation) {

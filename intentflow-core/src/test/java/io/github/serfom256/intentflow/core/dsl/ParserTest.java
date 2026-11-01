@@ -162,6 +162,21 @@ class ParserTest {
     }
 
     @Test
+    void sortingByTheAggregateWithItsFieldRepeatedSortsByTheAggregate() {
+        assertThat(parse("products | group brand | avg rating | sort avg rating desc"))
+                .isEqualTo(parse("products | group brand | avg rating | sort avg desc"));
+    }
+
+    @Test
+    void sortingByADifferentAggregateSaysHowToSortByTheAggregate() {
+        assertThatThrownBy(() -> parse("products | group brand | avg rating | sort avg price desc"))
+                .isInstanceOf(DslParseException.class).hasMessageContaining("sort by the aggregate's name alone")
+                .hasMessageContaining("'sort avg desc'");
+        assertThatThrownBy(() -> parse("products | sort max price")).isInstanceOf(DslParseException.class)
+                .hasMessageContaining("'sort max desc'");
+    }
+
+    @Test
     void sortMultipleKeys() {
         AstQuery q = parse("books | sort year desc, title asc");
         assertThat(q.sort()).hasSize(2);
@@ -202,9 +217,10 @@ class ParserTest {
     }
 
     @Test
-    void duplicateFilterIsRejected() {
-        assertThatThrownBy(() -> parse("books | filter a == 1 | filter b == 2")).isInstanceOf(DslParseException.class)
-                .hasMessageContaining("duplicate 'filter'");
+    void repeatedFiltersAreCombinedButOtherStagesAppearOnce() {
+        assertThat(parse("books | filter a == 1 | filter b == 2")).isEqualTo(parse("books | filter a == 1 and b == 2"));
+        assertThatThrownBy(() -> parse("books | sort a | sort b")).isInstanceOf(DslParseException.class)
+                .hasMessageContaining("duplicate 'sort'");
     }
 
     @Test
@@ -270,6 +286,13 @@ class ParserTest {
     void unsupportedWithReasonThrowsUnsupportedRequest() {
         assertThatThrownBy(() -> parse("unsupported \"no publisher field\"")).isInstanceOfSatisfying(
                 UnsupportedRequestException.class, e -> assertThat(e.reason()).isEqualTo("no publisher field"));
+    }
+
+    @Test
+    void aSingleQuotedReasonIsAcceptedLikeADoubleQuotedOne() {
+        assertThatThrownBy(() -> parse("unsupported 'group only works on fields of orders'")).isInstanceOfSatisfying(
+                UnsupportedRequestException.class,
+                e -> assertThat(e.reason()).isEqualTo("group only works on fields of orders"));
     }
 
     @Test

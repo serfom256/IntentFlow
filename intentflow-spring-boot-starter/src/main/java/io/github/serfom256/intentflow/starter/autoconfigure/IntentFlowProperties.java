@@ -28,7 +28,7 @@ public record IntentFlowProperties(@DefaultValue("true") boolean enabled, @Nulla
 
     public record Llm(@Nullable String provider, @Nullable URI baseUrl, @Nullable String model,
             @DefaultValue("") String apiKey, @DefaultValue("60s") Duration timeout,
-            @DefaultValue("16000") int maxTokens, @DefaultValue("1") int maxRepairs,
+            @DefaultValue("16000") int maxTokens, @DefaultValue("2") int maxRepairs,
             @DefaultValue("Authorization") String apiKeyHeader, @DefaultValue Map<String, String> headers,
             @Nullable URI proxy, @DefaultValue("2") int maxRetries, @DefaultValue("500ms") Duration retryBackoff,
             @DefaultValue("30s") Duration healthInterval, @DefaultValue Concurrency concurrency,

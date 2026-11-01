@@ -1,6 +1,7 @@
 package io.github.serfom256.intentflow.core.pipeline.impl;
 
 import io.github.serfom256.intentflow.core.ErrorCode;
+import io.github.serfom256.intentflow.core.IntentFlowException;
 import io.github.serfom256.intentflow.core.api.AggregateRow;
 import io.github.serfom256.intentflow.core.api.Aggregation;
 import io.github.serfom256.intentflow.core.api.IntentContext;
@@ -34,6 +35,7 @@ import io.github.serfom256.intentflow.core.pipeline.AccessDeniedException;
 import io.github.serfom256.intentflow.core.pipeline.AccessPolicy;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
 import io.github.serfom256.intentflow.core.pipeline.AuditLog;
+import io.github.serfom256.intentflow.core.pipeline.Diagnostic;
 import io.github.serfom256.intentflow.core.pipeline.DslCache;
 import io.github.serfom256.intentflow.core.pipeline.DslCacheKey;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
@@ -346,7 +348,8 @@ public final class DefaultIntentPipeline implements IntentPipeline {
                 repairs++;
                 long llmStart = System.nanoTime();
                 DslSource failed = dsl;
-                dsl = askLlm(true, expectedName, () -> llm.repairDsl(normalized, scope, failed, rejected.getMessage()));
+                String error = explained(rejected, failed.value());
+                dsl = askLlm(true, expectedName, () -> llm.repairDsl(normalized, scope, failed, error));
                 tokens = tokens.plus(dsl.usage());
                 trail.dsl = dsl.value();
                 trail.tokens = tokens;
@@ -393,6 +396,15 @@ public final class DefaultIntentPipeline implements IntentPipeline {
         trail.query = query;
         log.debug("Query: {} binds={}", query.sql(), LogValues.values(logValues, query.values()));
         return new Compiled(normalized, dsl, cached, validated, query, start, repairs, tokens, paging);
+    }
+
+    private static String explained(IntentFlowException rejected, String dsl) {
+        Optional<Diagnostic> diagnostic = switch (rejected) {
+        case DslParseException e -> e.diagnostic();
+        case ValidationException e -> e.diagnostic();
+        default -> Optional.empty();
+        };
+        return diagnostic.orElseGet(() -> Diagnostic.of(rejected.getMessage())).render(dsl);
     }
 
     private DslSource askLlm(boolean repair, @Nullable ServiceName service, Supplier<DslSource> call) {

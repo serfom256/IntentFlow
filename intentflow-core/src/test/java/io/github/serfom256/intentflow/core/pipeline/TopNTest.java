@@ -110,4 +110,11 @@ class TopNTest {
         assertThatThrownBy(() -> validate("orders | top 1000 by total")).isInstanceOf(ValidationException.class)
                 .hasMessageContaining("exceeds maxTake");
     }
+
+    @Test
+    void topByARelatedFieldPointsToSortAndTake() {
+        assertThatThrownBy(() -> validate("orders | top 5 by customer.country desc"))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("use sort and take: 'sort customer.country desc | take 5'");
+    }
 }

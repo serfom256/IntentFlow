@@ -20,7 +20,7 @@ import java.time.format.DateTimeParseException;
 public final class ClickHouseDialect implements SqlDialect {
 
     private static final SqlCapabilities CAPABILITIES = new SqlCapabilities(true, true, false, true, false,
-            Integer.MAX_VALUE, 65_535);
+            Integer.MAX_VALUE, 65_535, false);
 
     private static final DateTimeFormatter SECONDS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter MICROS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");

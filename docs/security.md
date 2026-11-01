@@ -84,8 +84,8 @@ then checks the parsed query against the caller's view:
 
 Questions longer than `intentflow.max-question-length` (2000 characters) are rejected before the model is called.
 
-A rejected answer goes back to the model once (`intentflow.llm.max-repairs`) with the validator's message, and then
-fails with `ValidationException`.
+A rejected answer goes back to the model up to twice (`intentflow.llm.max-repairs`) with the validator's message, and
+then fails with `ValidationException`.
 
 ### SQL generation and execution
 

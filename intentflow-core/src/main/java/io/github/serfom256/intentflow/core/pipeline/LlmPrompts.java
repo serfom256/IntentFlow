@@ -59,7 +59,10 @@ public final class LlmPrompts {
 
     private static final String RELATIONS = """
             - <relation>.<field> filters and sorts by a related service's field, e.g. customer.country == "DE".
-              Not in group or expressions.
+              Through a relation to many rows it keeps the rows with at least one match: customers | filter
+              orders.status == "CANCELLED" lists customers who have a cancelled order. <relation>.latest.<field> and
+              <relation>.earliest.<field> test only the newest or oldest related row: orders.latest.status ==
+              "CANCELLED" means the last order was cancelled. Not in group or expressions.
             """;
 
     private static final String EXAMPLES = """
@@ -79,7 +82,7 @@ public final class LlmPrompts {
     }
 
     public static String repair(String error) {
-        return "That query was rejected: " + error + ". Reply with a corrected query only, "
+        return "That query was rejected:\n\n" + error + "\n\nReply with a corrected query only, "
                 + "or unsupported \"<reason>\" if the request cannot be expressed.";
     }
 

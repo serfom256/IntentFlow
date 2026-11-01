@@ -63,7 +63,7 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
     @IntentService(value = "orders", table = "rel_order", uri = "/orders/{{id}}", defaultSort = "id")
     @IntentRelation(name = "customer", service = "customers", from = "customer_id", to = "id")
     public record Order(@IntentField long id, @IntentField long customerId, @IntentField String status,
-            @IntentField BigDecimal total) {
+            @IntentField BigDecimal total, @IntentField LocalDateTime placedAt) {
     }
 
     @IntentService(value = "notes", table = "conf_note", uri = "/notes/{{id}}", defaultSort = "id", restriction = "deleted = 0")
@@ -141,6 +141,24 @@ public abstract class DialectConformanceTest extends ExecutorDifferentialTest {
                 .containsExactly(2L, 3L);
         assertThat(ids("customers | filter not (orders.status == \"CANCELLED\")", Customer.class)).containsExactly(1L,
                 2L, 4L);
+    }
+
+    @Test
+    void latestAndEarliestTestOneRelatedRow() {
+        assertThat(ids("customers | filter orders.status == \"CANCELLED\"", Customer.class)).containsExactly(3L);
+        if (!database().dialect().capabilities().nestedCorrelation()) {
+            assertThatThrownBy(() -> ids("customers | filter orders.latest.status == \"PAID\"", Customer.class))
+                    .isInstanceOfSatisfying(ValidationException.class,
+                            e -> assertThat(e.code()).isEqualTo(ErrorCode.UNSUPPORTED));
+            return;
+        }
+        assertThat(ids("customers | filter orders.latest.status == \"CANCELLED\"", Customer.class)).containsExactly(3L);
+        assertThat(ids("customers | filter orders.latest.status == \"PAID\"", Customer.class)).containsExactly(1L, 2L);
+        assertThat(ids("customers | filter orders.earliest.status == \"PAID\"", Customer.class)).containsExactly(2L,
+                3L);
+        assertThat(
+                ids("customers | filter orders.latest.status == \"PAID\" and orders.status == \"NEW\"", Customer.class))
+                .containsExactly(1L);
     }
 
     @Test

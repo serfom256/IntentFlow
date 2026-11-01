@@ -55,6 +55,7 @@ import io.github.serfom256.intentflow.core.dsl.Punctuation;
 import io.github.serfom256.intentflow.core.dsl.PunctuationToken;
 import io.github.serfom256.intentflow.core.dsl.StringToken;
 import io.github.serfom256.intentflow.core.dsl.Token;
+import io.github.serfom256.intentflow.core.pipeline.Diagnostic;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import io.github.serfom256.intentflow.core.pipeline.UnsupportedRequestException;
 import lombok.RequiredArgsConstructor;
@@ -62,11 +63,14 @@ import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public final class DefaultParser implements Parser {
 
@@ -146,12 +150,13 @@ public final class DefaultParser implements Parser {
             }
             switch (kw.keyword()) {
             case FILTER -> {
-                once(stages, "filter", t);
-                stages.filter = parseOrExpr();
+                advance();
+                FilterExpr condition = parseFilter(stages, t);
+                stages.filter = stages.filter == null ? condition : new And(stages.filter, condition);
             }
             case SORT -> {
                 once(stages, "sort", t);
-                stages.sort = parseSort();
+                stages.sort = parseSort(stages);
             }
             case SKIP -> {
                 once(stages, "skip", t);
@@ -167,9 +172,32 @@ public final class DefaultParser implements Parser {
 
         private void once(Stages stages, String stage, Token at) {
             if (!stages.seen.add(stage)) {
-                throw error("duplicate '" + stage + "' stage", at);
+                throw error("duplicate '" + stage + "' stage",
+                        Diagnostic.of("'" + stage + "' appears twice").at(start(at), end(at), "second '" + stage + "'")
+                                .note("each stage appears at most once")
+                                .help(stage.equals("sort") ? "list every key in one sort: sort rating desc, price"
+                                        : "keep one '" + stage + "' stage"),
+                        at);
             }
             advance();
+        }
+
+        private FilterExpr parseFilter(Stages stages, Token at) {
+            if (stages.function == null) {
+                return parseOrExpr();
+            }
+            try {
+                return parseOrExpr();
+            } catch (DslParseException e) {
+                throw error("a filter after an aggregate cannot use the aggregated value",
+                        Diagnostic.of("a filter cannot test the aggregated value").at(start(at), end(at), "this filter")
+                                .note("filter keeps rows before they are grouped; a condition on a count, sum or "
+                                        + "average (like SQL's HAVING) cannot be expressed")
+                                .help("put conditions on the rows themselves before the group stage, e.g. "
+                                        + "products | filter stock > 0 | group category | avg price; "
+                                        + "for a condition on the aggregate reply unsupported \"<reason>\""),
+                        at);
+            }
         }
 
         private void parseAggregate(Stages stages, AggregateFunction function, Token at) {
@@ -202,7 +230,32 @@ public final class DefaultParser implements Parser {
                 throw error("expected 'by' and an order in 'top', e.g. top 3 per category by rating desc", by);
             }
             advance();
-            return new TopN(count, partition, parseSort());
+            int first = pos;
+            List<SortKey> order = parseSort(null);
+            Token next = peek();
+            if (next instanceof OperatorToken op && op.operator() != Operator.CONTAINS) {
+                int last = pos;
+                while (last + 1 < tokens.size() && !(tokens.get(last + 1) instanceof EofToken)
+                        && !(tokens.get(last + 1) instanceof PunctuationToken p && p.punctuation() == Punctuation.PIPE)
+                        && !(tokens.get(last + 1) instanceof IdentifierToken w && w.name().equals("by"))) {
+                    last++;
+                }
+                Token from = tokens.get(first);
+                throw error("'top ... by' needs fields to rank by, not a condition",
+                        Diagnostic.of("'top ... by' ranks rows by fields, not by conditions")
+                                .at(start(from), end(tokens.get(last)), "a condition")
+                                .note("a condition on a related field, like orders.status == \"NEW\", keeps the rows "
+                                        + "that have at least one matching related row")
+                                .help("move the condition into the filter: filter " + Diagnostic.MARKED),
+                        from);
+            }
+            if (next instanceof IdentifierToken word && word.name().equals("by")) {
+                throw error("'top' takes one 'by' list",
+                        Diagnostic.of("'top' takes one 'by' list").at(start(next), end(next), "second 'by'").help(
+                                "separate the order keys with commas: top 3 per category by rating desc, price"),
+                        next);
+            }
+            return new TopN(count, partition, order);
         }
 
         List<ValueExpr> parseGroupList() {
@@ -241,6 +294,15 @@ public final class DefaultParser implements Parser {
                 throw error("expected field name after '" + first + ".'", t);
             }
             advance();
+            if ((next.name().equals("latest") || next.name().equals("earliest")) && peekPunct(Punctuation.DOT)) {
+                advance();
+                Token field = peek();
+                if (!(field instanceof IdentifierToken last)) {
+                    throw error("expected field name after '" + first + "." + next.name() + ".'", field);
+                }
+                advance();
+                return first + "." + next.name() + "." + last.name();
+            }
             return first + "." + next.name();
         }
 
@@ -439,8 +501,14 @@ public final class DefaultParser implements Parser {
                 expectPunct(Punctuation.RPAREN, "expected ')'");
                 return new CastExpr(value, type);
             }
-            ExprFunction function = ExprFunction.fromKeyword(name.name())
-                    .orElseThrow(() -> error("unknown function '" + name.name() + "'", name));
+            ExprFunction function = ExprFunction.fromKeyword(name.name()).orElseThrow(() -> error(
+                    "unknown function '" + name.name() + "'",
+                    Diagnostic.of("unknown function '" + name.name() + "'").at(start(name), end(name), "not a function")
+                            .help("the functions are "
+                                    + Arrays.stream(ExprFunction.values()).map(ExprFunction::keyword)
+                                            .collect(Collectors.joining(", "))
+                                    + "; count, sum, avg, min and max are stages after '|', not functions"),
+                    name));
             List<ValueExpr> args = new ArrayList<>();
             if (!peekPunct(Punctuation.RPAREN)) {
                 args.add(parseValueExpr());
@@ -506,22 +574,33 @@ public final class DefaultParser implements Parser {
             throw error("expected value literal (string, number, true, false, null)", t);
         }
 
-        List<SortKey> parseSort() {
+        List<SortKey> parseSort(@Nullable Stages stages) {
             List<SortKey> keys = new ArrayList<>();
-            keys.add(parseSortItem());
+            keys.add(parseSortItem(stages));
             while (peekPunct(Punctuation.COMMA)) {
                 advance();
-                keys.add(parseSortItem());
+                keys.add(parseSortItem(stages));
             }
             return keys;
         }
 
-        SortKey parseSortItem() {
+        SortKey parseSortItem(@Nullable Stages stages) {
             Token t = peek();
             if (!startsValue(t)) {
                 throw error("expected sort field", t);
             }
             ValueExpr value = parseValueExpr();
+            if (value instanceof FieldRef f && AggregateFunction.fromKeyword(f.field().value()).isPresent()
+                    && startsValue(peek())) {
+                Token repeated = peek();
+                ValueExpr field = parseValueExpr();
+                if (stages == null || stages.function == null
+                        || !stages.function.keyword().equals(f.field().value().toLowerCase(Locale.ROOT))
+                        || !field.equals(stages.aggregated)) {
+                    throw error("sort by the aggregate's name alone, e.g. 'sort " + f.field().value() + " desc'",
+                            repeated);
+                }
+            }
             SortKey.Direction dir = SortKey.Direction.ASC;
             if (peek() instanceof KeywordToken kw) {
                 if (kw.keyword() == Keyword.ASC) {
@@ -608,13 +687,32 @@ public final class DefaultParser implements Parser {
         private void expectEof() {
             Token t = peek();
             if (!(t instanceof EofToken)) {
-                throw error("unexpected token after pipeline", t);
+                throw error("unexpected token after pipeline",
+                        Diagnostic.of("expected '|' and the next stage, or the end of the query")
+                                .at(start(t), end(t), "not expected here")
+                                .note("the stages are filter, group, count, sum, avg, min, max, top, sort, skip and "
+                                        + "take, each after '|'"),
+                        t);
             }
         }
 
-        private static DslParseException error(String message, Token at) {
+        private DslParseException error(String message, Token at) {
+            return error(message, Diagnostic.of(message).at(start(at), end(at), ""), at);
+        }
+
+        private DslParseException error(String message, Diagnostic diagnostic, Token at) {
             Position p = at.position();
-            return new DslParseException(message + " at line " + p.line() + ", column " + p.column());
+            return new DslParseException(message + " at line " + p.line() + ", column " + p.column(), diagnostic);
+        }
+
+        private static int start(Token at) {
+            return at.position().offset();
+        }
+
+        private int end(Token at) {
+            int index = tokens.indexOf(at);
+            return index >= 0 && index + 1 < tokens.size() ? tokens.get(index + 1).position().offset()
+                    : at.position().offset() + 1;
         }
     }
 }

@@ -68,7 +68,8 @@ class RepairTest {
         assertThat(response.trace().dsl()).isEqualTo("books | filter title == \"x\"");
         assertThat(response.trace().repairs()).isEqualTo(1);
         assertThat(errors).singleElement().asString()
-                .startsWith("books | filter author == \"x\" -> field 'author' is not declared");
+                .startsWith("books | filter author == \"x\" -> error: unknown field 'author'")
+                .contains("1 | books | filter author == \"x\"").contains("^^^^^^ not a field here");
         assertThat(pipeline.resolve(IntentRequests.of("books by x")).trace().cached()).isTrue();
         assertThat(generated).isEqualTo(1);
     }

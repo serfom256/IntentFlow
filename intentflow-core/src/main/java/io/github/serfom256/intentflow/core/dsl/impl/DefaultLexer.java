@@ -15,6 +15,7 @@ import io.github.serfom256.intentflow.core.dsl.PunctuationToken;
 import io.github.serfom256.intentflow.core.dsl.StringToken;
 import io.github.serfom256.intentflow.core.dsl.Token;
 import io.github.serfom256.intentflow.core.dsl.factories.Positions;
+import io.github.serfom256.intentflow.core.pipeline.Diagnostic;
 import io.github.serfom256.intentflow.core.pipeline.DslParseException;
 import org.jspecify.annotations.Nullable;
 
@@ -75,10 +76,19 @@ public final class DefaultLexer implements Lexer {
                 identifier(pos);
             } else if (Character.isDigit(c) || negativeNumber(c)) {
                 number(pos);
-            } else if (c == '"') {
-                string(pos);
+            } else if (c == '"' || c == '\'') {
+                string(pos, c);
             } else if (!symbol(c, pos)) {
-                throw new DslParseException("unexpected character '" + c + "' at line " + line + ", column " + column);
+                Diagnostic diagnostic = Diagnostic.of("unexpected character '" + c + "'").at(i, i + 1,
+                        "not part of the query language");
+                diagnostic = switch (c) {
+                case '=' -> diagnostic.help("compare with '==': price == 10");
+                case ';' -> diagnostic.help("end the query without ';'");
+                case '`' -> diagnostic.help("reply with the bare query, without markdown");
+                default -> diagnostic;
+                };
+                throw new DslParseException("unexpected character '" + c + "' at line " + line + ", column " + column,
+                        diagnostic);
             }
         }
 
@@ -118,11 +128,11 @@ public final class DefaultLexer implements Lexer {
             }
         }
 
-        private void string(Position pos) {
+        private void string(Position pos, char quote) {
             String unterminated = "unterminated string starting at line " + line + ", column " + column;
             advance(1);
             StringBuilder sb = new StringBuilder();
-            while (i < n && s.charAt(i) != '"') {
+            while (i < n && s.charAt(i) != quote) {
                 char ch = s.charAt(i);
                 if (ch == '\n') {
                     throw new DslParseException(unterminated);
@@ -144,7 +154,7 @@ public final class DefaultLexer implements Lexer {
             }
             char next = s.charAt(i);
             return switch (next) {
-            case '"', '\\' -> next;
+            case '"', '\'', '\\' -> next;
             case 'n' -> '\n';
             case 't' -> '\t';
             default ->

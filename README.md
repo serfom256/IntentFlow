@@ -59,10 +59,10 @@ Requirements: Java 21+, Spring Boot 3.2+ or 4.x, an OpenAI-compatible chat API (
 
 ```kotlin
 dependencies {
-    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.9.2")
-    implementation("io.github.serfom256:intentflow-jdbc:0.9.2")
-    implementation("io.github.serfom256:intentflow-postgresql:0.9.2")
-    implementation("io.github.serfom256:intentflow-openai:0.9.2")
+    implementation("io.github.serfom256:intentflow-spring-boot-starter:0.9.3")
+    implementation("io.github.serfom256:intentflow-jdbc:0.9.3")
+    implementation("io.github.serfom256:intentflow-postgresql:0.9.3")
+    implementation("io.github.serfom256:intentflow-openai:0.9.3")
 }
 ```
 
@@ -260,6 +260,16 @@ A relation condition means "some related row matches" and becomes an `EXISTS` su
 duplicated; `not (...)` means "no related row matches". Conditions on one relation within an `and` apply to the same
 related row.
 
+`<relation>.latest.<field>` and `<relation>.earliest.<field>` test only the newest or oldest related row, ordered by
+the first date in the related service's `defaultSort` (or its only date field):
+
+```
+customers | filter orders.latest.status == "CANCELLED"
+customers | filter orders.earliest.total > 1000
+```
+
+They work in `filter` only, and not on ClickHouse, whose subqueries cannot refer two levels out.
+
 Your ORM still loads the entities, so associations behave as usual:
 
 - **JPA (Hibernate)** loads the matching ids with JPQL. A named entity graph `<Entity>.intentflow` decides which
@@ -329,7 +339,7 @@ overrides it.
 | ----------------------- | ----------------- |
 | `intentflow-postgresql` | PostgreSQL        |
 | `intentflow-mysql`      | MySQL 8+, MariaDB |
-| `intentflow-oracle`     | Oracle Database 19c+ (tested on 21c XE and 23ai Free) |
+| `intentflow-oracle`     | Oracle Database 23ai (tested on 23ai Free); the SQL avoids 23ai-only syntax, but 19c and 21c are not tested |
 | `intentflow-clickhouse` | ClickHouse 26.3; no sorting by a related field; pages by offset, since keys are not enforced |
 | `intentflow-h2`         | H2 2.x, with or without `DATABASE_TO_LOWER` |
 | `intentflow-cassandra`  | Cassandra 5       |
@@ -492,7 +502,7 @@ and the UI packages; `./gradlew build` fails while they are out of date.
 | intentflow.llm.rate-limit.redis.prefix, .fail-open | intentflow:rate-limit:, true | Key prefix of the buckets in Redis or Valkey (the `spring.data.redis.*` connection); `fail-open: false` refuses questions while it is unreachable |
 | intentflow.llm.rate-limit.jdbc.table, .create-table, .fail-open | intentflow_rate_limit, true, true | Table of the buckets in the application's database; with Liquibase include `db/intentflow/intentflow-ratelimit.changelog.yaml` and set `create-table: false` |
 | intentflow.llm.rate-limit.zookeeper.connect, .path, .fail-open | -, /intentflow/rate-limit, true | ZooKeeper to keep the buckets in (or a `CuratorFramework` bean); `fail-open: false` refuses questions while it is unreachable |
-| intentflow.llm.max-repairs            | 1                           | Retries with the error when a query is rejected     |
+| intentflow.llm.max-repairs            | 2                           | Retries with the error when a query is rejected     |
 | intentflow.cache.ttl                  | 10m                         | How long a translation is cached                    |
 | intentflow.cache.max-size             | 10000                       | Maximum cached translations                         |
 | intentflow.paging.cursor-key          | random per instance         | Secret of at least 32 bytes that signs page cursors; the same on every instance, so next pages skip the LLM anywhere |

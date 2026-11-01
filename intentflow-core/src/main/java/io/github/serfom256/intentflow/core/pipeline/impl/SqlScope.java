@@ -24,6 +24,7 @@ import java.util.Map;
 final class SqlScope {
 
     static final String RELATED_ALIAS = "intentflow_r";
+    static final String PRECEDING_ALIAS = "intentflow_p";
     private static final String JOIN_ALIAS = "intentflow_j";
 
     private final PlanContext context;
@@ -56,7 +57,15 @@ final class SqlScope {
     }
 
     SqlScope inner(String relationName) {
-        return new SqlScope(context, related(relationName), RELATED_ALIAS, true, Map.of());
+        return inner(relationName, RELATED_ALIAS);
+    }
+
+    SqlScope inner(String relationName, String innerAlias) {
+        return new SqlScope(context, related(relationName), innerAlias, true, Map.of());
+    }
+
+    ServiceDescriptor service() {
+        return service;
     }
 
     PlanContext context() {
@@ -179,8 +188,12 @@ final class SqlScope {
     }
 
     SqlPredicate correlation(String relationName) {
+        return correlation(relationName, inner(relationName));
+    }
+
+    SqlPredicate correlation(String relationName, SqlScope inner) {
         ServiceRelation relation = relation(relationName);
-        return new SqlPredicate.Compare(inner(relationName).column(relation.to()), "=",
+        return new SqlPredicate.Compare(inner.column(relation.to()), "=",
                 new SqlExpr.Column(reference(), field(relation.from()).column().value()));
     }
 

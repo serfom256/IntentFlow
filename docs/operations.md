@@ -17,7 +17,7 @@ step.
 | ------------------------------------------------ | ------- | ----------------------------------------------------------------- |
 | intentflow.llm.timeout                           | 60s     | Per attempt. For interactive search, 10–20 seconds fails faster    |
 | intentflow.llm.max-retries, .retry-backoff       | 2, 500ms | Each retry after a 429 or 5xx is another attempt of up to `timeout` |
-| intentflow.llm.max-repairs                       | 1       | Each repair is another LLM call; 0 fails a rejected answer at once |
+| intentflow.llm.max-repairs                       | 2       | Each repair is another LLM call; 0 fails a rejected answer at once |
 | intentflow.sql.statement-timeout                 | 30s     | Keep it below your HTTP timeout                                    |
 
 The longest a single question can take is about `timeout × (1 + max-retries) × (1 + max-repairs)`, plus the same

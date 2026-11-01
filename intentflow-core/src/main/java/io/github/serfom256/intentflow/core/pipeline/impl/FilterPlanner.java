@@ -19,6 +19,8 @@ import io.github.serfom256.intentflow.core.ast.TextLiteral;
 import io.github.serfom256.intentflow.core.catalog.FieldMapping;
 import io.github.serfom256.intentflow.core.catalog.FieldType;
 import io.github.serfom256.intentflow.core.catalog.LogicalFieldName;
+import io.github.serfom256.intentflow.core.catalog.SortKey;
+import io.github.serfom256.intentflow.core.pipeline.Diagnostic;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.sql.Optimization;
 import io.github.serfom256.intentflow.core.sql.plan.Select;
@@ -135,12 +137,44 @@ final class FilterPlanner {
     }
 
     private static SqlPredicate exists(String relation, List<FilterExpr> parts, SqlScope outer) {
-        SqlScope inner = outer.inner(relation);
+        String base = RelationPaths.base(relation);
+        SqlScope inner = outer.inner(base);
         List<SqlPredicate> where = new ArrayList<>();
-        where.add(outer.correlation(relation));
+        where.add(outer.correlation(base));
         parts.forEach(part -> where.add(plan(RelationPaths.stripRelation(part, relation), inner)));
+        String modifier = RelationPaths.modifier(relation);
+        if (modifier != null && !outer.context().capabilities().nestedCorrelation()) {
+            throw new ValidationException(ErrorCode.UNSUPPORTED,
+                    "'" + relation + "' needs a subquery inside a subquery, which " + outer.context().dialectName()
+                            + " does not support",
+                    Map.of(), Diagnostic.of("'" + relation + "' cannot be answered on " + outer.context().dialectName())
+                            .near(relation, "needs nested subqueries").help("reply unsupported \"<reason>\""));
+        }
+        if (modifier != null) {
+            where.add(new SqlPredicate.Not(new SqlPredicate.Exists(preceding(base, modifier, inner, outer))));
+        }
         return new SqlPredicate.Exists(
                 Select.from(inner.from(), List.of(new Select.Value(new SqlExpr.Inline(1), null)), inner.where(where)));
+    }
+
+    private static Select preceding(String relation, String modifier, SqlScope row, SqlScope outer) {
+        SqlScope other = outer.inner(relation, SqlScope.PRECEDING_ALIAS);
+        List<SortKey> keys = RelationPaths.recency(other.service(), modifier).orElseThrow();
+        List<SqlPredicate> alternatives = new ArrayList<>();
+        for (int i = 0; i < keys.size(); i++) {
+            List<SqlPredicate> parts = new ArrayList<>();
+            for (int j = 0; j < i; j++) {
+                parts.add(new SqlPredicate.Compare(other.column(keys.get(j).field()), "=",
+                        row.column(keys.get(j).field())));
+            }
+            parts.add(new SqlPredicate.Compare(other.column(keys.get(i).field()),
+                    keys.get(i).direction() == SortKey.Direction.DESC ? ">" : "<", row.column(keys.get(i).field())));
+            alternatives.add(parts.size() == 1 ? parts.getFirst() : new SqlPredicate.And(parts));
+        }
+        List<SqlPredicate> where = new ArrayList<>();
+        where.add(outer.correlation(relation, other));
+        where.add(alternatives.size() == 1 ? alternatives.getFirst() : new SqlPredicate.Or(alternatives));
+        return Select.from(other.from(), List.of(new Select.Value(new SqlExpr.Inline(1), null)), other.where(where));
     }
 
     private static SqlPredicate compare(Compare c, SqlScope scope) {

@@ -37,6 +37,7 @@ import io.github.serfom256.intentflow.core.catalog.ServiceRelation;
 import io.github.serfom256.intentflow.core.catalog.SortKey;
 import io.github.serfom256.intentflow.core.catalog.factories.LogicalFieldNames;
 import io.github.serfom256.intentflow.core.pipeline.AstValidator;
+import io.github.serfom256.intentflow.core.pipeline.Diagnostic;
 import io.github.serfom256.intentflow.core.pipeline.ValidatedQuery;
 import io.github.serfom256.intentflow.core.pipeline.ValidationException;
 import io.github.serfom256.intentflow.core.pipeline.factories.AstValidators;
@@ -97,7 +98,10 @@ public final class DefaultAstValidator implements AstValidator {
             throw new ValidationException(
                     ErrorCode.LIMIT_EXCEEDED, "take value " + take + " exceeds maxTake " + service.maxTake().value()
                             + " for service '" + service.name().value() + "'",
-                    Map.of("limit", service.maxTake().value()));
+                    Map.of("limit", service.maxTake().value()),
+                    Diagnostic.of("take " + take + " is more than '" + service.name().value() + "' returns at once")
+                            .near("take " + take, "too many rows")
+                            .help("use take " + service.maxTake().value() + " or less"));
         }
 
         return ValidatedQueries.of(service, ast, fields.related);
@@ -123,6 +127,16 @@ public final class DefaultAstValidator implements AstValidator {
         for (SortKey key : top.order()) {
             if (key instanceof ExprSortKey e) {
                 fields.types.check(e.expression());
+            } else if (top.partition().isEmpty() && key.field().value().contains(".")) {
+                String direction = key.direction() == SortKey.Direction.DESC ? " desc" : "";
+                String instead = "sort " + key.field().value() + direction + " | take " + top.count();
+                throw new ValidationException(
+                        ErrorCode.UNSUPPORTED, "'top' only works on fields of '" + fields.service.name().value()
+                                + "'; for the first rows by " + "a related field use sort and take: '" + instead + "'",
+                        Map.of(),
+                        Diagnostic.of("'top' cannot rank by the related field '" + key.field().value() + "'")
+                                .near(key.field().value(), "a related field")
+                                .help("for the first rows by a related field use sort and take: " + instead));
             } else {
                 fields.own(key.field(), "top");
             }
@@ -178,8 +192,20 @@ public final class DefaultAstValidator implements AstValidator {
 
         FieldMapping own(LogicalFieldName name, String stage) {
             if (name.value().contains(".")) {
-                throw new ValidationException(ErrorCode.UNSUPPORTED, "'" + stage + "' only works on fields of '"
-                        + service.name().value() + "', not on related field '" + name.value() + "'", Map.of());
+                if (stage.equals("expression")) {
+                    throw new ValidationException(ErrorCode.UNSUPPORTED,
+                            "related field '" + name.value() + "' cannot be used inside an expression", Map.of(),
+                            Suggestions.relatedInExpression(name.value()));
+                }
+                throw new ValidationException(ErrorCode.UNSUPPORTED,
+                        "'" + stage + "' only works on fields of '" + service.name().value()
+                                + "', not on related field '" + name.value() + "'",
+                        Map.of(),
+                        Diagnostic.of("'" + stage + "' cannot use the related field '" + name.value() + "'")
+                                .near(name.value(), "a related field")
+                                .note("'" + stage + "' works on the fields of '" + service.name().value() + "' only")
+                                .help("use a field of '" + service.name().value() + "' instead; if the question "
+                                        + "needs the related field here, reply unsupported \"<reason>\""));
             }
             return lookup(queryable, name.value(), name.value(), stage);
         }
@@ -203,7 +229,28 @@ public final class DefaultAstValidator implements AstValidator {
                         + relation.to().value() + "' of '" + target.name().value() + "'");
             }
             related.put(relationName, target);
-            return lookup(queryableFields(target), name.value().substring(dot + 1), name.value(), stage);
+            String rest = name.value().substring(dot + 1);
+            int next = rest.indexOf('.');
+            if (next > 0 && RelationPaths.MODIFIERS.contains(rest.substring(0, next))) {
+                String path = relationName + "." + rest.substring(0, next);
+                if (!stage.equals("filter")) {
+                    throw new ValidationException(ErrorCode.UNSUPPORTED,
+                            "'" + path + "' only works in filter, not in '" + stage + "'", Map.of(),
+                            Diagnostic.of("'" + path + "' only works in filter").near(name.value(), "used in " + stage)
+                                    .help("filter by it instead, e.g. filter " + name.value() + " == ..."));
+                }
+                if (RelationPaths.recency(target, rest.substring(0, next)).isEmpty()) {
+                    throw new ValidationException(ErrorCode.UNSUPPORTED,
+                            "'" + path + "' needs a date that orders '" + target.name().value() + "'", Map.of(),
+                            Diagnostic.of("'" + path + "' needs a date that orders '" + target.name().value() + "'")
+                                    .near(name.value(), "no date decides which row is " + rest.substring(0, next))
+                                    .note("'" + rest.substring(0, next) + "' uses the first date in the default "
+                                            + "sort of '" + target.name().value() + "', or its only date field")
+                                    .help("reply unsupported \"<reason>\""));
+                }
+                return lookup(queryableFields(target), rest.substring(next + 1), name.value(), stage);
+            }
+            return lookup(queryableFields(target), rest, name.value(), stage);
         }
 
         private static FieldMapping lookup(Map<String, FieldMapping> fields, String key, String shown, String stage) {
@@ -211,7 +258,7 @@ public final class DefaultAstValidator implements AstValidator {
             if (fm == null) {
                 throw new ValidationException(ErrorCode.UNKNOWN_FIELD,
                         "field '" + shown + "' is not declared or not queryable (referenced in '" + stage + "')",
-                        Map.of("field", shown));
+                        Map.of("field", shown), Suggestions.unknownField(shown, key, fields.keySet()));
             }
             return fm;
         }

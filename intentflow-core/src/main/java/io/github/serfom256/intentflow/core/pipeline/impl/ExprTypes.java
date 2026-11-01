@@ -42,7 +42,8 @@ final class ExprTypes {
             FieldMapping fm = fields.get(name);
             if (fm == null) {
                 throw new ValidationException(ErrorCode.UNKNOWN_FIELD,
-                        "field '" + name + "' is not declared or not queryable", Map.of("field", name));
+                        "field '" + name + "' is not declared or not queryable", Map.of("field", name),
+                        Suggestions.unknownField(name, name, fields.keySet()));
             }
             return fm;
         });
@@ -61,7 +62,8 @@ final class ExprTypes {
         case FieldRef f -> {
             if (f.field().value().contains(".")) {
                 throw new ValidationException(ErrorCode.UNSUPPORTED,
-                        "related field '" + f.field().value() + "' cannot be used inside an expression", Map.of());
+                        "related field '" + f.field().value() + "' cannot be used inside an expression", Map.of(),
+                        Suggestions.relatedInExpression(f.field().value()));
             }
             yield of(fields.apply(f.field().value()));
         }

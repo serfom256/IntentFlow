@@ -53,6 +53,6 @@ class LlmPromptsTest {
     @Test
     void theRepairInstructionCarriesTheError() {
         assertThat(LlmPrompts.repair("field 'author' is not declared"))
-                .startsWith("That query was rejected: field 'author' is not declared.");
+                .startsWith("That query was rejected:\n\nfield 'author' is not declared\n\nReply with");
     }
 }

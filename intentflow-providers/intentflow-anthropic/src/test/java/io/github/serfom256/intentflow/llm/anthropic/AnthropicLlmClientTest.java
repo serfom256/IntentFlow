@@ -78,7 +78,7 @@ class AnthropicLlmClientTest {
                 DslSources.of("books | filter author == \"x\""), "field 'author' is not declared");
 
         assertThat(requests.getFirst()).contains("\"role\":\"assistant\"")
-                .contains("That query was rejected: field 'author' is not declared");
+                .contains("That query was rejected:\\n\\nfield 'author' is not declared");
     }
 
     @Test

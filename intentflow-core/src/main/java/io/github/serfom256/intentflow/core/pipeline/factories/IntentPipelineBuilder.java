@@ -37,7 +37,7 @@ public final class IntentPipelineBuilder {
     private DslParser parser = DslParsers.create();
     private AstValidator validator = AstValidators.create();
     private UriBuilder uriBuilder = UriBuilders.create();
-    private int maxRepairs = 1;
+    private int maxRepairs = 2;
     private int maxQuestionLength = DEFAULT_MAX_QUESTION_LENGTH;
     private AccessPolicy accessPolicy = AccessPolicy.ALLOW_ALL;
     private Supplier<IntentContext> defaultCaller = IntentContexts::anonymous;
